@@ -1,0 +1,61 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml"
+  lang="en"
+  xml:lang="en">
+
+<head>
+
+  <meta http-equiv="Content-Type"
+    content="text/html;
+    charset=utf-8" />
+  <title>CFDG Gallery - CFDG Gallery</title>
+
+  <link rel="stylesheet"  href="../site.css?20081203" type="text/css" />
+  <link rel="stylesheet"  href="gallery.css?20170716" type="text/css" />
+  <link rel="stylesheet"  href="widget-style.css?20081203" type="text/css" />
+  <link rel="stylesheet"  href="github.css" type="text/css" />
+  <link rel="alternate" type="application/rss+xml" 
+     href="uploads/design_feed.xml" title="RSS feed for gallery designs" />
+</head>
+
+<body>
+  <div id="CFAheader">
+        <p>Context Free Art</p>
+  </div>
+  <div id="CFAtitle">
+    <h1>Gallery</h1>
+  </div>
+  <div id="CFAnavbar">
+    <ul>
+      <li><a href="../index.html">Home</a></li>
+      <li><a href="../gallery/index.php">Gallery</a></li>
+      <li><a href="../downloads.html">Download</a></li>
+      <li><a href="https://github.com/MtnViewJohn/context-free/wiki">Documentation</a></li>
+      <li><a href="../phpbb/index.php">Forums</a></li>
+    </ul>
+  </div>
+  <div id="elm-root">
+    <div style="width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: #9A9A9A; font-family: &#39;Source Sans Pro&#39;;">
+        <div style="font-size: 3em;">Building your project!</div>
+        <img src="/_reactor/waiting.gif">
+        <div style="font-size: 1em">With new projects, I need a bunch of extra time to download packages.</div>
+    </div>
+  </div>
+  <div id="CFAfooter"></div>
+  <div id="CFAbook">
+        <a href="../book.html"><img src="graphics/cover-shot-120.png" alt="book cover" /><span class="CFAmessage"><span class="CFAleadin">See our book:</span><br /><span class="CFAtitle">Community of Variation</span></span></a>
+  </div>
+</body>
+
+<script type="text/javascript" src="highlight.pack.js" ></script>
+<script type="text/javascript" src="/_compile/src/Main.elm"></script>
+<script type="text/javascript">
+    var node = document.getElementById('elm-root');
+    while (node.firstChild) {
+        node.removeChild(node.firstChild);
+    }
+    app = Elm.Main.embed(node);
+</script>
+</html>

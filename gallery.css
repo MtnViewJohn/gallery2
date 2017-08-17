@@ -1,0 +1,196 @@
+/* @override http://aluminium.local/~john/cfa2/gallery/gallery.css?20090601 */
+
+form {
+ display:inline;
+}
+
+button {
+	border-style: none;
+	background-color: transparent;
+}
+
+li.rss {
+	background: url(graphics/feed-icon-14x14.png) no-repeat;
+	padding-left: 20px;
+}
+
+a.letterref { 
+    padding: 3px; 
+    font: 12pt Courier, 'Courier New', monospace; 
+}
+a:link.letterref  {color: #fff; text-decoration: none; background-color: #888}
+a:visited.letterref  {color: #fff; text-decoration: none; background-color: #888}
+a:hover.letterref  {color: #000; text-decoration: none; background: transparent; }
+
+
+form input {
+    font-size: 8pt;
+	font-weight: normal;
+	font-style: normal;
+	font-variant: normal;
+}
+fieldset {border:0; margin:0; padding:0;}
+
+.tip {
+    font:12px/14px Arial,Helvetica,sans-serif; 
+    border:solid 1px #666666; width:270px; padding:1px;
+    padding: 4px;
+    position:absolute; z-index:100;
+    visibility:hidden; color:#333333; top:20px;
+    left:90px; background-color:#ffffcc;
+    layer-background-color:#ffffcc;
+}
+                      
+.vupload {  vertical-align: top; }
+.loginarea {
+ padding:2px;
+ margin:0px;
+ font-size:9pt;
+}
+table.upload td {
+	width: 40%;
+	text-align: right;
+	padding-right: 1em;
+}
+
+tr.lupload td {
+	text-align: left;
+}
+table.upload td + td {
+	width: auto;
+	text-align: left;
+}
+.loginform td {
+    padding:0 5px 0 0;
+    border: 0;
+    font-size: 9pt;
+}
+.small {
+    font-size:8pt;
+}
+.thumb {
+ border:1px solid #333333;
+}
+.sm_thumb {
+ border:1px solid #333333;
+}
+.image {
+ border:1px solid #333333;
+}
+.fullimagediv {
+ width:90%;
+ text-align:center;
+}
+.tiledimagediv {
+ width:100%;
+ min-width: 800px;
+ height:800px;
+ text-align:center;
+}
+.tiledthumbdiv {
+ width:300px;
+ height:300px;
+}
+.thumbtable {
+ display:inline;
+ width:800px;
+ text-align:left;
+ border:none;
+}
+.thumbtable td {
+ padding:10px;
+vertical-align: top;
+}
+.sm_thumbtable {
+ display:inline;
+ width:225px;
+ text-align:left;
+ margin:10px;
+ float: left;
+}
+.halfcell { width: 50%; vertical-align: top;
+}
+.commentcell { vertical-align: top; }
+.goRight { float: right; margin: 0; }
+.ccform { background-color: #eee; }
+.thumbcell {
+ width: 300px;
+ vertical-align: top;
+ text-align: right;
+}
+.sm_thumbcell { 
+    width: 100px; 
+    height: 100px;
+    text-align: center;
+    vertical-align: middle;
+}
+table.sm_thumbtable { height: 120px; }
+.status_message {
+ border:1px solid black;
+ padding:10px;
+}
+.topborder {
+ border-top:1px dotted #ccc;
+ padding-top: 10px; 
+}
+.welcometable {
+	padding-bottom: 10px;
+}
+.welcometable td{
+	padding-left: 20px;
+	padding-right: 20px;
+}
+.filediv {
+ padding:10px;
+ margin:5px;
+ font-size:8pt;
+ border:1px solid #5286ed;
+ background-color:#fff;
+}
+.addcommenttext {
+ width:100%;
+ height:120px;
+ font-size:8pt;
+}
+.addcommentdiv {
+ padding: 5px;
+    background-color:#dddddd;
+    font-size:8pt;
+}
+.commentsdiv {
+    font-size:8pt;
+    background-color:#dddddd;
+ padding:8pt;
+ margin:5px;
+ border:1px solid #999999;
+}
+.commentblock {
+ margin: 3px;
+ padding:4px;
+}
+.taghelp { font-size: 8pt; }
+.notesdiv {
+ padding: 5px;
+    background-color:#c4d7ff;
+    border-bottom:1px solid #aaccff;
+    margin-bottom:15px;
+}
+div.ccInfo {margin: 4px 0;}
+div.ccInfo a.ccIcon {float:left; margin-right: 4px;}
+.alert { color:#990000; font-weight:bold; }
+.clearleft { clear: left; }
+textarea { width: 400px; height: 150px; }
+
+textarea.cfdg {
+	width: 100%;
+	height: 300px;
+	font-family: monospace;
+}
+
+.disclaimer {
+    text-align:center;
+    width:400px;
+    margin:30px;
+    color:gray
+}
+.rightcell {text-align: right; padding-left: 1em; padding-right: 1em;}
