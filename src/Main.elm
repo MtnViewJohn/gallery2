@@ -48,7 +48,6 @@ type alias Model =
   , designLookup : Int
   , mainDesign : Maybe Design.Design
   , designList : DesignList
-  , currentLocation : Navigation.Location
   , viewMode : ViewMode
   }
 
@@ -57,7 +56,8 @@ zeroList = DesignList [] "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Nothing zeroList loc Designs, loginSession)
+  (Model Nothing Login.initModel False "" 0 Nothing zeroList Designs, 
+    Cmd.batch [loginSession, Navigation.modifyUrl loc.href])
 
 
 -- URL PARSING
@@ -142,66 +142,52 @@ update msg model =
     NewURL loc ->
       case Url.parseHash route loc of
         Nothing ->
-          ({model | currentLocation = loc}, Cmd.none)
+          (model, Cmd.none)
         Just route ->
           case route of
             Home ->
               ({model | mainDesign = Nothing, 
-                        designList = zeroList, 
-                        currentLocation = loc}, Cmd.none)
+                        designList = zeroList}, Cmd.none)
             DesignID id ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesign id)
             Author name start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("by/" ++ name) start count)
             AuthorInit name ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("by/" ++ name) 0 50)
             Newest start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" start count)
             NewestInit ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" 0 50)
             Oldest start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "oldest" start count)
             OldestInit ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "oldest" 0 50)
             Title start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "title" start count)
             TitleInit ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "title" 0 50)
             TitleIndex title ->
               (model, getTitle title)
             Popular start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "popular" start count)
             PopularInit ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "popular" 0 50)
             RandomDes seed start count ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("random/" ++ (toString seed)) start count)
             RandomInit seed ->
-              ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs },
+              ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("random/" ++ (toString seed)) 0 50)
             RandomSeed ->
               (model, Random.generate NewSeed (Random.int 1 1000000000))
