@@ -36,6 +36,7 @@ type alias DesignList =
   { designs : List Design.Design
   , prevlink : String
   , nextlink : String
+  , thislink : String
   , count : Int
   }
 
@@ -49,15 +50,20 @@ type alias Model =
   , mainDesign : Maybe Design.Design
   , designList : DesignList
   , viewMode : ViewMode
+  , designMode : Design.ViewSize
   }
 
 zeroList : DesignList
-zeroList = DesignList [] "" "" 0
+zeroList = DesignList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Nothing zeroList Designs, 
+  (Model Nothing Login.initModel False "" 0 Nothing zeroList Designs Design.Small, 
     Cmd.batch [loginSession, Navigation.modifyUrl loc.href])
+
+designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
+designMap mapping oldList =
+  { oldList | designs = List.map mapping oldList.designs }
 
 
 -- URL PARSING
@@ -67,18 +73,18 @@ type Route
   = Home
   | DesignID Int
   | Author String Int Int
-  | AuthorInit String
+  | AuthorInit String Int
   | Newest Int Int
-  | NewestInit
+  | NewestInit Int
   | Oldest Int Int
-  | OldestInit
+  | OldestInit Int
   | Title Int Int
-  | TitleInit
+  | TitleInit Int
   | TitleIndex String
   | Popular Int Int
-  | PopularInit
+  | PopularInit Int
   | RandomDes Int Int Int
-  | RandomInit Int
+  | RandomInit Int Int
   | RandomSeed
 
 
@@ -89,18 +95,18 @@ route =
     [ Url.map Home top
     , Url.map DesignID (Url.s "design" </> int)
     , Url.map Author (Url.s "user" </> Url.string </> int </> int)
-    , Url.map AuthorInit (Url.s "user" </> Url.string)
+    , Url.map AuthorInit (Url.s "user" </> Url.string </> int)
     , Url.map Newest (Url.s "newest" </> int </> int)
-    , Url.map NewestInit (Url.s "newest")
+    , Url.map NewestInit (Url.s "newest" </> int)
     , Url.map Oldest (Url.s "oldest" </> int </> int)
-    , Url.map OldestInit (Url.s "oldest")
+    , Url.map OldestInit (Url.s "oldest" </> int)
     , Url.map Title (Url.s "title" </> int </> int)
-    , Url.map TitleInit (Url.s "title")
+    , Url.map TitleInit (Url.s "title" </> int)
     , Url.map TitleIndex (Url.s "titleindex" </> Url.string)
     , Url.map Popular (Url.s "popular" </> int </> int)
-    , Url.map PopularInit (Url.s "popular")
+    , Url.map PopularInit (Url.s "popular" </> int)
     , Url.map RandomDes (Url.s "random" </> int </> int </> int)
-    , Url.map RandomInit (Url.s "random" </> int)
+    , Url.map RandomInit (Url.s "random" </> int </> int)
     , Url.map RandomSeed (Url.s "random")
     ]
 
@@ -113,6 +119,7 @@ type Msg
   = LoginClick 
   | LogoutClick
   | CCcheck Bool
+  | SwitchTo Design.ViewSize
   | NewURL Navigation.Location
   | LoginMsg Login.Msg
   | DesignMsg Design.Msg
@@ -139,6 +146,8 @@ update msg model =
       (model, logoutUser)
     CCcheck cc ->
       ({ model | limitCC = cc }, Cmd.none)
+    SwitchTo size ->
+      ({model | designMode = size}, Navigation.modifyUrl ("#" ++ model.designList.thislink))
     NewURL loc ->
       case Url.parseHash route loc of
         Nothing ->
@@ -154,45 +163,45 @@ update msg model =
             Author name start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("by/" ++ name) start count)
-            AuthorInit name ->
+            AuthorInit name start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("by/" ++ name) 0 50)
+                getDesigns ("by/" ++ name) start (if model.designMode == Design.Small then 50 else 5))
             Newest start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" start count)
-            NewestInit ->
+            NewestInit start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "newest" 0 50)
+                getDesigns "newest" start (if model.designMode == Design.Small then 50 else 5))
             Oldest start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "oldest" start count)
-            OldestInit ->
+            OldestInit start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "oldest" 0 50)
+                getDesigns "oldest" start (if model.designMode == Design.Small then 50 else 5))
             Title start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "title" start count)
-            TitleInit ->
+            TitleInit start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "title" 0 50)
+                getDesigns "title" start (if model.designMode == Design.Small then 50 else 5))
             TitleIndex title ->
               (model, getTitle title)
             Popular start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "popular" start count)
-            PopularInit ->
+            PopularInit start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "popular" 0 50)
+                getDesigns "popular" start (if model.designMode == Design.Small then 50 else 5))
             RandomDes seed start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("random/" ++ (toString seed)) start count)
-            RandomInit seed ->
+            RandomInit seed start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("random/" ++ (toString seed)) 0 50)
+                getDesigns ("random/" ++ (toString seed)) start (if model.designMode == Design.Small then 50 else 5))
             RandomSeed ->
               (model, Random.generate NewSeed (Random.int 1 1000000000))
     NewSeed seed ->
-      (model, Navigation.newUrl ("#random/" ++ (toString seed)))
+      (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
       let
         (newLoginModel, maybeAction) = Login.update lMsg model.loginform          
@@ -202,9 +211,9 @@ update msg model =
             update LoginClick { model | loginform = newLoginModel }
           Nothing ->
             ({ model | loginform = newLoginModel }, Cmd.none) 
-    DesignMsg dmsg ->
+    DesignMsg dmsg ->   -- TODO manage messages from all designs
       case model.mainDesign of
-        Nothing -> (model, Cmd.none)    -- shouldn't happen
+        Nothing -> (model, Cmd.none)
         Just des ->
           let
             (newDesign, maybeAction) = Design.update dmsg des
@@ -234,7 +243,11 @@ update msg model =
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | mainDesign = Nothing, designList = designs}, Cmd.none)
+          ({model | mainDesign = Nothing, designList = designs},         
+            if model.designMode == Design.Small then
+              Cmd.none
+            else
+              Cmd.batch (List.map getCfdgfromDesign designs.designs))
         Err error ->
           ({model | designList = zeroList}, Cmd.none)
     NewUser loginResult ->
@@ -261,17 +274,16 @@ update msg model =
             newLoginModel = Login.fail "Logout failed" model.loginform          
           in
             ({ model | loginform = newLoginModel }, Cmd.none) 
-    ReceiveCfdg id cfdgResult ->    -- ignoring id for now
+    ReceiveCfdg id cfdgResult ->
       case cfdgResult of
         Ok cfdgText ->
-          case model.mainDesign of
-            Just oldDesign ->
-              let
-                newDesign = Design.setCfdg cfdgText oldDesign 
-              in
-                ({model | mainDesign = Just newDesign}, Cmd.none)
-            Nothing ->            -- Shouldn't happen
-              (model, Cmd.none)   -- Just drop it
+          let
+            setCfdg = Design.setCfdg id cfdgText
+          in
+            ( { model
+              | mainDesign = Maybe.map setCfdg model.mainDesign
+              , designList = designMap setCfdg model.designList
+              }, Cmd.none)
         Err _ ->
           (model, Cmd.none)
     NewComments commentResult ->
@@ -346,7 +358,7 @@ viewDesigns model =
   ]
   ++
     let
-      vc = Design.ViewConfig Design.Small model.user
+      vc = Design.ViewConfig model.designMode model.user
     in
       (List.map ((Design.view vc) >> (Html.map DesignMsg))
         model.designList.designs)
@@ -358,6 +370,13 @@ viewDesigns model =
     ]
   ]
 
+radio : String -> msg -> Bool -> Html msg
+radio value msg isChecked =
+  label []
+    [ input [ type_ "radio", name "design-size", onClick msg, checked isChecked ] []
+    , text value
+    ]
+
 
 view : Model -> Html Msg
 view model =
@@ -365,10 +384,10 @@ view model =
   [ div [ id "CFAcolumn" ]
     [ h5 [] [ text "Gallery Tools:" ]
     , ul []
-      [ li [] [ a [href "#newest"] [text "Newest" ]]
-      , li [] [ a [href "#oldest"] [text "Oldest" ]]
-      , li [] [ a [href "#title"]  [text "Title" ]]
-      , li [] [ a [href "#popular"] [text "Popular" ]]
+      [ li [] [ a [href "#newest/0"] [text "Newest" ]]
+      , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
+      , li [] [ a [href "#title/0"]  [text "Title" ]]
+      , li [] [ a [href "#popular/0"] [text "Popular" ]]
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ text "People" ]
       , li [] [ text "Tags" ]
@@ -382,6 +401,14 @@ view model =
             , alt "Creative Commons badge"
             ] []
           , text "Only"
+          ]
+        ]
+      , li [] [ text "List mode:" ]
+      , li [] 
+        [ fieldset []
+          [ radio "Small" (SwitchTo Design.Small)  (model.designMode == Design.Small)
+          , text " "
+          , radio "Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)
           ]
         ]
       ]
@@ -509,10 +536,11 @@ getDesigns query start count =
 
 decodeDesigns : Json.Decode.Decoder DesignList
 decodeDesigns = 
-  Json.Decode.map4 DesignList
+  Json.Decode.map5 DesignList
     (Json.Decode.at ["designs"] (Json.Decode.list Design.decodeDesign))
     (Json.Decode.at ["prevlink"] Json.Decode.string)
     (Json.Decode.at ["nextlink"] Json.Decode.string)
+    (Json.Decode.at ["thislink"] Json.Decode.string)
     (Json.Decode.at ["count"]    Json.Decode.int)
 
       
@@ -552,6 +580,10 @@ getCfdg id =
     url = "http://localhost:5000/data/cfdg/" ++ (toString id)
   in
     Http.send (ReceiveCfdg id) (Http.getString url)
+
+getCfdgfromDesign : Design.Design -> Cmd Msg
+getCfdgfromDesign design =
+  getCfdg design.designid
 
 getComments : Int -> Cmd Msg
 getComments id =

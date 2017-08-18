@@ -75,13 +75,17 @@ initDesign: String -> String -> Design
 initDesign user ccURI = 
     Design "" "" ccURI 0 [] "" "" "" 0 user "" [] "" 0 "" 0 "" (text "") (text "") []
 
-setCfdg : String -> Design -> Design
-setCfdg newCfdg design =
-  let
-    markdown = String.concat ["```cfdg\n", newCfdg, "\n```\n"]
-  in
-    { design | cfdghtml = toHtml markdown, noteshtml = notesHtml design.notes }
+setCfdg : Int -> String -> Design -> Design
+setCfdg id newCfdg design =
+  if id == design.designid then
+    let
+      markdown = String.concat ["```cfdg\n", newCfdg, "\n```\n"]
+    in
+      { design | cfdghtml = toHtml markdown, noteshtml = notesHtml design.notes }
+  else
+    design
 
+    
 setComments : List Comment.Comment -> Design -> Design
 setComments newComments design =
   { design | comments = List.map Comment.setupHtml newComments }
