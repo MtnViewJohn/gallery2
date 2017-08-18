@@ -32,6 +32,13 @@ type ViewMode
   | People
   | Translation
 
+type alias DesignList =
+  { designs : List Design.Design
+  , prevlink : String
+  , nextlink : String
+  , count : Int
+  }
+
 
 type alias Model =
   { user : Maybe User
@@ -40,15 +47,17 @@ type alias Model =
   , authorLookup : String
   , designLookup : Int
   , mainDesign : Maybe Design.Design
-  , designList : List Design.Design
+  , designList : DesignList
   , currentLocation : Navigation.Location
   , viewMode : ViewMode
-  , showLinkBar : Bool
   }
+
+zeroList : DesignList
+zeroList = DesignList [] "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Nothing [] loc Designs False, loginSession)
+  (Model Nothing Login.initModel False "" 0 Nothing zeroList loc Designs, loginSession)
 
 
 -- URL PARSING
@@ -100,7 +109,6 @@ route =
 
 -- UPDATE
 
-
 type Msg
   = LoginClick 
   | LogoutClick
@@ -114,7 +122,7 @@ type Msg
   | DesignText String
   | NewSeed Int
   | NewDesign (Result Http.Error Design.Design)
-  | NewDesigns (Result Http.Error (List Design.Design))
+  | NewDesigns (Result Http.Error DesignList)
   | NewUser (Result Http.Error User.User)
   | SessionUser (Result Http.Error User.User)
   | LogoutUser (Result Http.Error Bool)
@@ -139,7 +147,7 @@ update msg model =
           case route of
             Home ->
               ({model | mainDesign = Nothing, 
-                        designList = [], 
+                        designList = zeroList, 
                         currentLocation = loc}, Cmd.none)
             DesignID id ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
@@ -147,53 +155,53 @@ update msg model =
                 getDesign id)
             Author name start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns ("by/" ++ name) start count)
             AuthorInit name ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns ("by/" ++ name) 0 50)
             Newest start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "newest" start count)
             NewestInit ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "newest" 0 50)
             Oldest start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "oldest" start count)
             OldestInit ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "oldest" 0 50)
             Title start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = True },
+                viewMode = Designs },
                 getDesigns "title" start count)
             TitleInit ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = True },
+                viewMode = Designs },
                 getDesigns "title" 0 50)
             TitleIndex title ->
               (model, getTitle title)
             Popular start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "popular" start count)
             PopularInit ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns "popular" 0 50)
             RandomDes seed start count ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns ("random/" ++ (toString seed)) start count)
             RandomInit seed ->
               ({model | currentLocation = loc, mainDesign = Nothing, 
-                viewMode = Designs, showLinkBar = False },
+                viewMode = Designs },
                 getDesigns ("random/" ++ (toString seed)) 0 50)
             RandomSeed ->
               (model, Random.generate NewSeed (Random.int 1 1000000000))
@@ -242,7 +250,7 @@ update msg model =
         Ok designs ->
           ({model | mainDesign = Nothing, designList = designs}, Cmd.none)
         Err error ->
-          ({model | designList = []}, Cmd.none)
+          ({model | designList = zeroList}, Cmd.none)
     NewUser loginResult ->
       case loginResult of
         Ok user ->
@@ -317,7 +325,53 @@ designString des =
 
 makeIndexLink : Char -> List (Html Msg)
 makeIndexLink c =
-  [ a [class "letterref", href ("#titleindex/" ++ (String.fromChar c))] [text (String.fromChar c)], text " "]
+  [ a [class "letterref", href ("#titleindex/" ++ (String.fromChar c))] 
+      [text (String.fromChar c)]
+  , text " "
+  ]
+
+makePNlink : String -> Int -> String -> Html Msg
+makePNlink type_ count url =
+  a [ href ("#" ++ url), 
+      style [("visibility", if (String.isEmpty url) then "hidden" else "visible")]]
+    [ b [] [text (type_ ++ " " ++ (toString count))]]
+
+viewDesigns : Model -> List (Html Msg)
+viewDesigns model =
+  if List.isEmpty model.designList.designs then
+    [ text "Nothing to show" ]
+  else
+  [ if String.contains "title" model.designList.prevlink || 
+       String.contains "title" model.designList.nextlink then
+      div []
+      ([ a [class "letterref", href "#title"] [text "all"], text " "]
+      ++
+      List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+      ++ [hr [][]])
+    else
+      text ""
+  ]
+  ++
+  [ div [class "clearleft"] 
+    [ makePNlink "Previous" model.designList.count model.designList.prevlink
+    , text " "
+    , makePNlink "Next" model.designList.count model.designList.nextlink
+    ]
+  ]
+  ++
+    let
+      vc = Design.ViewConfig Design.Small model.user
+    in
+      (List.map ((Design.view vc) >> (Html.map DesignMsg))
+        model.designList.designs)
+  ++
+  [ div [class "clearleft"] 
+    [ makePNlink "Previous" model.designList.count model.designList.prevlink
+    , text " "
+    , makePNlink "Next" model.designList.count model.designList.nextlink
+    ]
+  ]
+
 
 view : Model -> Html Msg
 view model =
@@ -395,23 +449,7 @@ view model =
   , div [ id "CFAcontent" ]
     ( case model.mainDesign of
         Nothing ->
-          if List.isEmpty model.designList then
-            [ text "Nothing to show" ]
-          else
-            (if model.showLinkBar then
-              [ a [class "letterref", href "#title"] [text "all"], text " "
-              ] ++
-              List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
-              ++ [hr [][]] 
-            else
-              []
-            )
-            ++
-            let
-              vc = Design.ViewConfig Design.Small model.user
-            in
-              (List.map ((Design.view vc) >> (Html.map DesignMsg))
-                model.designList)
+          viewDesigns model
         Just design ->
           let
             vc = Design.ViewConfig Design.Large model.user
@@ -483,9 +521,13 @@ getDesigns query start count =
   in
     Http.send NewDesigns (get url decodeDesigns)
 
-decodeDesigns : Json.Decode.Decoder (List Design.Design)
+decodeDesigns : Json.Decode.Decoder DesignList
 decodeDesigns = 
-    Json.Decode.at ["designs"] (Json.Decode.list Design.decodeDesign)
+  Json.Decode.map4 DesignList
+    (Json.Decode.at ["designs"] (Json.Decode.list Design.decodeDesign))
+    (Json.Decode.at ["prevlink"] Json.Decode.string)
+    (Json.Decode.at ["nextlink"] Json.Decode.string)
+    (Json.Decode.at ["count"]    Json.Decode.int)
 
       
 loginUser : Login.Model -> Cmd Msg
