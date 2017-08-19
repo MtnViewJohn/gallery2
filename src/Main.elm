@@ -1,6 +1,6 @@
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onClick, onSubmit, onInput)
+import Html.Events exposing (onCheck, onClick, onSubmit, onInput, onWithOptions)
 import String exposing (trimLeft, toInt)
 import Login
 import Design
@@ -40,6 +40,10 @@ type alias DesignList =
   , count : Int
   }
 
+type alias TagInfo =
+  { name : String
+  , count : Int
+  }
 
 type alias Model =
   { user : Maybe User
@@ -47,10 +51,11 @@ type alias Model =
   , limitCC : Bool
   , authorLookup : String
   , designLookup : Int
+  , viewMode : ViewMode
   , mainDesign : Maybe Design.Design
   , designList : DesignList
-  , viewMode : ViewMode
   , designMode : Design.ViewSize
+  , tagList : List TagInfo
   }
 
 zeroList : DesignList
@@ -58,8 +63,8 @@ zeroList = DesignList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Nothing zeroList Designs Design.Small, 
-    Cmd.batch [loginSession, Navigation.modifyUrl loc.href])
+  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [], 
+    Cmd.batch [loginSession, getTags, Navigation.modifyUrl loc.href])
 
 designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
 designMap mapping oldList =
@@ -86,6 +91,9 @@ type Route
   | RandomDes Int Int Int
   | RandomInit Int Int
   | RandomSeed
+  | Tag String Int Int
+  | TagInit String Int
+  | ShowTags String
 
 
 
@@ -108,6 +116,9 @@ route =
     , Url.map RandomDes (Url.s "random" </> int </> int </> int)
     , Url.map RandomInit (Url.s "random" </> int </> int)
     , Url.map RandomSeed (Url.s "random")
+    , Url.map Tag (Url.s "tag" </> Url.string </> int </> int)
+    , Url.map TagInit (Url.s "tag" </> Url.string </> int)
+    , Url.map ShowTags (Url.s "tags" </> Url.string)
     ]
 
 
@@ -136,6 +147,7 @@ type Msg
   | ReceiveCfdg Int (Result Http.Error String)
   | NewComments (Result Http.Error (List Comment.Comment))
   | GotTitleIndex (Result Http.Error Int)
+  | GotTags (Result Http.Error (List TagInfo))
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -155,8 +167,9 @@ update msg model =
         Just route ->
           case route of
             Home ->
-              ({model | mainDesign = Nothing, 
-                        designList = zeroList}, Cmd.none)
+              ({model | mainDesign = Nothing 
+                      , designList = zeroList
+                      , viewMode = Designs}, Cmd.none)
             DesignID id ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesign id)
@@ -200,6 +213,25 @@ update msg model =
                 getDesigns ("random/" ++ (toString seed)) start (if model.designMode == Design.Small then 50 else 5))
             RandomSeed ->
               (model, Random.generate NewSeed (Random.int 1 1000000000))
+            Tag tag start count ->
+              ({model | mainDesign = Nothing, viewMode = Designs },
+                getDesigns ("tag/" ++ tag) start count)
+            TagInit tag start ->
+              ({model | mainDesign = Nothing, viewMode = Designs },
+                getDesigns ("tag/" ++ tag) start (if model.designMode == Design.Small then 50 else 5))
+            ShowTags tagType ->
+              let
+                comp = 
+                  if tagType == "tag" then
+                    \a b -> compare a.name b.name
+                  else
+                    \a b -> 
+                      if a.count == b.count then
+                        compare a.name b.name
+                      else
+                        compare b.count a.count   -- descending order
+              in
+                ({model| tagList = List.sortWith comp model.tagList, viewMode = Tags}, Cmd.none)
     NewSeed seed ->
       (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
@@ -305,6 +337,20 @@ update msg model =
           (model, Navigation.newUrl ("#title/" ++ (toString index) ++ "/50"))
         Err _ ->
           (model, Cmd.none)
+    GotTags tagsResult ->
+      case tagsResult of
+        Ok tags ->
+          ({ model | tagList = tags}, Cmd.none)
+        Err error ->
+          {- let
+            _ = case error of
+              Http.BadUrl url -> Debug.log "BadUrl" url
+              Http.Timeout -> Debug.log "Timeout" ""
+              Http.NetworkError -> Debug.log "NetworkError" ""
+              Http.BadStatus resp -> Debug.log "BadStatus" resp.status.message
+              Http.BadPayload msg resp -> Debug.log "BadPayload" msg
+          in -}
+            (model, Cmd.none)
 
 
 
@@ -378,6 +424,18 @@ radio value msg isChecked =
     ]
 
 
+viewTagInfo : TagInfo -> Html Msg
+viewTagInfo tag =
+  tr [] 
+  [ td [align "right"] [text (toString tag.count)]
+  , td [align "left"] [a [href ("#tag/" ++ tag.name ++ "/0")] [text tag.name]]
+  ]
+
+onNav : msg -> Attribute msg
+onNav msg =
+    onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed msg)
+
+
 view : Model -> Html Msg
 view model =
   div []
@@ -390,7 +448,7 @@ view model =
       , li [] [ a [href "#popular/0"] [text "Popular" ]]
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ text "People" ]
-      , li [] [ text "Tags" ]
+      , li [] [ a [href "#tags/tag"] [text "Tags"] ]
       , li [] 
         [ label []
           [ input [ type_ "checkbox", onCheck CCcheck, checked model.limitCC ] []
@@ -460,14 +518,37 @@ view model =
           Html.map LoginMsg (Login.view model.loginform)
     ]
   , div [ id "CFAcontent" ]
-    ( case model.mainDesign of
-        Nothing ->
-          viewDesigns model
-        Just design ->
-          let
-            vc = Design.ViewConfig Design.Large model.user
-          in
-            [ Html.map DesignMsg (Design.view vc design) ]
+    ( case model.viewMode of
+        Designs ->
+        ( case model.mainDesign of
+            Nothing ->
+              viewDesigns model
+            Just design ->
+              let
+                vc = Design.ViewConfig Design.Large model.user
+              in
+                [ Html.map DesignMsg (Design.view vc design) ]
+        )
+        Tags ->
+        ( [ table [class "tagstable"]
+            ( [ thead [] 
+                [ tr [] 
+                  [ th [align "right"] [a [href "#tags/count"] [text "Count"]]
+                  , th [align "left"] [a [href "#tags/tag"] [text "Tag"]]
+                  ]
+                ]
+              ]
+            ++
+              List.map viewTagInfo model.tagList
+            )
+          ]
+        )
+        People ->
+        ( [text "people"]
+        )
+        Translation ->
+        ( [text "translation"]
+        )
     )
   ]
 
@@ -606,5 +687,23 @@ getTitle title =
 decodeTitleIndex : Json.Decode.Decoder Int
 decodeTitleIndex = 
   Json.Decode.at ["index"] Json.Decode.int
+
+getTags : Cmd Msg
+getTags = 
+  let
+    url = "http://localhost:5000/tags"
+  in
+    Http.send GotTags (get url decodeTags)
+
+decodeTags : Json.Decode.Decoder (List TagInfo)
+decodeTags =
+  Json.Decode.at ["tags"] (Json.Decode.list decodeTagInfo)
+
+decodeTagInfo : Json.Decode.Decoder TagInfo
+decodeTagInfo =
+  Json.Decode.map2 TagInfo
+    (Json.Decode.field "name"  Json.Decode.string)
+    (Json.Decode.field "count" Json.Decode.int)
+
       
 
