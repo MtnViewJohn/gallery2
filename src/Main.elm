@@ -79,6 +79,7 @@ type Route
   | DesignID Int
   | Author String Int Int
   | AuthorInit String Int
+  | AuthorInit2 String
   | Newest Int Int
   | NewestInit Int
   | Oldest Int Int
@@ -104,6 +105,7 @@ route =
     , Url.map DesignID (Url.s "design" </> int)
     , Url.map Author (Url.s "user" </> Url.string </> int </> int)
     , Url.map AuthorInit (Url.s "user" </> Url.string </> int)
+    , Url.map AuthorInit2 (Url.s "user" </> Url.string)
     , Url.map Newest (Url.s "newest" </> int </> int)
     , Url.map NewestInit (Url.s "newest" </> int)
     , Url.map Oldest (Url.s "oldest" </> int </> int)
@@ -179,6 +181,8 @@ update msg model =
             AuthorInit name start ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns ("by/" ++ name) start (if model.designMode == Design.Small then 50 else 5))
+            AuthorInit2 name ->
+              (model, Navigation.modifyUrl ("#user/" ++ name ++ "/0"))
             Newest start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" start count)
@@ -252,7 +256,7 @@ update msg model =
           in
             (model, Cmd.none)           -- not implemented yet
     LookupName ->
-      (model, Navigation.newUrl ("#user/" ++ model.authorLookup))
+      (model, Navigation.newUrl ("#user/" ++ model.authorLookup ++ "/0"))
     LookupDesign ->
       (model, Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
     AuthorText author ->
@@ -334,7 +338,7 @@ update msg model =
     GotTitleIndex indexResult ->
       case indexResult of
         Ok index ->
-          (model, Navigation.newUrl ("#title/" ++ (toString index) ++ "/50"))
+          (model, Navigation.newUrl ("#title/" ++ (toString index)))
         Err _ ->
           (model, Cmd.none)
     GotTags tagsResult ->
@@ -388,7 +392,7 @@ viewDesigns model =
   [ if String.contains "title" model.designList.prevlink || 
        String.contains "title" model.designList.nextlink then
       div []
-      ([ a [class "letterref", href "#title"] [text "all"], text " "]
+      ([ a [class "letterref", href "#title/0"] [text "all"], text " "]
       ++
       List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
       ++ [hr [][]])

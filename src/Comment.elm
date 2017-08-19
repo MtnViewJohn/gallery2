@@ -87,7 +87,6 @@ setupHtml comment =
 type Msg
     = DeleteClick Int
     | EditClick Int
-    | OwnerClick String
 
 update : Msg -> Comment -> Comment
 update msg comment =
@@ -96,8 +95,6 @@ update msg comment =
       comment  -- Container never sends this
     EditClick id->
       comment  -- Not implemented
-    OwnerClick name ->
-      comment  -- Container never sends this
 
 
 

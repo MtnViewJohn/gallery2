@@ -133,9 +133,6 @@ type Action
     | Edit Int
     | AddFaves Int
     | RemoveFaves Int
-    | GoDesigner String
-    | GoTag String
-    | GoDesign Int
     | DeleteComment Int
 
 
@@ -146,9 +143,6 @@ type Msg
     | EditClick
     | AddFavesClick
     | RemoveFavesClick
-    | DesignerClick String
-    | TagClick String
-    | DesignClick
     | CommentMsg Comment.Msg
 
 update : Msg -> Design -> (Design, Maybe Action)
@@ -158,17 +152,12 @@ update msg design =
     EditClick -> ( design, Just (Edit design.designid))
     AddFavesClick -> ( design, Just (AddFaves design.designid))
     RemoveFavesClick -> ( design, Just (RemoveFaves design.designid))
-    DesignerClick user -> ( design, Just (GoDesigner user))
-    TagClick tag -> ( design, Just (GoTag tag))
-    DesignClick -> ( design, Just (GoDesign design.designid) )
     CommentMsg cmsg ->
       case cmsg of
         Comment.DeleteClick id ->
           (design, Just (DeleteComment id))
         Comment.EditClick id ->
           ({design | comments = List.map (Comment.update cmsg) design.comments}, Nothing)
-        Comment.OwnerClick name ->
-          (design, Just (GoDesigner name))
 
 
 
@@ -177,11 +166,11 @@ update msg design =
 
 makeTagLink : String -> Html Msg
 makeTagLink tag = 
-  a [href "#", onClick (TagClick tag)] [text (tag ++ " ")]
+  a [href ("#tag/" ++ tag ++ "/0")] [text (tag ++ " ")]
 
 makeFanLink : String -> Html Msg
 makeFanLink fan = 
-  a [href ("#user" ++ fan)] [b [] [text (fan ++ " ")]]
+  a [href ("#user/" ++ fan ++ "/0")] [b [] [text (fan ++ " ")]]
 
 fanCount : Int -> String
 fanCount cnt =
@@ -221,7 +210,7 @@ view cfg design =
         , b [] [ text design.title ]
         , br [] []
         , text "by " 
-        , a [href ("#user/" ++ design.owner)] 
+        , a [href ("#user/" ++ design.owner ++ "/0")] 
             [ b [] [text design.owner]]
         ]
       , if isEmpty design.variation then
@@ -243,7 +232,7 @@ view cfg design =
         else
           []
       , [ br [] []
-        , a [ href design.filelocation, type_ "application/octet-stream", 
+        , a [ href design.filelocation, download True, 
               title "Download the cfdg file to your computer." ]
             [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
                     width 100, height 22] []
@@ -327,7 +316,7 @@ view cfg design =
           (List.concat
           [ [ b [] [text design.title ]
             , text " by "
-            , a [ href ("#user/" ++ design.owner) ] 
+            , a [ href ("#user/" ++ design.owner ++ "/0") ] 
                 [ b [] [text design.owner] ]
             ]
             , if isEmpty design.variation then
@@ -342,13 +331,13 @@ view cfg design =
               else
                 []
           , [ br [] []
-            , a [ href design.filelocation, type_ "application/octet-stream", 
+            , a [ href design.filelocation, download True, 
                   title "Download the cfdg file to your computer." ]
                 [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
                         width 100, height 22] []
                 ]
             , text " "
-            , a [ href ("#design" ++ (toString design.designid)), title "View design." ] 
+            , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
                 [ img [ src "graphics/viewButton.png", alt "View Design",
                         width 70, height 22 ] []
                 ]
@@ -401,7 +390,7 @@ view cfg design =
             [ [ b [] [text design.title ]
               , br [] []
               , text " by "
-              , a [ href ("#user/" ++ design.owner) ] 
+              , a [ href ("#user/" ++ design.owner ++ "/0") ] 
                   [ b [] [text design.owner] ]
               ]
               , if design.numvotes > 0 then
@@ -411,13 +400,13 @@ view cfg design =
                 else
                   []
             , [ br [][]
-              , a [ href design.filelocation, type_ "application/octet-stream", 
+              , a [ href design.filelocation, download True, 
                     title "Download the cfdg file to your computer." ]
                   [ img [ src "graphics/downloadMiniButton.png", alt "Download cfdg",
                           width 30, height 22] []
                   ]
               , text " "
-              , a [ href "#", onClick DesignClick, title "View design." ] 
+              , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
                   [ img [ src "graphics/viewMiniButton.png", alt "View Design",
                           width 30, height 22 ] []
                   ]
