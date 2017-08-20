@@ -598,7 +598,7 @@ view model =
           [ h5 [] [ text ("User " ++ user.name) ]
           , ul []
             [ li [] [ text "Upload!" ]
-            , li [] [ text "My uploads" ]
+            , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
           ]
