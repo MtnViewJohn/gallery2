@@ -117,6 +117,12 @@ table.tagstable td,th {
     border-collapse: collapse;
     padding: 5px;
 }
+table.tagstable th.usernames {
+    width: 120px;
+}
+table.tagstable th.dates {
+    width: 150px;
+}
 .halfcell { width: 50%; vertical-align: top;
 }
 .commentcell { vertical-align: top; }
@@ -187,7 +193,7 @@ table.sm_thumbtable { height: 120px; }
 div.ccInfo {margin: 4px 0;}
 div.ccInfo a.ccIcon {float:left; margin-right: 4px;}
 .alert { color:#990000; font-weight:bold; }
-.clearleft { clear: left; }
+.clearleft { clear: left; padding: 5px;}
 textarea { width: 400px; height: 150px; }
 
 textarea.cfdg {

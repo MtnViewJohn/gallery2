@@ -11,6 +11,7 @@ import Http
 import Navigation
 import UrlParser as Url exposing ((</>), (<?>), s, int, stringParam, top)
 import Random
+import GalleryUtils exposing (..)
 
 main : Program Never Model Msg
 main =
@@ -40,6 +41,14 @@ type alias DesignList =
   , count : Int
   }
 
+type alias UserList =
+  { users : List User.MiniUser
+  , prevlink : String
+  , nextlink : String
+  , thislink : String
+  , count : Int
+  }
+
 type alias TagInfo =
   { name : String
   , count : Int
@@ -56,14 +65,18 @@ type alias Model =
   , designList : DesignList
   , designMode : Design.ViewSize
   , tagList : List TagInfo
+  , userList : UserList
   }
 
 zeroList : DesignList
 zeroList = DesignList [] "" "" "" 0
 
+zeroUList : UserList
+zeroUList = UserList [] "" "" "" 0
+
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [], 
+  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList, 
     Cmd.batch [loginSession, getTags, Navigation.modifyUrl loc.href])
 
 designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
@@ -95,6 +108,9 @@ type Route
   | Tag String Int Int
   | TagInit String Int
   | ShowTags String
+  | Users String Int Int
+
+
 
 
 
@@ -121,6 +137,7 @@ route =
     , Url.map Tag (Url.s "tag" </> Url.string </> int </> int)
     , Url.map TagInit (Url.s "tag" </> Url.string </> int)
     , Url.map ShowTags (Url.s "tags" </> Url.string)
+    , Url.map Users (Url.s "users" </> Url.string </> Url.int </> Url.int)
     ]
 
 
@@ -150,6 +167,7 @@ type Msg
   | NewComments (Result Http.Error (List Comment.Comment))
   | GotTitleIndex (Result Http.Error Int)
   | GotTags (Result Http.Error (List TagInfo))
+  | NewUsers (Result Http.Error UserList)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -236,6 +254,11 @@ update msg model =
                         compare b.count a.count   -- descending order
               in
                 ({model| tagList = List.sortWith comp model.tagList, viewMode = Tags}, Cmd.none)
+            Users utype start count ->
+              if List.member utype ["name", "posts", "joined"] then
+                ({model | viewMode = People}, getUsers ("users/" ++ utype) start count)
+              else
+                (model, Cmd.none)
     NewSeed seed ->
       (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
@@ -355,6 +378,12 @@ update msg model =
               Http.BadPayload msg resp -> Debug.log "BadPayload" msg
           in -}
             (model, Cmd.none)
+    NewUsers usersResult ->
+      case usersResult of
+        Ok users ->
+          ({model | userList = users}, Cmd.none)
+        Err error ->
+          (model,Cmd.none)
 
 
 
@@ -420,10 +449,39 @@ viewDesigns model =
     ]
   ]
 
-radio : String -> msg -> Bool -> Html msg
-radio value msg isChecked =
+viewUsers : Model -> List (Html Msg)
+viewUsers model =
+  if List.isEmpty model.userList.users then
+    [ text "Nothing to show" ]
+  else
+  [ div [class "clearleft"] 
+    [ makePNlink "Previous" model.userList.count model.userList.prevlink
+    , text " "
+    , makePNlink "Next" model.userList.count model.userList.nextlink
+    ]
+  , table [class "tagstable"]
+    ( [ thead [] 
+        [ tr [] 
+          [ th [align "left", class "usernames"] [a [href "#users/name/0/25"] [text "User name"]]
+          , th [align "right"] [a [href "#users/posts/0/25"] [text "Post count"]]
+          , th [align "right", class "dates"] [a [href "#users/joined/0/25"] [text "Join date"]]
+          ]
+        ]
+      ]
+    ++
+      List.map viewMiniUser model.userList.users
+    )
+  , div [class "clearleft"] 
+    [ makePNlink "Previous" model.userList.count model.userList.prevlink
+    , text " "
+    , makePNlink "Next" model.userList.count model.userList.nextlink
+    ]
+  ]
+
+radio : String -> msg -> Bool -> Bool -> Html msg
+radio value msg isChecked isDisabled =
   label []
-    [ input [ type_ "radio", name "design-size", onClick msg, checked isChecked ] []
+    [ input [ type_ "radio", name "design-size", onClick msg, checked isChecked, disabled isDisabled ] []
     , text value
     ]
 
@@ -433,6 +491,14 @@ viewTagInfo tag =
   tr [] 
   [ td [align "right"] [text (toString tag.count)]
   , td [align "left"] [a [href ("#tag/" ++ tag.name ++ "/0")] [text tag.name]]
+  ]
+
+viewMiniUser : MiniUser -> Html Msg
+viewMiniUser muser = 
+  tr []
+  [ td [align "left"] [a [href ("#user/" ++ muser.name ++ "/0")] [text muser.name]]
+  , td [align "right"] [text (toString muser.numPosts)]
+  , td [align "right"] [text (makeDate muser.joinedOn)]
   ]
 
 onNav : msg -> Attribute msg
@@ -451,7 +517,7 @@ view model =
       , li [] [ a [href "#title/0"]  [text "Title" ]]
       , li [] [ a [href "#popular/0"] [text "Popular" ]]
       , li [] [ a [href "#random"] [text "Random" ]]
-      , li [] [ text "People" ]
+      , li [] [ a [href "#users/name/0/25"] [text "People" ]]
       , li [] [ a [href "#tags/tag"] [text "Tags"] ]
       , li [] 
         [ label []
@@ -466,13 +532,16 @@ view model =
           ]
         ]
       , li [] [ text "List mode:" ]
-      , li [] 
-        [ fieldset []
-          [ radio "Small" (SwitchTo Design.Small)  (model.designMode == Design.Small)
-          , text " "
-          , radio "Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)
+      , let
+          disable = not (model.viewMode == Designs && model.mainDesign == Nothing)
+        in
+          li []
+          [ fieldset []
+            [ radio "Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable
+            , text " "
+            , radio "Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable
+            ]
           ]
-        ]
       ]
     , h5 [] [ text "Lookup" ]
     , ul []
@@ -548,8 +617,7 @@ view model =
           ]
         )
         People ->
-        ( [text "people"]
-        )
+          viewUsers model
         Translation ->
         ( [text "translation"]
         )
@@ -710,4 +778,20 @@ decodeTagInfo =
     (Json.Decode.field "count" Json.Decode.int)
 
       
+getUsers: String -> Int -> Int -> Cmd Msg
+getUsers query start count =
+  let
+    url = String.join "/" ["http://localhost:5000", query, 
+                           toString(start), toString(count)]
+  in
+    Http.send NewUsers (get url decodeUsers)
 
+decodeUsers : Json.Decode.Decoder UserList
+decodeUsers =
+  Json.Decode.map5 UserList
+    (Json.Decode.at ["users"] (Json.Decode.list User.decodeMiniUser))
+    (Json.Decode.at ["prevlink"] Json.Decode.string)
+    (Json.Decode.at ["nextlink"] Json.Decode.string)
+    (Json.Decode.at ["thislink"] Json.Decode.string)
+    (Json.Decode.at ["count"]    Json.Decode.int)
+      

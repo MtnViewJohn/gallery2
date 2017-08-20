@@ -1,14 +1,16 @@
 module User exposing
-  (
-    User,
-    canModify,
-    decodeUser
+  ( User
+  , canModify
+  , decodeUser
+  , MiniUser
+  , decodeMiniUser
   )
 
 
 import Json.Decode
 import Json.Decode.Pipeline
 import Time
+import GalleryUtils exposing (..)
 
 type alias User = 
   { name : String
@@ -22,9 +24,12 @@ type alias User =
   , defaultccURI : String
   }
 
-int2Time : Int -> Time.Time
-int2Time i = 
-  (toFloat i) * 1000.0
+type alias MiniUser = 
+  { name : String
+  , joinedOn : Time.Time
+  , numPosts : Int
+  }
+
 
 
 decodeUser : Json.Decode.Decoder User
@@ -40,6 +45,15 @@ decodeUser =
         |> Json.Decode.Pipeline.required "notify" (Json.Decode.bool)
         |> Json.Decode.Pipeline.required "ccURI" (Json.Decode.string)
 
+decodeMiniUser : Json.Decode.Decoder MiniUser
+decodeMiniUser =
+    Json.Decode.Pipeline.decode MiniUser
+        |> Json.Decode.Pipeline.required "username" (Json.Decode.string)
+        |> Json.Decode.Pipeline.required "joinedon" (Json.Decode.map int2Time Json.Decode.int)
+        |> Json.Decode.Pipeline.required "numposts" (Json.Decode.int)
+
+
+
 
 canModify: String -> Maybe User -> Bool
 canModify owner loggedUser =
@@ -47,3 +61,5 @@ canModify owner loggedUser =
     Nothing -> False
     Just user ->
       user.isAdmin || (owner == user.name)
+
+
