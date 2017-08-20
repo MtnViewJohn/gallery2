@@ -166,11 +166,11 @@ update msg design =
 
 makeTagLink : String -> Html Msg
 makeTagLink tag = 
-  a [href ("#tag/" ++ tag ++ "/0")] [text (tag ++ " ")]
+  a [href (makeUri "#tag" [tag, "0"])] [text (tag ++ " ")]
 
 makeFanLink : String -> Html Msg
 makeFanLink fan = 
-  a [href ("#user/" ++ fan ++ "/0")] [b [] [text (fan ++ " ")]]
+  a [href (makeUri "#user" [fan, "0"])] [b [] [text (fan ++ " ")]]
 
 fanCount : Int -> String
 fanCount cnt =
@@ -210,7 +210,7 @@ view cfg design =
         , b [] [ text design.title ]
         , br [] []
         , text "by " 
-        , a [href ("#user/" ++ design.owner ++ "/0")] 
+        , a [href (makeUri "#user" [design.owner, "0"])] 
             [ b [] [text design.owner]]
         ]
       , if isEmpty design.variation then
@@ -316,7 +316,7 @@ view cfg design =
           (List.concat
           [ [ b [] [text design.title ]
             , text " by "
-            , a [ href ("#user/" ++ design.owner ++ "/0") ] 
+            , a [ href (makeUri "#user" [design.owner, "0"]) ] 
                 [ b [] [text design.owner] ]
             ]
             , if isEmpty design.variation then
@@ -390,7 +390,7 @@ view cfg design =
             [ [ b [] [text design.title ]
               , br [] []
               , text " by "
-              , a [ href ("#user/" ++ design.owner ++ "/0") ] 
+              , a [ href (makeUri "#user" [design.owner, "0"]) ] 
                   [ b [] [text design.owner] ]
               ]
               , if design.numvotes > 0 then

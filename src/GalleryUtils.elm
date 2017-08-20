@@ -1,12 +1,12 @@
 module GalleryUtils exposing 
-  (
-    makeDate,
-    int2Time
+  ( makeDate
+  , int2Time
+  , makeUri
   )
 
 import Time
 import Date
-
+import Http
 
 int2Time : Int -> Time.Time
 int2Time i = 
@@ -43,3 +43,7 @@ makeDate udate =
   in
     month ++ " " ++ (toString day) ++ suffix ++ ", " ++ toString (Date.year d)
 
+
+makeUri : String -> List String -> String
+makeUri base rest =
+  String.join "/" (base :: (List.map Http.encodeUri rest))

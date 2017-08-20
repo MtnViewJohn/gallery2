@@ -193,14 +193,23 @@ update msg model =
             DesignID id ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesign id)
-            Author name start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("by/" ++ name) start count)
-            AuthorInit name start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("by/" ++ name) start (if model.designMode == Design.Small then 50 else 5))
-            AuthorInit2 name ->
-              (model, Navigation.modifyUrl ("#user/" ++ name ++ "/0"))
+            Author name_enc start count ->
+              let
+                name = Maybe.withDefault "" (Http.decodeUri name_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "by" [name]) start count)
+            AuthorInit name_enc start ->
+              let
+                name = Maybe.withDefault "" (Http.decodeUri name_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "by" [name]) start (if model.designMode == Design.Small then 50 else 5))
+            AuthorInit2 name_enc ->
+              let
+                name = Maybe.withDefault "" (Http.decodeUri name_enc)
+              in
+                (model, Navigation.modifyUrl (makeUri "by" [name, "0"]))
             Newest start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" start count)
@@ -235,12 +244,18 @@ update msg model =
                 getDesigns ("random/" ++ (toString seed)) start (if model.designMode == Design.Small then 50 else 5))
             RandomSeed ->
               (model, Random.generate NewSeed (Random.int 1 1000000000))
-            Tag tag start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("tag/" ++ tag) start count)
-            TagInit tag start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("tag/" ++ tag) start (if model.designMode == Design.Small then 50 else 5))
+            Tag tag_enc start count ->
+              let
+                tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "tag" [tag]) start count)
+            TagInit tag_enc start ->
+              let
+                tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "tag" [tag]) start (if model.designMode == Design.Small then 50 else 5))
             ShowTags tagType ->
               let
                 comp = 
@@ -490,13 +505,13 @@ viewTagInfo : TagInfo -> Html Msg
 viewTagInfo tag =
   tr [] 
   [ td [align "right"] [text (toString tag.count)]
-  , td [align "left"] [a [href ("#tag/" ++ tag.name ++ "/0")] [text tag.name]]
+  , td [align "left"] [a [href (makeUri "#tag" [tag.name, "0"])] [text tag.name]]
   ]
 
 viewMiniUser : MiniUser -> Html Msg
 viewMiniUser muser = 
   tr []
-  [ td [align "left"] [a [href ("#user/" ++ muser.name ++ "/0")] [text muser.name]]
+  [ td [align "left"] [a [href (makeUri "#user" [muser.name, "0"])] [text muser.name]]
   , td [align "right"] [text (toString muser.numPosts)]
   , td [align "right"] [text (makeDate muser.joinedOn)]
   ]
@@ -700,8 +715,12 @@ decodeDesigns =
 loginUser : Login.Model -> Cmd Msg
 loginUser lmodel =
   let
-    url = String.join "/" ["http://localhost:5000/login", lmodel.user, 
-                           lmodel.password, if lmodel.remember then "1" else "0"]
+    url = makeUri 
+      "http://localhost:5000/login"
+      [ lmodel.user
+      , lmodel.password
+      , if lmodel.remember then "1" else "0"
+      ]
   in
     Http.send NewUser (post url Http.emptyBody decodeUser)
 
@@ -752,7 +771,7 @@ decodeComments =
 getTitle : String -> Cmd Msg
 getTitle title =
   let
-    url = "http://localhost:5000/titleindex/" ++ title
+    url = "http://localhost:5000/titleindex/" ++ (Http.encodeUri title)
   in
     Http.send GotTitleIndex (get url decodeTitleIndex)
 
