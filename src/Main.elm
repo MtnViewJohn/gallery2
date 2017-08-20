@@ -451,11 +451,18 @@ viewDesigns model =
     ]
   ]
   ++
-    let
-      vc = Design.ViewConfig model.designMode model.user
+  ( let
+      vcfg = Design.ViewConfig model.designMode model.user
+
+      htmlList = 
+        (List.map ((Design.view vcfg) >> (Html.map DesignMsg))
+          model.designList.designs)
     in
-      (List.map ((Design.view vc) >> (Html.map DesignMsg))
-        model.designList.designs)
+      if model.designMode == Design.Medium then
+        (List.intersperse (hr [] []) htmlList)
+      else
+        htmlList
+  )
   ++
   [ div [class "clearleft"] 
     [ makePNlink "Previous" model.designList.count model.designList.prevlink
