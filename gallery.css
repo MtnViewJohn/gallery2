@@ -1,5 +1,9 @@
 /* @override http://aluminium.local/~john/cfa2/gallery/gallery.css?20090601 */
 
+#CFAcontent p, #CFAcontent ul {
+    padding-left: 0;
+}
+
 form {
  display:inline;
 }
