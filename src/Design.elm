@@ -298,6 +298,78 @@ fullImageAttributes design =
             ]
           ]
 
+thumbImageAttributes : Design -> List (Attribute Msg)
+thumbImageAttributes design =
+  let
+    imageurl = "url(" ++ design.imagelocation ++ ")"
+    sz = Maybe.withDefault (Size 300 300) design.imagesize
+  in
+    case design.tiled of
+      Untiled ->
+        [ class "thumbcell"
+        , style 
+          [ ("float", "left")
+          ]
+        ]
+      Hfrieze ->
+        [ class "thumbcell"
+        , style
+          [ ("background-image", imageurl)
+          , ("background-repeat", "repeat-x")
+          , ("height", toString sz.height ++ "px")
+          , ("text-align", "left")
+          , ("width", "100%")
+          ]
+        ]
+      Vfrieze ->
+        [ class "thumbcell"
+        , style
+          [ ("background-image", imageurl)
+          , ("background-repeat", "repeat-y")
+          , ("background-position", "right")
+          , ("min-height", toString (2 * sz.height) ++ "px")
+          , ("float", "left")
+          ]
+        ]
+      Tiled ->
+        [ class "thumbcell"
+        , style
+          [ ("background-image", imageurl)
+          , ("background-repeat", "repeat")
+          , ("min-height", toString (2 * sz.height) ++ "px")
+          , ("float", "left")
+          ]
+        ]
+
+thumbImage : Design -> Html Msg
+thumbImage design =
+  let
+    sz = Maybe.withDefault (Size 300 300) design.imagesize
+  in
+    case design.tiled of
+      Untiled ->
+        a [ href ("#design/" ++ (toString design.designid))]
+          [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
+      Hfrieze ->
+        a [ href ("#design/" ++ (toString design.designid))]
+          [ img 
+            [ class "image"
+            , src "empty300.png"
+            , width 300
+            , height (sz.height - 1)
+            , alt "design thumbnail"
+            ] []]
+      _ ->
+        a [ href ("#design/" ++ (toString design.designid))]
+          [ img 
+            [ class "image"
+            , src "empty300.png"
+            , width (sz.width - 1)
+            , height (sz.height - 1)
+            , alt "design thumbnail"
+            ] []]
+
+
 view : ViewConfig -> Design -> Html Msg
 view cfg design =
   case cfg.size of
@@ -417,13 +489,10 @@ view cfg design =
         ])
       ]
     Medium ->
-      table [class "thumbtable"]
-      [ tr []
-        [ td [class "thumbcell"]
-          [ a [ href ("#design/" ++ (toString design.designid))]
-            [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
-          ]
-        , td []
+      div [style [("overflow", "auto")]]
+      [ div (thumbImageAttributes design)
+        [ thumbImage design ]
+      , div [style [("padding-left", "310px")]]
           (List.concat
           [ [ b [] [text design.title ]
             , text " by "
@@ -481,13 +550,12 @@ view cfg design =
                 ]
               ]
           , [ br [] []
-            , div [class "filediv", style [("width","100%")]]
+            , div [class "filediv", style [("width","95%")]]
                 [ design.noteshtml
                 , design.cfdghtml
                 ]
             ]
           ])
-        ]
       ]
     Small ->
       table [class "sm_thumbtable"]
