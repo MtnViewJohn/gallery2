@@ -31,6 +31,13 @@ import Markdown
 
 -- MODEL
 
+type alias Size =
+    { width : Int
+    , height : Int
+    }
+
+type TileType = Untiled | Hfrieze | Vfrieze | Tiled
+
 type alias Design =
     { ccImage : String
     , ccName : String
@@ -39,13 +46,14 @@ type alias Design =
     , fans : List String
     , filelocation : String
     , imagelocation : String
+    , imagesize : Maybe Size
     , notes : String
     , numvotes : Int
     , owner : String
     , smthumblocation : String
     , tags : List String
     , thumblocation : String
-    , tiled : Int
+    , tiled : TileType
     , title : String
     , uploaddate : Time.Time
     , variation : String
@@ -71,9 +79,25 @@ notesHtml notes =
   else
     Markdown.toHtmlWith options [class "notesdiv"] notes
 
+int2Tiled : Int -> TileType
+int2Tiled i =
+  case i of
+    1 -> Hfrieze
+    2 -> Vfrieze
+    3 -> Tiled
+    _ -> Untiled
+
+tiled2Int : TileType -> Int
+tiled2Int tt =
+  case tt of
+    Untiled -> 0
+    Hfrieze -> 1
+    Vfrieze -> 2
+    Tiled -> 3
+
 initDesign: String -> String -> Design
 initDesign user ccURI = 
-    Design "" "" ccURI 0 [] "" "" "" 0 user "" [] "" 0 "" 0 "" (text "") (text "") []
+    Design "" "" ccURI 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" 0 "" (text "") (text "") []
 
 setCfdg : Int -> String -> Design -> Design
 setCfdg id newCfdg design =
@@ -90,6 +114,12 @@ setComments : List Comment.Comment -> Design -> Design
 setComments newComments design =
   { design | comments = List.map Comment.setupHtml newComments }
 
+decodeSize : Json.Decode.Decoder Size
+decodeSize = 
+  Json.Decode.map2 Size
+    (Json.Decode.field "width" Json.Decode.int)
+    (Json.Decode.field "height" Json.Decode.int)
+
 decodeDesign : Json.Decode.Decoder Design
 decodeDesign =
     Json.Decode.Pipeline.decode Design
@@ -100,13 +130,14 @@ decodeDesign =
         |> Json.Decode.Pipeline.optional "fans" (Json.Decode.list Json.Decode.string) []
         |> Json.Decode.Pipeline.required "filelocation" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "imagelocation" (Json.Decode.string)
+        |> Json.Decode.Pipeline.optional "imagesize" (Json.Decode.maybe decodeSize) Nothing
         |> Json.Decode.Pipeline.required "notes" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "numvotes" (Json.Decode.int)
         |> Json.Decode.Pipeline.required "owner" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "smthumblocation" (Json.Decode.string)
         |> Json.Decode.Pipeline.optional "tags" (Json.Decode.list Json.Decode.string) []
         |> Json.Decode.Pipeline.required "thumblocation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "tiled" (Json.Decode.int)
+        |> Json.Decode.Pipeline.required "tiled" (Json.Decode.map int2Tiled Json.Decode.int)
         |> Json.Decode.Pipeline.required "title" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "uploaddate" (Json.Decode.map int2Time Json.Decode.int)
         |> Json.Decode.Pipeline.required "variation" (Json.Decode.string)
@@ -122,7 +153,7 @@ encodeDesign record =
         , ("ccURI",     Json.Encode.string  <| record.ccURI)
         , ("designid",  Json.Encode.int     <| record.designid)
         , ("notes",     Json.Encode.string  <| record.notes)
-        , ("tiled",     Json.Encode.int     <| record.tiled)
+        , ("tiled",     Json.Encode.int     <| (tiled2Int record.tiled))
         , ("title",     Json.Encode.string  <| record.title)
         , ("variation", Json.Encode.string  <| record.variation)
         ]
@@ -164,6 +195,12 @@ update msg design =
 
 -- VIEW
 
+showOnSide : Design -> Bool
+showOnSide design =
+  case design.imagesize of
+    Nothing -> False
+    Just sz -> design.tiled == Vfrieze && sz.width <= 150
+
 makeTagLink : String -> Html Msg
 makeTagLink tag = 
   a [href (makeUri "#tag" [tag, "0"])] [text (tag ++ " ")]
@@ -179,13 +216,13 @@ fanCount cnt =
   else
     toString cnt ++ " votes"
 
-tileText : Int -> String
+tileText : TileType -> String
 tileText tile =
   case tile of
-    1 -> ", horizontal frieze"
-    2 -> ", vertical frieze"
-    3 -> ", tiled"
-    _ -> ""
+    Untiled -> ""
+    Hfrieze -> ", horizontal frieze"
+    Vfrieze -> ", vertical frieze"
+    Tiled -> ", tiled"
 
 type ViewSize
     = Large
@@ -197,114 +234,188 @@ type alias ViewConfig =
     , currentUser : Maybe User
     }
 
+fullImageAttributes : Design -> List (Attribute Msg)
+fullImageAttributes design =
+  let
+    imageurl = "url(" ++ design.imagelocation ++ ")"
+  in
+    if showOnSide design then
+      [ style
+        [ ("background-image", imageurl)
+        , ("background-repeat", "repeat-y")
+        , ("margin-bottom", "5px")
+        , ("width", 
+            let
+              sz = Maybe.withDefault (Size 150 800) design.imagesize
+            in
+              toString sz.width ++ "px"
+          )
+        , ("float", "left")
+        , ("min-height",
+            let
+              sz = Maybe.withDefault (Size 150 800) design.imagesize
+            in
+              toString (2 * sz.height) ++ "px"
+          )
+        ]
+      ]
+    else
+      case design.tiled of
+        Untiled ->
+          [ class "fullimagediv"
+          ]
+        Hfrieze ->
+          [ class "tiledimagediv"
+          , style 
+            [ ("background-image", imageurl)
+            , ("background-repeat", "repeat-x")
+            , ("height", 
+                let
+                  sz = Maybe.withDefault (Size 800 800) design.imagesize
+                in
+                  ((toString sz.height) ++ "px")
+              )
+            ]
+          ]
+        Vfrieze ->
+          [ class "tiledimagediv"
+          , style 
+            [ ("background-image", imageurl)
+            , ("background-repeat", "repeat-y")
+            , ("width", 
+                let
+                  sz = Maybe.withDefault (Size 800 800) design.imagesize
+                in
+                  ((toString sz.width) ++ "px")
+              )
+            ]
+          ]
+        Tiled ->
+          [ class "tiledimagediv"
+          , style 
+            [ ("background-image", imageurl)
+            , ("background-repeat", "repeat")
+            ]
+          ]
+
 view : ViewConfig -> Design -> Html Msg
 view cfg design =
   case cfg.size of
     Large ->
       div []
-      (List.concat
-      [ [ div [class "fullimagediv"]
-          [ img [class "image", src design.imagelocation, alt "cfdg image"] []
+      [ div (fullImageAttributes design)
+        [ if design.tiled == Untiled then
+            img [class "image", src design.imagelocation, alt "cfdg image"] []
+          else
+            text " "
+        ]
+      , div 
+        ( if showOnSide design then
+            [ style [("padding-left", "150px")]
+            ]
+          else
+            []
+        )
+        (List.concat
+        [ [ b [] [ text design.title ]
           , br [] []
+          , text "by " 
+          , a [href (makeUri "#user" [design.owner, "0"])] 
+              [ b [] [text design.owner]]
           ]
-        , b [] [ text design.title ]
-        , br [] []
-        , text "by " 
-        , a [href (makeUri "#user" [design.owner, "0"])] 
-            [ b [] [text design.owner]]
-        ]
-      , if isEmpty design.variation then
-          [ text "" ]
-        else
-          [ text " Variation: ", b [] [text (design.variation ++ tileText design.tiled)] ]
-      , [ text (" uploaded on " ++ (makeDate design.uploaddate)) ]
-      , if not (List.isEmpty design.tags) then
-          [ div [class "pte_tags_form"] 
-             ([text "Tags: "] ++ (List.map makeTagLink design.tags))
-          ]
-        else
-          []
-      , if not (List.isEmpty design.fans) then
-          [ div [id "favelist"] 
-             ([text (fanCount design.numvotes), text ": "] ++ 
-              (List.map makeFanLink design.fans))
-          ]
-        else
-          []
-      , [ br [] []
-        , a [ href design.filelocation, download True, 
-              title "Download the cfdg file to your computer." ]
-            [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
-                    width 100, height 22] []
+        , if isEmpty design.variation then
+            [ text "" ]
+          else
+            [ text " Variation: ", b [] [text (design.variation ++ tileText design.tiled)] ]
+        , [ text (" uploaded on " ++ (makeDate design.uploaddate)) ]
+        , if not (List.isEmpty design.tags) then
+            [ div [class "pte_tags_form"] 
+               ([text "Tags: "] ++ (List.map makeTagLink design.tags))
             ]
-        , text " "
-        , a [ href ("translate.php?id=" ++ toString design.designid),
-              title "Translate to new syntax." ] 
-            [ img [ src "graphics/translateButton.png", alt "Translate to new syntax",
-                    width 83, height 22 ] []
+          else
+            []
+        , if not (List.isEmpty design.fans) then
+            [ div [id "favelist"] 
+               ([text (fanCount design.numvotes), text ": "] ++ 
+                (List.map makeFanLink design.fans))
             ]
-        , text " "
-        ]
-      , if canModify design.owner cfg.currentUser then  
-          [ a [ href "#", onClick DeleteClick, title "Delete this design."] 
-              [ img [ src "graphics/deleteButton.png", alt "Delete this design",
-                      width 80, height 22 ][]
+          else
+            []
+        , [ br [] []
+          , a [ href design.filelocation, download True, 
+                title "Download the cfdg file to your computer." ]
+              [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
+                      width 100, height 22] []
               ]
           , text " "
-          , a [ href "#", onClick EditClick, title "Edit this design."] 
-              [ img [ src "graphics/editButton.png", alt "Edit this design",
-                      width 60, height 22 ][]
+          , a [ href ("translate.php?id=" ++ toString design.designid),
+                title "Translate to new syntax." ] 
+              [ img [ src "graphics/translateButton.png", alt "Translate to new syntax",
+                      width 83, height 22 ] []
               ]
           , text " "
           ]
-        else
-          [ ]
-      , case cfg.currentUser of
-          Nothing -> [ ]
-          Just user ->
-            if List.member user.name design.fans then
-              [ a [ href "#", onClick RemoveFavesClick, title "Remove this design from your list of favorites."] 
-                  [ img [ src "graphics/deleteFaveButton.png", alt "Remove from favorites",
-                          width 90, height 22 ][]
-                  ]
-              ]
-            else
-              [ a [ href "#", onClick AddFavesClick, title "Add this design to your list of favorites."] 
-                  [ img [ src "graphics/addFaveButton.png", alt "Add to favorites",
-                          width 65, height 22 ][]
-                  ]
-              ]
-      , [ br [][]
-        , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
-        ]
-      , if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
-          []
-        else
-          [ div [class "ccInfo"]
-            [ a [class "ccIcon", href design.ccURI]
-                [ img [alt "creative commons icon", src design.ccImage][] ]
-            , text design.ccName
+        , if canModify design.owner cfg.currentUser then  
+            [ a [ href "#", onClick DeleteClick, title "Delete this design."] 
+                [ img [ src "graphics/deleteButton.png", alt "Delete this design",
+                        width 80, height 22 ][]
+                ]
+            , text " "
+            , a [ href "#", onClick EditClick, title "Edit this design."] 
+                [ img [ src "graphics/editButton.png", alt "Edit this design",
+                        width 60, height 22 ][]
+                ]
+            , text " "
             ]
+          else
+            [ ]
+        , case cfg.currentUser of
+            Nothing -> [ ]
+            Just user ->
+              if List.member user.name design.fans then
+                [ a [ href "#", onClick RemoveFavesClick, title "Remove this design from your list of favorites."] 
+                    [ img [ src "graphics/deleteFaveButton.png", alt "Remove from favorites",
+                            width 90, height 22 ][]
+                    ]
+                ]
+              else
+                [ a [ href "#", onClick AddFavesClick, title "Add this design to your list of favorites."] 
+                    [ img [ src "graphics/addFaveButton.png", alt "Add to favorites",
+                            width 65, height 22 ][]
+                    ]
+                ]
+        , [ br [][]
+          , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
           ]
-      , [ br [] [] 
-        , table [style [("table-layout","fixed"),("width","100%")]]
-          [ tr []
-            [ td [class "halfcell"]
-              [ div [class "filediv"]
-                [ design.noteshtml
-                , design.cfdghtml
+        , if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
+            []
+          else
+            [ div [class "ccInfo"]
+              [ a [class "ccIcon", href design.ccURI]
+                  [ img [alt "creative commons icon", src design.ccImage][] ]
+              , text design.ccName
+              ]
+            ]
+        , [ br [] [] 
+          , table [style [("table-layout","fixed"),("width","100%")]]
+            [ tr []
+              [ td [class "halfcell"]
+                [ div [class "filediv"]
+                  [ design.noteshtml
+                  , design.cfdghtml
+                  ]
+                ]
+              , td [class "commentcell"]
+                [ div [class "commentsdiv"]
+                  (List.intersperse (hr [][])
+                  (List.map ((Comment.view cfg.currentUser) >> (Html.map CommentMsg))
+                    design.comments))
                 ]
               ]
-            , td [class "commentcell"]
-              [ div [class "commentsdiv"]
-                (List.intersperse (hr [][])
-                (List.map ((Comment.view cfg.currentUser) >> (Html.map CommentMsg))
-                  design.comments))
-              ]
             ]
           ]
-        ]
-      ])
+        ])
+      ]
     Medium ->
       table [class "thumbtable"]
       [ tr []
