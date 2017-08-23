@@ -398,8 +398,10 @@ view cfg design =
         , if isEmpty design.variation then
             [ text "" ]
           else
-            [ text " Variation: ", b [] [text (design.variation ++ tileText design.tiled)] ]
-        , [ text (" uploaded on " ++ (makeDate design.uploaddate)) ]
+            [ text ", Variation: ", b [] [text design.variation] ]
+        , [ b [] [text (tileText design.tiled)]
+          , text (", uploaded on " ++ (makeDate design.uploaddate))
+          ]
         , if not (List.isEmpty design.tags) then
             [ div [class "pte_tags_form"] 
                ([text "Tags: "] ++ (List.map makeTagLink design.tags))
@@ -502,8 +504,10 @@ view cfg design =
             , if isEmpty design.variation then
                 [ text "" ]
               else
-                [ text " Variation: ", b [] [text (design.variation ++ tileText design.tiled)] ]
-            , [ br [][], text (" uploaded on " ++ (makeDate design.uploaddate)) ]
+                [ text ", Variation: ", b [] [text design.variation] ]
+            , [ b [] [text (tileText design.tiled)]
+              , text (", uploaded on " ++ (makeDate design.uploaddate))
+              ]
             , if design.numvotes > 0 then
                 [ br [] []
                 , span [class "small"] [text (fanCount design.numvotes) ]
