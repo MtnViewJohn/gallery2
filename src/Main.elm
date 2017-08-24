@@ -296,7 +296,7 @@ update msg model =
           in
             (model, Cmd.none)           -- not implemented yet
     LookupName ->
-      (model, Navigation.newUrl ("#user/" ++ model.authorLookup ++ "/0"))
+      (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
       (model, Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
     AuthorText author ->
