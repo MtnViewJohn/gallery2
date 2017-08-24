@@ -487,6 +487,14 @@ view cfg design =
                   [ design.noteshtml
                   , design.cfdghtml
                   ]
+                , div [class "disclaimer"]
+                  [ br [] []
+                  , br [] []
+                  , text """
+    An uploaded image and the corresponding CFDG are both presumed to be owned by the uploader. 
+    The CFDG Gallery makes no claims about ownership whatsoever. Peace!
+    """
+                  ]
                 ]
               , td [class "commentcell"]
                 [ div [class "commentsdiv"]
