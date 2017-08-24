@@ -32,6 +32,7 @@ type ViewMode
   | Tags
   | People
   | Translation
+  | Default
 
 type alias DesignList =
   { designs : List Design.Design
@@ -187,9 +188,10 @@ update msg model =
         Just route ->
           case route of
             Home ->
-              ({model | mainDesign = Nothing 
-                      , designList = zeroList
-                      , viewMode = Designs}, Cmd.none)
+              ({model | viewMode = Default
+                      , mainDesign = Nothing
+                      , designList = zeroList}, 
+                Cmd.batch [getDesigns "newest" 0 10, getNewbie])
             DesignID id ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesign id)
@@ -317,7 +319,7 @@ update msg model =
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | mainDesign = Nothing, designList = designs},         
+          ({model | designList = designs},         
             if model.designMode == Design.Small then
               Cmd.none
             else
@@ -643,6 +645,70 @@ view model =
         Translation ->
         ( [text "translation"]
         )
+        Default ->
+        ( [ table []
+            [ tr []
+              [ td [class "halfcell"]
+                [ text """
+     CFDG is a simple language for generating stunning images.
+     With only a few lines you can describe abstract art, beautiful organic scenery,
+     and many kinds of fractals. It's highly addictive!
+                  """
+                , br [] []
+                , br [] []
+                , text "The CFDG Gallery is a public repository for artwork made "
+                , text "using the language."
+                , br [] []
+                , br [] []
+                , b [] [text "What now?"]
+                , br [] []
+                , br [] []
+                , text "The links at the top of the page will navigate you around the site. "
+                , a [href "../downloads.html"] [text "Get the software here. "]
+                , text " or "
+                , a [href "#newest/0"] [text "browse the latest designs uploaded. "]
+                , text "Once you've started making your own, "
+                , a [href "../phpbb/ucp.php?mode=register"] [text "join us "]
+                , text "and post your own designs to the gallery."
+                ]
+              , td []
+                [ case model.mainDesign of
+                    Just design ->
+                      table [class "welcometable"]
+                        [ tr []
+                          [ td [class "thumbcell"] 
+                            [ a [href ("#design/" ++ (toString design.designid))] 
+                              [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
+                            ]
+                          ]
+                        , tr []
+                          [ td [] 
+                            [ text "The Gallery's newest contributor is: "
+                            , a [href (makeUri "#user" [design.owner, "0"])] [text design.owner]
+                            , text ", whose latest piece is called "
+                            , b [] [text design.title]
+                            ]
+                          ]
+                        ]
+                    Nothing ->
+                      text ""
+                ]
+              ]
+            ]
+          , hr [] []
+          , b [] [text "Most recent uploaded designs:"]
+          , br [] []
+          , br [] []
+          ]
+          ++
+          ( let
+              vcfg = Design.ViewConfig Design.Small model.user
+            in
+              List.map ((Design.view vcfg) >> (Html.map DesignMsg))
+                                model.designList.designs
+          )
+        )
+
     )
   ]
 
@@ -689,6 +755,13 @@ get url decoder =
 
 
 
+getNewbie : Cmd Msg
+getNewbie =
+  let
+    url = "http://localhost:5000/newbie"
+  in
+    Http.send NewDesign (get url decodeDesign)
+      
 
 getDesign : Int -> Cmd Msg
 getDesign id =
