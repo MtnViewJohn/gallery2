@@ -105,7 +105,7 @@ setCfdg id newCfdg design =
     let
       markdown = String.concat ["```cfdg\n", newCfdg, "\n```\n"]
     in
-      { design | cfdghtml = toHtml markdown, noteshtml = notesHtml design.notes }
+      { design | cfdghtml = toHtml markdown }
   else
     design
 
@@ -119,6 +119,10 @@ decodeSize =
   Json.Decode.map2 Size
     (Json.Decode.field "width" Json.Decode.int)
     (Json.Decode.field "height" Json.Decode.int)
+
+decodeNotesMarkdown : Json.Decode.Decoder (Html Msg)
+decodeNotesMarkdown =
+  Json.Decode.map notesHtml Json.Decode.string
 
 decodeDesign : Json.Decode.Decoder Design
 decodeDesign =
@@ -142,7 +146,7 @@ decodeDesign =
         |> Json.Decode.Pipeline.required "uploaddate" (Json.Decode.map int2Time Json.Decode.int)
         |> Json.Decode.Pipeline.required "variation" (Json.Decode.string)
         |> Json.Decode.Pipeline.hardcoded (text "")
-        |> Json.Decode.Pipeline.hardcoded (text "")
+        |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
         |> Json.Decode.Pipeline.hardcoded []
 
 encodeDesign : Design -> Json.Encode.Value
