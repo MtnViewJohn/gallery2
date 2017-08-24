@@ -359,13 +359,22 @@ thumbImage design =
             , height (sz.height - 1)
             , alt "design thumbnail"
             ] []]
-      _ ->
+      Vfrieze ->
         a [ href ("#design/" ++ (toString design.designid))]
           [ img 
             [ class "image"
             , src "empty300.png"
             , width (sz.width - 1)
-            , height (sz.height - 1)
+            , height (2 * sz.height - 1)
+            , alt "design thumbnail"
+            ] []]
+      Tiled ->
+        a [ href ("#design/" ++ (toString design.designid))]
+          [ img 
+            [ class "image"
+            , src "empty300.png"
+            , width 300
+            , height 300
             , alt "design thumbnail"
             ] []]
 
