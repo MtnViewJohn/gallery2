@@ -213,3 +213,26 @@ textarea.cfdg {
     color:gray
 }
 .rightcell {text-align: right; padding-left: 1em; padding-right: 1em;}
+table.tabtable {
+    table-layout: auto;
+    width: 100%;
+    border: none;
+    empty-cells: show;
+    border-collapse: collapse;
+}
+td.tabinter {
+    width: 35px;
+    height: 37px;
+    border: none;
+}
+td.tabdata {
+    height: 37px;
+    width: auto;
+    background-repeat: repeat-x;
+    word-break: keep-all;
+}
+td.tabrest {
+    height: 37px;
+    width: 100%;
+    background-repeat: repeat-x;
+}

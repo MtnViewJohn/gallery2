@@ -94,6 +94,8 @@ type Route
   | Author String Int Int
   | AuthorInit String Int
   | AuthorInit2 String
+  | Faves String Int Int
+  | FavesInit String Int
   | Newest Int Int
   | NewestInit Int
   | Oldest Int Int
@@ -123,6 +125,8 @@ route =
     , Url.map Author (Url.s "user" </> Url.string </> int </> int)
     , Url.map AuthorInit (Url.s "user" </> Url.string </> int)
     , Url.map AuthorInit2 (Url.s "user" </> Url.string)
+    , Url.map Faves (Url.s "faves" </> Url.string </> int </> int)
+    , Url.map FavesInit (Url.s "faves" </> Url.string </> int)
     , Url.map Newest (Url.s "newest" </> int </> int)
     , Url.map NewestInit (Url.s "newest" </> int)
     , Url.map Oldest (Url.s "oldest" </> int </> int)
@@ -212,6 +216,18 @@ update msg model =
                 name = Maybe.withDefault "" (Http.decodeUri name_enc)
               in
                 (model, Navigation.modifyUrl (makeUri "by" [name, "0"]))
+            Faves name_enc start count ->
+              let
+                name = Maybe.withDefault "" (Http.decodeUri name_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "faves" [name]) start count)
+            FavesInit name_enc start ->
+              let
+                name = Maybe.withDefault "" (Http.decodeUri name_enc)
+              in
+                ({model | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns (makeUri "faves" [name]) start (if model.designMode == Design.Small then 50 else 5))
             Newest start count ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesigns "newest" start count)
@@ -430,48 +446,94 @@ makePNlink type_ count url =
       style [("visibility", if (String.isEmpty url) then "hidden" else "visible")]]
     [ b [] [text (type_ ++ " " ++ (toString count))]]
 
-viewDesigns : Model -> List (Html Msg)
-viewDesigns model =
-  if List.isEmpty model.designList.designs then
-    [ text "Nothing to show" ]
-  else
-  [ if String.contains "title" model.designList.prevlink || 
-       String.contains "title" model.designList.nextlink then
+makePNbar : DesignList -> Html Msg
+makePNbar dlist =
+  div [class "clearleft"] 
+  [ makePNlink "Previous" dlist.count dlist.prevlink
+  , text " "
+  , makePNlink "Next" dlist.count dlist.nextlink
+  ]
+
+
+makeHeader : String -> Html Msg
+makeHeader thislink =
+  let
+    urlparts = String.split "/" thislink
+    urlname = Maybe.withDefault "" (List.head <| (List.drop 1) <| urlparts)
+    name = Maybe.withDefault "" (Http.decodeUri urlname)
+    -- Map spaces to non-breaking spaces
+    namenb = String.map (\c -> if c == ' ' then ' ' else c) name
+
+  in
+    if String.startsWith "title/" thislink then
       div []
       ([ a [class "letterref", href "#title/0"] [text "all"], text " "]
       ++
       List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
       ++ [hr [][]])
-    else
+    else if String.startsWith "faves/" thislink then
+      table [class "tabtable"]
+      [ tr []
+        [ td [class "tabdata", style [("background-image", "url(graphics/empty.png)")]] 
+             [text ("Gallery user: " ++ namenb)]
+        , td [class "tabinter"]
+             [img [src "graphics/empty2inactive.png", width 35, height 37][]]
+        , td [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
+             [a [href (makeUri "#user" [urlname, "0"])] [text "Own Designs"]]
+        , td [class "tabinter"]
+             [img [src "graphics/inactive2active.png", width 35, height 37][]]
+        , td [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
+             [text "Favorite Designs"]
+        , td [class "tabinter"]
+             [img [src "graphics/active2empty.png", width 35, height 37][]]
+        , td [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text ""]
+        ]
+      ]
+    else if String.startsWith "user/" thislink then
+      table [class "tabtable"]
+      [ tr []
+        [ td [class "tabdata", style [("background-image", "url(graphics/empty.png)")]]
+             [text ("Gallery user: " ++ namenb)]
+        , td [class "tabinter"]
+             [img [src "graphics/empty2active.png", width 35, height 37][]]
+        , td [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
+             [text "Own Designs"]
+        , td [class "tabinter"]
+             [img [src "graphics/active2inactive.png", width 35, height 37][]]
+        , td [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
+             [a [href (makeUri "#faves" [urlname, "0"])] [text "Favorite Designs"]]
+        , td [class "tabinter"]
+             [img [src "graphics/inactive2empty.png", width 35, height 37][]]
+        , td [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text ""]
+        ]
+      ]
+    else 
       text ""
-  ]
-  ++
-  [ div [class "clearleft"] 
-    [ makePNlink "Previous" model.designList.count model.designList.prevlink
-    , text " "
-    , makePNlink "Next" model.designList.count model.designList.nextlink
-    ]
-  ]
-  ++
-  ( let
-      vcfg = Design.ViewConfig model.designMode model.user
 
-      htmlList = 
-        (List.map ((Design.view vcfg) >> (Html.map DesignMsg))
-          model.designList.designs)
-    in
-      if model.designMode == Design.Medium then
-        (List.intersperse (hr [] []) htmlList)
-      else
-        htmlList
-  )
-  ++
-  [ div [class "clearleft"] 
-    [ makePNlink "Previous" model.designList.count model.designList.prevlink
-    , text " "
-    , makePNlink "Next" model.designList.count model.designList.nextlink
-    ]
-  ]
+viewDesigns : Model -> List (Html Msg)
+viewDesigns model =
+  (makeHeader model.designList.thislink)
+  ::
+  if List.isEmpty model.designList.designs then
+    [ text "Nothing to show" ]
+  else
+    (makePNbar model.designList)
+    ::
+    ( let
+        vcfg = Design.ViewConfig model.designMode model.user
+
+        htmlList = 
+          (List.map ((Design.view vcfg) >> (Html.map DesignMsg))
+            model.designList.designs)
+      in
+        if model.designMode == Design.Medium then
+          (List.intersperse (hr [] []) htmlList)
+        else
+          htmlList
+    )
+    ++
+    [makePNbar model.designList]
+
 
 viewUsers : Model -> List (Html Msg)
 viewUsers model =
