@@ -213,26 +213,32 @@ textarea.cfdg {
     color:gray
 }
 .rightcell {text-align: right; padding-left: 1em; padding-right: 1em;}
-table.tabtable {
-    table-layout: auto;
+div.tabtable {
     width: 100%;
-    border: none;
-    empty-cells: show;
-    border-collapse: collapse;
+    height: 37px;
 }
-td.tabinter {
+div.tabinter {
+    background-repeat: no-repeat;
     width: 35px;
     height: 37px;
-    border: none;
+    float: left;
 }
-td.tabdata {
+div.tabdata {
     height: 37px;
     width: auto;
     background-repeat: repeat-x;
-    word-break: keep-all;
+    float: left;
+    padding-top: 10px;
 }
-td.tabrest {
+div.tabrest {
     height: 37px;
     width: 100%;
     background-repeat: repeat-x;
+}
+div.tabclear {
+    clear: both;
+    height: 1px;
+    overflow: hidden;
+    font-size: 0pt;
+    margin-top: -1px;
 }
