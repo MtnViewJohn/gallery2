@@ -55,6 +55,11 @@ type alias TagInfo =
   , count : Int
   }
 
+type alias FaveInfo =
+  { designid : Int
+  , fans : List String
+  }
+
 type alias Model =
   { user : Maybe User
   , loginform : Login.Model
@@ -176,6 +181,7 @@ type Msg
   | GotTitleIndex (Result Http.Error Int)
   | GotTags (Result Http.Error (List TagInfo))
   | NewUsers (Result Http.Error UserList)
+  | NewFaves (Result Http.Error FaveInfo)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -451,6 +457,21 @@ update msg model =
           ({model | userList = users}, Cmd.none)
         Err error ->
           (model,Cmd.none)
+    NewFaves favesResults -> case favesResults of
+      Ok faveinfo -> case model.mainDesign of
+        Just design ->
+          if design.designid == faveinfo.designid then
+            let
+              design_ = {design
+                         | fans = faveinfo.fans
+                         , numvotes = List.length faveinfo.fans}
+            in
+              ({model | mainDesign = Just design_}, Cmd.none)
+          else
+            (model, Cmd.none)
+        Nothing -> (model, Cmd.none)
+      Err _ -> (model, Cmd.none)
+
 
 updateDesignList : Design.MsgId -> List Design.Design -> (List Design.Design, Maybe Action)
 updateDesignList (dmsg, id) designs =
@@ -871,7 +892,22 @@ resolveAction ma model =
       UpdateComment commentid comment_ -> sendComment commentid comment_
       CreateComment designid comment_ -> newComment designid comment_
       DeleteComment commentid -> deleteComment commentid
+      AddFaves designid -> changeFave "addfave" designid
+      RemoveFaves designid -> changeFave "deletefave" designid
       _ -> Cmd.none
+
+changeFave : String -> Int -> Cmd Msg
+changeFave change designid =
+  let
+    url = String.join "/" ["http://localhost:5000", change, toString designid]
+  in
+    Http.send NewFaves (post url Http.emptyBody decodeFaves)
+
+decodeFaves : Json.Decode.Decoder FaveInfo
+decodeFaves =
+  Json.Decode.map2 FaveInfo
+    (Json.Decode.field "designid"  Json.Decode.int)
+    (Json.Decode.field "faves" (Json.Decode.list Json.Decode.string))
 
 sendComment : Int -> String -> Cmd Msg
 sendComment commentid comment_ =

@@ -511,13 +511,13 @@ view cfg design =
             Nothing -> [ ]
             Just user ->
               if List.member user.name design.fans then
-                [ a [ href "#", onClick (RemoveFavesClick,design.designid), title "Remove this design from your list of favorites."] 
+                [ a [ href "#", onNav (RemoveFavesClick,design.designid), title "Remove this design from your list of favorites."] 
                     [ img [ src "graphics/deleteFaveButton.png", alt "Remove from favorites",
                             width 90, height 22 ][]
                     ]
                 ]
               else
-                [ a [ href "#", onClick (AddFavesClick,design.designid), title "Add this design to your list of favorites."] 
+                [ a [ href "#", onNav (AddFavesClick,design.designid), title "Add this design to your list of favorites."] 
                     [ img [ src "graphics/addFaveButton.png", alt "Add to favorites",
                             width 65, height 22 ][]
                     ]
