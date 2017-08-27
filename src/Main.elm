@@ -319,7 +319,8 @@ update msg model =
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
-      (model, Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
+      ({model | designList = zeroList}, 
+        Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
     AuthorText author ->
       ({ model | authorLookup = trimLeft author }, Cmd.none)
     DesignText desText ->
