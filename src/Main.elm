@@ -215,7 +215,7 @@ update msg model =
               let
                 name = Maybe.withDefault "" (Http.decodeUri name_enc)
               in
-                (model, Navigation.modifyUrl (makeUri "by" [name, "0"]))
+                (model, Navigation.modifyUrl (makeUri "#user" [name, "0"]))
             Faves name_enc start count ->
               let
                 name = Maybe.withDefault "" (Http.decodeUri name_enc)
