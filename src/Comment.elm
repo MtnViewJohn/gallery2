@@ -73,8 +73,8 @@ setupHtml : Comment -> Comment
 setupHtml comment = 
   { comment | htmltext = toHtml 
     (String.concat 
-      [ comment.comment 
-      , " - [**"
+      [ comment.commentmd 
+      , " \\- [**"
       , comment.screenname
       , "**](#user/"
       , encodeUri comment.screenname
