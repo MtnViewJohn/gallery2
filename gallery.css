@@ -3,6 +3,13 @@
 #CFAcontent p, #CFAcontent ul {
     padding-left: 0;
 }
+#Addcommentdiv p, #Addcommentdiv ul {
+    padding-left: 3em !important;
+}
+#Addcommentdiv input {
+    padding: 2px 6px 3px;
+    margin-right: 8px;
+}
 
 form {
  display:inline;

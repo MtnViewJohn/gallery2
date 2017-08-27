@@ -170,6 +170,8 @@ type Msg
   | LogoutUser (Result Http.Error Bool)
   | ReceiveCfdg Int (Result Http.Error String)
   | NewComments (Result Http.Error (List Comment.Comment))
+  | NewComment (Result Http.Error Comment.Comment)
+  | RemoveComment (Result Http.Error Int)
   | GotTitleIndex (Result Http.Error Int)
   | GotTags (Result Http.Error (List TagInfo))
   | NewUsers (Result Http.Error UserList)
@@ -303,14 +305,17 @@ update msg model =
             update LoginClick { model | loginform = newLoginModel }
           Nothing ->
             ({ model | loginform = newLoginModel }, Cmd.none) 
-    DesignMsg dmsg ->   -- TODO manage messages from all designs
+    DesignMsg dmsg ->
       case model.mainDesign of
         Nothing -> (model, Cmd.none)
         Just des ->
           let
             (newDesign, maybeAction) = Design.update dmsg des
+            (newDesigns, maybeActions) = 
+              List.unzip (List.map (Design.update dmsg) model.designList.designs)
+            newAction = firstJust (maybeAction :: maybeActions)
           in
-            (model, Cmd.none)           -- not implemented yet
+            ({model|mainDesign = Just newDesign}, resolveAction newAction model)
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
@@ -391,6 +396,26 @@ update msg model =
               (model, Cmd.none)   -- Just drop it
         Err _ ->
           (model, Cmd.none)
+    NewComment commentResult ->
+      case commentResult of
+        Ok comment -> case model.mainDesign of
+          Just design ->
+            let
+              design_ = Design.setComment comment design
+            in
+              ({model | mainDesign = Just design_}, Cmd.none)
+          Nothing -> (model, Cmd.none)
+        Err _ -> (model, Cmd.none)
+    RemoveComment commentidResult ->
+      case commentidResult of
+        Ok commentid -> case model.mainDesign of
+          Just design ->
+            let
+              design_ = Design.removeComment commentid design
+            in
+              ({model | mainDesign = Just design_}, Cmd.none)
+          Nothing -> (model, Cmd.none)
+        Err _ -> (model, Cmd.none)
     GotTitleIndex indexResult ->
       case indexResult of
         Ok index ->
@@ -584,11 +609,6 @@ viewMiniUser muser =
   , td [align "right"] [text (toString muser.numPosts)]
   , td [align "right"] [text (makeDate muser.joinedOn)]
   ]
-
-onNav : msg -> Attribute msg
-onNav msg =
-    onWithOptions "click" { stopPropagation = True, preventDefault = True } (Json.Decode.succeed msg)
-
 
 view : Model -> Html Msg
 view model =
@@ -814,7 +834,41 @@ get url decoder =
     }
 
 
+resolveAction : Maybe Action -> Model -> Cmd Msg
+resolveAction ma model =
+  case ma of 
+    Nothing -> Cmd.none
+    Just act -> case act of
+      UpdateComment commentid comment_ -> sendComment commentid comment_
+      CreateComment designid comment_ -> newComment designid comment_
+      DeleteComment commentid -> deleteComment commentid
+      _ -> Cmd.none
 
+sendComment : Int -> String -> Cmd Msg
+sendComment commentid comment_ =
+  let
+    url = "http://localhost:5000/updatecomment/" ++ (toString commentid)
+  in
+    Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
+
+newComment : Int -> String -> Cmd Msg
+newComment designid comment_ =
+  let
+    url = "http://localhost:5000/createcomment/" ++ (toString designid)
+  in
+    Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
+
+deleteComment : Int -> Cmd Msg
+deleteComment commentid =
+  let
+    url = "http://localhost:5000/deletecomment/" ++ (toString commentid)
+  in
+    Http.send RemoveComment (post url Http.emptyBody decodeCommentId)
+
+decodeCommentId : Json.Decode.Decoder Int
+decodeCommentId =
+  Json.Decode.at ["commentid"] Json.Decode.int
+      
 getNewbie : Cmd Msg
 getNewbie =
   let

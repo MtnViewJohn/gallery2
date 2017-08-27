@@ -2,11 +2,28 @@ module GalleryUtils exposing
   ( makeDate
   , int2Time
   , makeUri
+  , onNav
+  , firstJust
+  , justAccum
+  , Action (..)
   )
 
 import Time
 import Date
 import Http
+import Html exposing (..)
+import Html.Events exposing (onWithOptions)
+import Json.Decode
+
+type Action 
+    = DeleteDesign Int
+    | EditDesign Int
+    | AddFaves Int
+    | RemoveFaves Int
+    | DeleteComment Int
+    | UpdateComment Int String
+    | CreateComment Int String
+
 
 int2Time : Int -> Time.Time
 int2Time i = 
@@ -47,3 +64,29 @@ makeDate udate =
 makeUri : String -> List String -> String
 makeUri base rest =
   String.join "/" (base :: (List.map Http.encodeUri rest))
+
+onNav : msg -> Attribute msg
+onNav msg =
+    onWithOptions "click" { stopPropagation = False, preventDefault = True } (Json.Decode.succeed msg)
+
+
+{-mConcat : List (Maybe a) -> Maybe a
+mConcat l =
+  let
+    firstJust ma mb = case ma of
+      Just _ -> ma
+      Nothing -> mb
+  in
+    List.foldl firstJust Nothing l-}
+
+firstJust : List (Maybe a) -> Maybe a
+firstJust l = case l of
+  Just a :: _ -> Just a
+  Nothing :: l_ -> firstJust l_
+  [] -> Nothing
+
+justAccum : Maybe a -> Maybe a -> Maybe a
+justAccum ma mb = case ma of
+  Just a -> ma
+  Nothing -> mb
+

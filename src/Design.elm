@@ -3,9 +3,10 @@ module Design exposing
   , initDesign
   , setCfdg
   , setComments
+  , setComment
+  , removeComment
   , decodeDesign
   , encodeDesign
-  , Action
 
   , Msg
   , update
@@ -28,6 +29,7 @@ import User exposing (..)
 import Comment
 import GalleryUtils exposing (..)
 import Markdown
+--import Debug
 
 -- MODEL
 
@@ -60,6 +62,7 @@ type alias Design =
     , cfdghtml : Html Msg
     , noteshtml : Html Msg
     , comments : List Comment.Comment
+    , emptyComment : Comment.Comment
     }
 
 options : Markdown.Options
@@ -97,7 +100,8 @@ tiled2Int tt =
 
 initDesign: String -> String -> Design
 initDesign user ccURI = 
-    Design "" "" ccURI 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" 0 "" (text "") (text "") []
+    Design "" "" ccURI 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" 0 "" 
+      (text "") (text "") [] (Comment.emptyComment 0)
 
 setCfdg : Int -> String -> Design -> Design
 setCfdg id newCfdg design =
@@ -113,6 +117,28 @@ setCfdg id newCfdg design =
 setComments : List Comment.Comment -> Design -> Design
 setComments newComments design =
   { design | comments = List.map Comment.setupHtml newComments }
+
+setComment : Comment.Comment -> Design -> Design
+setComment newComment design =
+  { design | comments = replaceComment newComment design.comments}
+
+replaceComment : Comment.Comment -> List Comment.Comment -> List Comment.Comment
+replaceComment cmt_ cmts =
+  case cmts of
+    c :: lc -> 
+      if c.commentid == cmt_.commentid then
+        (Comment.setupHtml cmt_) :: lc
+      else
+        c :: (replaceComment cmt_ lc)
+    [] -> [Comment.setupHtml cmt_]
+
+removeComment : Int -> Design -> Design
+removeComment deleteid design =
+  let
+    comments_ = List.filter (\c -> c.commentid /= deleteid) design.comments
+  in
+    {design | comments = comments_}      
+
 
 decodeSize : Json.Decode.Decoder Size
 decodeSize = 
@@ -148,6 +174,7 @@ decodeDesign =
         |> Json.Decode.Pipeline.hardcoded (text "")
         |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
         |> Json.Decode.Pipeline.hardcoded []
+        |> Json.Decode.Pipeline.required "designid" (Json.Decode.map Comment.emptyComment Json.Decode.int)
 
 encodeDesign : Design -> Json.Encode.Value
 encodeDesign record =
@@ -163,14 +190,6 @@ encodeDesign record =
         ]
 
 
-type Action 
-    = Delete Int
-    | Edit Int
-    | AddFaves Int
-    | RemoveFaves Int
-    | DeleteComment Int
-
-
 -- UPDATE
 
 type Msg
@@ -178,21 +197,46 @@ type Msg
     | EditClick
     | AddFavesClick
     | RemoveFavesClick
-    | CommentMsg Comment.Msg
+    | CommentMsg Comment.MsgId
 
 update : Msg -> Design -> (Design, Maybe Action)
 update msg design =
   case msg of
-    DeleteClick -> ( design, Just (Delete design.designid))
-    EditClick -> ( design, Just (Edit design.designid))
-    AddFavesClick -> ( design, Just (AddFaves design.designid))
-    RemoveFavesClick -> ( design, Just (RemoveFaves design.designid))
-    CommentMsg cmsg ->
-      case cmsg of
-        Comment.DeleteClick id ->
-          (design, Just (DeleteComment id))
-        Comment.EditClick id ->
-          ({design | comments = List.map (Comment.update cmsg) design.comments}, Nothing)
+    DeleteClick -> (design, Just (DeleteDesign design.designid))
+    EditClick -> (design, Just (EditDesign design.designid))
+    AddFavesClick -> (design, Just (AddFaves design.designid))
+    RemoveFavesClick -> (design, Just (RemoveFaves design.designid))
+    CommentMsg (cmsg, id) ->
+      if id == 0 then
+        let
+          (comment_, act) = Comment.update cmsg design.emptyComment
+        in
+          ({design | emptyComment = comment_}, act)
+      else
+        let
+          (comments_, act) = updateCommentList (cmsg, id) design.comments
+        in
+          ({design | comments = comments_}, act)
+
+
+
+updateCommentList : Comment.MsgId -> List Comment.Comment -> (List Comment.Comment, Maybe Action)
+updateCommentList (msg, id) comments =
+  case comments of
+    c :: lc ->
+      if c.commentid == id then
+        let
+          (c_, act_) = Comment.update msg c
+        in
+          (c_ :: lc, act_)
+      else
+        let
+          (lc_, act_) = updateCommentList (msg, id) lc
+        in
+          (c :: lc_, act_)
+    [] -> ([], Nothing)
+        
+
 
 
 
@@ -501,11 +545,24 @@ view cfg design =
                   ]
                 ]
               , td [class "commentcell"]
-                [ div [class "commentsdiv"]
-                  (List.intersperse (hr [][])
-                  (List.map ((Comment.view cfg.currentUser) >> (Html.map CommentMsg))
-                    design.comments))
-                ]
+                ( let
+                    editing = List.any Comment.isEditable design.comments
+                    user = if editing then Nothing else cfg.currentUser
+                  in
+                    [ div [class "commentsdiv"]
+                      (List.intersperse (hr [][])
+                        (List.map ((Comment.view user) >> (Html.map CommentMsg))
+                          ( design.comments
+                            ++
+                            if cfg.currentUser == Nothing || editing then
+                              []
+                            else
+                              [design.emptyComment]
+                          )
+                        )
+                      )
+                    ]
+                )
               ]
             ]
           ]
