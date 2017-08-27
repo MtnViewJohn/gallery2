@@ -163,6 +163,7 @@ type Msg
   | AuthorText String
   | DesignText String
   | NewSeed Int
+  | DismissDesign
   | NewDesign (Result Http.Error Design.Design)
   | NewDesigns (Result Http.Error DesignList)
   | NewUser (Result Http.Error User.User)
@@ -336,6 +337,8 @@ update msg model =
           (model, Cmd.none)
         else
           ({ model | designLookup = des }, Cmd.none)
+    DismissDesign ->
+      ({model | mainDesign = Nothing}, Navigation.back 1)
     NewDesign designResult ->
       case designResult of
         Ok design ->
@@ -724,7 +727,13 @@ view model =
               let
                 vc = Design.ViewConfig Design.Large model.user
               in
-                [ Html.map DesignMsg (Design.view vc design) ]
+                [ if List.isEmpty model.designList.designs then
+                    text ""
+                  else
+                    div [style [("float", "right"), ("position", "relative"), ("top", "-1.75em")]]
+                     [a [href "#", onNav DismissDesign] [text "⬅︎ Back"]]
+                , Html.map DesignMsg (Design.view vc design)
+                ]
         )
         Tags ->
         ( [ table [class "tagstable"]
