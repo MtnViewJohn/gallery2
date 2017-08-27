@@ -9,6 +9,7 @@ module Design exposing
   , encodeDesign
 
   , Msg
+  , MsgId
   , update
   , ViewConfig
   , ViewSize (..)
@@ -59,8 +60,8 @@ type alias Design =
     , title : String
     , uploaddate : Time.Time
     , variation : String
-    , cfdghtml : Html Msg
-    , noteshtml : Html Msg
+    , cfdghtml : Html MsgId
+    , noteshtml : Html MsgId
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
     }
@@ -72,10 +73,10 @@ options =
   in
     { opts | sanitize = True, defaultHighlighting = Just "cfdg" }
 
-toHtml : String -> Html Msg
+toHtml : String -> Html MsgId
 toHtml = Markdown.toHtmlWith options []
 
-notesHtml : String -> Html Msg
+notesHtml : String -> Html MsgId
 notesHtml notes = 
   if isEmpty notes then
     text ""
@@ -146,7 +147,7 @@ decodeSize =
     (Json.Decode.field "width" Json.Decode.int)
     (Json.Decode.field "height" Json.Decode.int)
 
-decodeNotesMarkdown : Json.Decode.Decoder (Html Msg)
+decodeNotesMarkdown : Json.Decode.Decoder (Html MsgId)
 decodeNotesMarkdown =
   Json.Decode.map notesHtml Json.Decode.string
 
@@ -199,6 +200,12 @@ type Msg
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
 
+type alias MsgId = (Msg, Int)
+
+commentMsgId : Int -> Comment.MsgId -> MsgId
+commentMsgId id cmsgid =
+  (CommentMsg cmsgid, id)
+
 update : Msg -> Design -> (Design, Maybe Action)
 update msg design =
   case msg of
@@ -249,11 +256,11 @@ showOnSide design =
     Nothing -> False
     Just sz -> design.tiled == Vfrieze && sz.width <= 150
 
-makeTagLink : String -> Html Msg
+makeTagLink : String -> Html MsgId
 makeTagLink tag = 
   a [href (makeUri "#tag" [tag, "0"])] [text (tag ++ " ")]
 
-makeFanLink : String -> Html Msg
+makeFanLink : String -> Html MsgId
 makeFanLink fan = 
   a [href (makeUri "#user" [fan, "0"])] [b [] [text (fan ++ " ")]]
 
@@ -282,7 +289,7 @@ type alias ViewConfig =
     , currentUser : Maybe User
     }
 
-fullImageAttributes : Design -> List (Attribute Msg)
+fullImageAttributes : Design -> List (Attribute MsgId)
 fullImageAttributes design =
   let
     imageurl = "url(" ++ design.imagelocation ++ ")"
@@ -346,7 +353,7 @@ fullImageAttributes design =
             ]
           ]
 
-thumbImageAttributes : Design -> List (Attribute Msg)
+thumbImageAttributes : Design -> List (Attribute MsgId)
 thumbImageAttributes design =
   let
     imageurl = "url(" ++ design.imagelocation ++ ")"
@@ -389,7 +396,7 @@ thumbImageAttributes design =
           ]
         ]
 
-thumbImage : Design -> Html Msg
+thumbImage : Design -> Html MsgId
 thumbImage design =
   let
     sz = Maybe.withDefault (Size 300 300) design.imagesize
@@ -427,7 +434,7 @@ thumbImage design =
             ] []]
 
 
-view : ViewConfig -> Design -> Html Msg
+view : ViewConfig -> Design -> Html MsgId
 view cfg design =
   case cfg.size of
     Large ->
@@ -487,12 +494,12 @@ view cfg design =
           , text " "
           ]
         , if canModify design.owner cfg.currentUser then  
-            [ a [ href "#", onClick DeleteClick, title "Delete this design."] 
+            [ a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
                 [ img [ src "graphics/deleteButton.png", alt "Delete this design",
                         width 80, height 22 ][]
                 ]
             , text " "
-            , a [ href "#", onClick EditClick, title "Edit this design."] 
+            , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
                 [ img [ src "graphics/editButton.png", alt "Edit this design",
                         width 60, height 22 ][]
                 ]
@@ -504,13 +511,13 @@ view cfg design =
             Nothing -> [ ]
             Just user ->
               if List.member user.name design.fans then
-                [ a [ href "#", onClick RemoveFavesClick, title "Remove this design from your list of favorites."] 
+                [ a [ href "#", onClick (RemoveFavesClick,design.designid), title "Remove this design from your list of favorites."] 
                     [ img [ src "graphics/deleteFaveButton.png", alt "Remove from favorites",
                             width 90, height 22 ][]
                     ]
                 ]
               else
-                [ a [ href "#", onClick AddFavesClick, title "Add this design to your list of favorites."] 
+                [ a [ href "#", onClick (AddFavesClick,design.designid), title "Add this design to your list of favorites."] 
                     [ img [ src "graphics/addFaveButton.png", alt "Add to favorites",
                             width 65, height 22 ][]
                     ]
@@ -551,7 +558,7 @@ view cfg design =
                   in
                     [ div [class "commentsdiv"]
                       (List.intersperse (hr [][])
-                        (List.map ((Comment.view user) >> (Html.map CommentMsg))
+                        (List.map ((Comment.view user) >> (Html.map (commentMsgId design.designid)))
                           ( design.comments
                             ++
                             if cfg.currentUser == Nothing || editing then
@@ -606,12 +613,12 @@ view cfg design =
             , text " "
             ]
           , if canModify design.owner cfg.currentUser then  
-              [ a [ href "#", onClick DeleteClick, title "Delete this design."] 
+              [ a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
                   [ img [ src "graphics/deleteButton.png", alt "Delete this design",
                           width 80, height 22 ][]
                   ]
               , text " "
-              , a [ href "#", onClick EditClick, title "Edit this design."] 
+              , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
                   [ img [ src "graphics/editButton.png", alt "Edit this design",
                           width 60, height 22 ][]
                   ]
@@ -675,12 +682,12 @@ view cfg design =
               ]
             , if canModify design.owner cfg.currentUser then  
                 [ br [][]
-                , a [ href "#", onClick DeleteClick, title "Delete this design."] 
+                , a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
                     [ img [ src "graphics/deleteMiniButton.png", alt "Delete this design",
                             width 30, height 22 ][]
                     ]
                 , text " "
-                , a [ href "#", onClick EditClick, title "Edit this design."] 
+                , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
                     [ img [ src "graphics/editMiniButton.png", alt "Edit this design",
                             width 30, height 22 ][]
                     ]

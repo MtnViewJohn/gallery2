@@ -157,7 +157,7 @@ type Msg
   | SwitchTo Design.ViewSize
   | NewURL Navigation.Location
   | LoginMsg Login.Msg
-  | DesignMsg Design.Msg
+  | DesignMsg Design.MsgId
   | LookupName
   | LookupDesign
   | AuthorText String
@@ -305,17 +305,22 @@ update msg model =
             update LoginClick { model | loginform = newLoginModel }
           Nothing ->
             ({ model | loginform = newLoginModel }, Cmd.none) 
-    DesignMsg dmsg ->
-      case model.mainDesign of
-        Nothing -> (model, Cmd.none)
-        Just des ->
+    DesignMsg (dmsg, id) -> case model.mainDesign of
+      Just design ->
+        if design.designid == id then
           let
-            (newDesign, maybeAction) = Design.update dmsg des
-            (newDesigns, maybeActions) = 
-              List.unzip (List.map (Design.update dmsg) model.designList.designs)
-            newAction = firstJust (maybeAction :: maybeActions)
+            (design_, act_) = Design.update dmsg design
           in
-            ({model|mainDesign = Just newDesign}, resolveAction newAction model)
+            ({model | mainDesign = Just design_}, resolveAction act_ model)
+        else
+          (model, Cmd.none)
+      Nothing ->
+        let
+          (dlist_, act_) = updateDesignList (dmsg, id) model.designList.designs
+          designList = model.designList
+          designList_ = {designList | designs = dlist_}
+        in
+          ({model | designList = designList_}, resolveAction act_ model)
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
@@ -444,7 +449,21 @@ update msg model =
         Err error ->
           (model,Cmd.none)
 
-
+updateDesignList : Design.MsgId -> List Design.Design -> (List Design.Design, Maybe Action)
+updateDesignList (dmsg, id) designs =
+  case designs of
+    d :: ld -> 
+      if d.designid == id then
+        let
+          (d_, act_) = Design.update dmsg d
+        in
+          (d_ :: ld, act_)
+      else
+        let
+          (ld_, act_) = updateDesignList (dmsg, id) ld
+        in
+          (d :: ld_, act_)
+    [] -> ([], Nothing)
 
 
 
