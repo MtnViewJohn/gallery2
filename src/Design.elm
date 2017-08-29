@@ -471,6 +471,16 @@ viewCC design =
     , text design.ccName
     ]
 
+downloadLink : String -> Html MsgId -> Html MsgId
+downloadLink filepath content =
+  let
+    mfilename = List.head <| List.reverse <| (String.split "/" filepath)
+    filename = Maybe.withDefault filepath mfilename
+  in
+    a [href filepath, downloadAs filename, title "Download the cfdg file to your computer."]
+      [ content ]
+      
+
 
 view : ViewConfig -> Design -> Html MsgId
 view cfg design =
@@ -518,11 +528,10 @@ view cfg design =
           else
             []
         , [ br [] []
-          , a [ href design.filelocation, download True, 
-                title "Download the cfdg file to your computer." ]
-              [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
+          , downloadLink design.filelocation 
+              ( img [ src "graphics/downloadButton.png", alt "Download cfdg",
                       width 100, height 22] []
-              ]
+              )
           , text " "
           , a [ href ("translate.php?id=" ++ toString design.designid),
                 title "Translate to new syntax." ] 
@@ -630,11 +639,10 @@ view cfg design =
               else
                 []
           , [ br [] []
-            , a [ href design.filelocation, download True, 
-                  title "Download the cfdg file to your computer." ]
-                [ img [ src "graphics/downloadButton.png", alt "Download cfdg",
+            , downloadLink design.filelocation 
+                ( img [ src "graphics/downloadButton.png", alt "Download cfdg",
                         width 100, height 22] []
-                ]
+                )
             , text " "
             , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
                 [ img [ src "graphics/viewButton.png", alt "View Design",
@@ -690,11 +698,10 @@ view cfg design =
                 else
                   []
             , [ br [][]
-              , a [ href design.filelocation, download True, 
-                    title "Download the cfdg file to your computer." ]
-                  [ img [ src "graphics/downloadMiniButton.png", alt "Download cfdg",
+              , downloadLink design.filelocation 
+                  ( img [ src "graphics/downloadMiniButton.png", alt "Download cfdg",
                           width 30, height 22] []
-                  ]
+                  )
               , text " "
               , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
                   [ img [ src "graphics/viewMiniButton.png", alt "View Design",
