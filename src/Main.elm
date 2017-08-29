@@ -12,6 +12,8 @@ import Navigation
 import UrlParser as Url exposing ((</>), (<?>), s, int, stringParam, top)
 import Random
 import GalleryUtils exposing (..)
+import Time exposing (Time)
+import Task
 
 main : Program Never Model Msg
 main =
@@ -33,6 +35,8 @@ type ViewMode
   | People
   | Translation
   | Default
+  | Editing
+  | Error
 
 type alias DesignList =
   { designs : List Design.Design
@@ -72,6 +76,7 @@ type alias Model =
   , designMode : Design.ViewSize
   , tagList : List TagInfo
   , userList : UserList
+  , errorMessage : String
   }
 
 zeroList : DesignList
@@ -82,7 +87,7 @@ zeroUList = UserList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList, 
+  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList "", 
     Cmd.batch [loginSession, getTags, Navigation.modifyUrl loc.href])
 
 designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
@@ -95,7 +100,9 @@ designMap mapping oldList =
 
 type Route
   = Home
+  | ErrorMsg String
   | DesignID Int
+  | EditDesign Int
   | Author String Int Int
   | AuthorInit String Int
   | AuthorInit2 String
@@ -126,7 +133,9 @@ route : Url.Parser (Route -> a) a
 route =
   Url.oneOf
     [ Url.map Home top
+    , Url.map ErrorMsg (Url.s "error" </> Url.string)
     , Url.map DesignID (Url.s "design" </> int)
+    , Url.map EditDesign (Url.s "edit" </> int)
     , Url.map Author (Url.s "user" </> Url.string </> int </> int)
     , Url.map AuthorInit (Url.s "user" </> Url.string </> int)
     , Url.map AuthorInit2 (Url.s "user" </> Url.string)
@@ -169,6 +178,7 @@ type Msg
   | DesignText String
   | NewSeed Int
   | DismissDesign
+  | LoadDesign Time
   | NewDesign (Result Http.Error Design.Design)
   | NewDesigns (Result Http.Error DesignList)
   | NewUser (Result Http.Error User.User)
@@ -205,9 +215,25 @@ update msg model =
                       , mainDesign = Nothing
                       , designList = zeroList}, 
                 Cmd.batch [getDesigns "newest" 0 10, getNewbie])
+            ErrorMsg msg_enc ->
+              let
+                msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
+              in
+                ({model | errorMessage = msg, viewMode = Error}, Cmd.none)
             DesignID id ->
               ({model | mainDesign = Nothing, viewMode = Designs },
                 getDesign id)
+            EditDesign id ->
+              case model.user of
+                Nothing -> (model, Cmd.none)
+                Just user ->
+                  let
+                    cmd_ = if id == 0 then
+                      Task.perform LoadDesign Time.now
+                    else
+                      getDesign id
+                  in
+                    ({model | mainDesign = Nothing, viewMode = Editing}, cmd_)
             Author name_enc start count ->
               let
                 name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -345,6 +371,14 @@ update msg model =
           ({ model | designLookup = des }, Cmd.none)
     DismissDesign ->
       ({model | mainDesign = Nothing}, Navigation.back 1)
+    LoadDesign time ->
+      case model.user of
+        Nothing -> (model, Cmd.none)
+        Just user ->
+          let
+            design_ = Design.initDesign user.name user.defaultccURI time
+          in
+            ({model | mainDesign = Just design_}, Cmd.none)
     NewDesign designResult ->
       case designResult of
         Ok design ->
@@ -730,7 +764,7 @@ view model =
           div []
           [ h5 [] [ text ("User " ++ user.name) ]
           , ul []
-            [ li [] [ text "Upload!" ]
+            [ li [] [ a [href "#edit/0"] [text "Upload!" ]]
             , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
@@ -740,6 +774,19 @@ view model =
     ]
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
+        Error ->
+          [ h1 [] [text "An error occured!"]
+          , p [] [text model.errorMessage]
+          ]
+        Editing ->
+        ( case model.mainDesign of
+            Nothing -> [text "Design didn't load."]
+            Just design ->
+              let
+                vc = Design.ViewConfig Design.Edit model.user
+              in
+                [Html.map DesignMsg (Design.view vc design)]
+        )
         Designs ->
         ( case model.mainDesign of
             Nothing ->
@@ -894,6 +941,7 @@ resolveAction ma model =
       DeleteComment commentid -> deleteComment commentid
       AddFaves designid -> changeFave "addfave" designid
       RemoveFaves designid -> changeFave "deletefave" designid
+      CancelEditAct -> Navigation.back 1
       _ -> Cmd.none
 
 changeFave : String -> Int -> Cmd Msg

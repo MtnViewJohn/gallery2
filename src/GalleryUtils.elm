@@ -23,6 +23,7 @@ type Action
     | DeleteComment Int
     | UpdateComment Int String
     | CreateComment Int String
+    | CancelEditAct
 
 
 int2Time : Int -> Time.Time

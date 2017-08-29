@@ -30,6 +30,7 @@ import User exposing (..)
 import Comment
 import GalleryUtils exposing (..)
 import Markdown
+import Date
 --import Debug
 
 -- MODEL
@@ -60,6 +61,7 @@ type alias Design =
     , title : String
     , uploaddate : Time.Time
     , variation : String
+    , uploadPNG : Bool
     , cfdghtml : Html MsgId
     , noteshtml : Html MsgId
     , comments : List Comment.Comment
@@ -99,9 +101,28 @@ tiled2Int tt =
     Vfrieze -> 2
     Tiled -> 3
 
-initDesign: String -> String -> Design
-initDesign user ccURI = 
-    Design "" "" ccURI 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" 0 "" 
+initDesign: String -> String -> Time.Time -> Design
+initDesign user ccURI now = 
+  let
+    (image,name,uri) = 
+      if String.contains "/licenses/by/" ccURI then
+        ("https://licensebuttons.net/l/by/4.0/88x31.png","Creative Commons Attribution 4.0 International","https://creativecommons.org/licenses/by/4.0/")
+      else if String.contains "/licenses/by-sa/" ccURI then
+        ("https://licensebuttons.net/l/by-sa/4.0/88x31.png","Creative Commons Attribution-ShareAlike 4.0 International","https://creativecommons.org/licenses/by-sa/4.0/")
+      else if String.contains "/licenses/by-nd/" ccURI then
+        ("https://licensebuttons.net/l/by-nd/4.0/88x31.png","Creative Commons Attribution-NoDerivatives 4.0 International","https://creativecommons.org/licenses/by-nd/4.0/")
+      else if String.contains "/licenses/by-nc/" ccURI then
+        ("https://licensebuttons.net/l/by-nc/4.0/88x31.png","Creative Commons Attribution-NonCommercial 4.0 International","https://creativecommons.org/licenses/by-nc/4.0/")
+      else if String.contains "/licenses/by-nc-sa/" ccURI then
+        ("https://licensebuttons.net/l/by-nc-sa/4.0/88x31.png","Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International","https://creativecommons.org/licenses/by-nc-sa/4.0/")
+      else if String.contains "/licenses/by-nc-nd/" ccURI then
+        ("https://licensebuttons.net/l/by-nc-nd/4.0/88x31.png","Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International","https://creativecommons.org/licenses/by-nc-nd/4.0/")
+      else if String.contains "/publicdomain/zero/" ccURI then
+        ("https://licensebuttons.net/p/zero/1.0/88x31.png","CC0 1.0 Universal (CC0 1.0) Public Domain Dedication","https://creativecommons.org/publicdomain/zero/1.0/")
+      else
+        ("No license chosen", "", "")
+  in
+    Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now "" False
       (text "") (text "") [] (Comment.emptyComment 0)
 
 setCfdg : Int -> String -> Design -> Design
@@ -172,6 +193,7 @@ decodeDesign =
         |> Json.Decode.Pipeline.required "title" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "uploaddate" (Json.Decode.map int2Time Json.Decode.int)
         |> Json.Decode.Pipeline.required "variation" (Json.Decode.string)
+        |> Json.Decode.Pipeline.required "imagelocation" (Json.Decode.map (String.endsWith ".png") Json.Decode.string)
         |> Json.Decode.Pipeline.hardcoded (text "")
         |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
         |> Json.Decode.Pipeline.hardcoded []
@@ -195,10 +217,10 @@ encodeDesign record =
 
 type Msg
     = DeleteClick
-    | EditClick
     | AddFavesClick
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
+    | CancelEdit
 
 type alias MsgId = (Msg, Int)
 
@@ -210,7 +232,6 @@ update : Msg -> Design -> (Design, Maybe Action)
 update msg design =
   case msg of
     DeleteClick -> (design, Just (DeleteDesign design.designid))
-    EditClick -> (design, Just (EditDesign design.designid))
     AddFavesClick -> (design, Just (AddFaves design.designid))
     RemoveFavesClick -> (design, Just (RemoveFaves design.designid))
     CommentMsg (cmsg, id) ->
@@ -224,6 +245,7 @@ update msg design =
           (comments_, act) = updateCommentList (cmsg, id) design.comments
         in
           ({design | comments = comments_}, act)
+    CancelEdit -> (design, Just (CancelEditAct))
 
 
 
@@ -283,6 +305,7 @@ type ViewSize
     = Large
     | Medium
     | Small
+    | Edit
 
 type alias ViewConfig =
     { size : ViewSize
@@ -433,6 +456,21 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
 
+viewCC : Design -> Html MsgId
+viewCC design =
+  if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
+    let
+      date = Date.fromTime design.uploaddate
+    in
+        
+      text ("Copyright " ++ (toString (Date.year date)) ++ ", all rights reserved.")
+  else
+    div [class "ccInfo"]
+    [ a [class "ccIcon", href design.ccURI]
+        [ img [alt "creative commons icon", src design.ccImage][] ]
+    , text design.ccName
+    ]
+
 
 view : ViewConfig -> Design -> Html MsgId
 view cfg design =
@@ -499,7 +537,7 @@ view cfg design =
                         width 80, height 22 ][]
                 ]
             , text " "
-            , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
+            , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
                 [ img [ src "graphics/editButton.png", alt "Edit this design",
                         width 60, height 22 ][]
                 ]
@@ -525,15 +563,7 @@ view cfg design =
         , [ br [][]
           , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
           ]
-        , if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
-            []
-          else
-            [ div [class "ccInfo"]
-              [ a [class "ccIcon", href design.ccURI]
-                  [ img [alt "creative commons icon", src design.ccImage][] ]
-              , text design.ccName
-              ]
-            ]
+        , [ viewCC design ]
         , [ br [] [] 
           , table [style [("table-layout","fixed"),("width","100%")]]
             [ tr []
@@ -618,7 +648,7 @@ view cfg design =
                           width 80, height 22 ][]
                   ]
               , text " "
-              , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
+              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
                   [ img [ src "graphics/editButton.png", alt "Edit this design",
                           width 60, height 22 ][]
                   ]
@@ -629,15 +659,7 @@ view cfg design =
           , [ br [][]
             , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
             ]
-          , if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
-              []
-            else
-              [ div [class "ccInfo"]
-                [ a [class "ccIcon", href design.ccURI]
-                    [ img [alt "creative commons icon", src design.ccImage][] ]
-                , text design.ccName
-                ]
-              ]
+          , [ viewCC design ]
           , [ br [] []
             , div [class "filediv", style [("width","95%")]]
                 [ design.noteshtml
@@ -687,7 +709,7 @@ view cfg design =
                             width 30, height 22 ][]
                     ]
                 , text " "
-                , a [ href "#", onClick (EditClick,design.designid), title "Edit this design."] 
+                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
                     [ img [ src "graphics/editMiniButton.png", alt "Edit this design",
                             width 30, height 22 ][]
                     ]
@@ -698,3 +720,129 @@ view cfg design =
             ])
           ]
         ]
+    Edit ->
+      div []
+      [ if design.designid == 0 then
+          h1 [] [text "Upload your artwork!"]
+        else
+          h1 [] [text "Update your artwork!"]
+      , div [style [("width", "600px")]]
+        [ text "Pick a title for your artwork (e.g. \"People Dancing and Dying\") "
+        , text "and upload it here. If you are using "
+        , b [] [text "Context Free"]
+        , text " for Mac or Windows you can upload directly from the program."
+        , br [][]
+        , br [][]
+        ]
+      , Html.form [method "POST", action "http://localhost:5000/postdesign", 
+              enctype "multipart/form-data"]
+        [ table [class "upload"]
+          [ tr []
+            [ td [] [b [] [text "Title"], text ":"]
+            , td [] [input [type_ "text", size 30, maxlength 100, name "title", value design.title][]]
+            , td [][]
+            ]
+          , tr []
+            [ td [] [b [] [text "CFDG"], text " file:"]
+            , td [] [input [type_ "file", name "cfdgfile"][]]
+            , td [][]
+            ]
+          , tr []
+            [ td [] [b [] [text "PNG"], text " file:"]
+            , td [] [input [type_ "file", name "imagefile"] []]
+            , td [][]
+            ]
+          , tr [] 
+            [ td [] [text "Image upload compression type:"]
+            , td [] 
+              [ input [type_ "radio", name "compression", value "JPEG", checked (not design.uploadPNG)][]
+              , text " JPEG "
+              , input [type_ "radio", name "compression", value "PNG-8", checked (design.uploadPNG)][]
+              , text " PNG-8 "
+              ]
+            , td [][]
+            ]
+          , tr []
+            [ td [] [b [] [text "Variation"], text ":"]
+            , td [] [input [type_ "text", size 9, maxlength 6, name "variation", value design.variation][]]
+            , td [][]
+            ]
+          , tr []
+            [ td [] [b [] [text "Tags"], text ":"]
+            , td [] [input [type_ "text", size 30, name "tags", value (String.join " " design.tags)] []]
+            , td [][]
+            ]
+          , tr []
+            [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
+            , td [] 
+              [ select [name "tiledtype", size 1]
+                [ option [value "0", selected (design.tiled == Untiled)] [text "Not tiled"]
+                , option [value "1", selected (design.tiled == Hfrieze)] [text "Horizontal frieze"]
+                , option [value "2", selected (design.tiled == Vfrieze)] [text "Vertical frieze"]
+                , option [value "3", selected (design.tiled == Tiled)]   [text "Tiled"]
+                ]
+              ]
+            , td [][]
+            ]
+          , tr []
+            [ td [class "vupload"]
+              [ p [] [b [] [text "Author notes"], text ":"]
+              , p [] [text "Please, please, please make sure that any included cfdg files are in the gallery as well and put links to them here."]
+              ]
+            , td [colspan 2]
+              [ textarea [rows 5, cols 20, name "notes", value design.notes] []
+              , div [class "taghelp"]
+                [ p [] [text "CFDG code should be put between [code] ... [/code] tags to get formatted properly. "]
+                , p [] [text "Link tags should be in one of these three forms:"]
+                , ul []
+                  [ li [] [text "[link design:505]Decreasing Aperture[/link]"]
+                  , li [] [text "[link user:Sykil]other stuff by Sykil[/link]"]
+                  , li [] [text "[link http://...]link to some other site[/link]"]
+                  ]
+                ]
+              ]
+            ]
+          , tr []
+            [ td [class "vupload"] [b [] [text "Set License"], text ":"]
+            , td [colspan 2]
+              [ select [name "cclicense", size 1]
+                [ option [value "-", selected True] [text "No change"]
+                , optgroup [attribute "label" "Public Domain"]
+                  [ option [value "zero"] [text "Creative Commons Zero"]]
+                , optgroup [attribute "label" "Creative Commons Licenses"]
+                  [ option [value "by"] [text "Creative Commons Attibution"]
+                  , option [value "by-sa"] [text "Creative Commons Attibution-ShareAlike"]
+                  , option [value "by-nd"] [text "Creative Commons Attibution-NoDerivatives"]
+                  , option [value "by-nc"] [text "Creative Commons Attibution-NonCommercial"]
+                  , option [value "by-nc-sa"] [text "Creative Commons Attibution-NonCommercial-ShareAlike"]
+                  , option [value "by-nc-nd"] [text "Creative Commons Attibution-NonCommercial-NoDerivatives"]
+                  ]
+                , optgroup [attribute "label" "Default Copyright"]
+                  [ option [value ""][text "All Rights Reserved"]]
+                ]
+              ]
+            ]
+          , tr []
+            [ td [][text "Current License:"]
+            , td [colspan 2] [viewCC design]
+            ]
+          , tr []
+            [ td [] 
+              [ input [type_ "submit", value
+                  (if design.designid == 0 then
+                    "Upload Design"
+                  else
+                    "Update Design")] []
+              , text " "
+              , input [type_ "submit", value "Cancel", onNav (CancelEdit,design.designid)] []
+              ]
+            , td [colspan 2] 
+              [ if design.designid == 0 then
+                  text ""
+                else
+                  input [type_ "hidden", name "designid", value (toString design.designid)] []
+              ]
+            ]
+          ]
+        ]
+      ]
