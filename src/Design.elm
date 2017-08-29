@@ -20,7 +20,7 @@ module Design exposing
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onInput, onClick, onSubmit)
+import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on)
 import String exposing (isEmpty, trimLeft)
 import Json.Encode
 import Json.Decode
@@ -31,6 +31,8 @@ import Comment
 import GalleryUtils exposing (..)
 import Markdown
 import Date
+import Array
+import Char
 --import Debug
 
 -- MODEL
@@ -66,6 +68,7 @@ type alias Design =
     , noteshtml : Html MsgId
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
+    , formPartValid : Array.Array Bool
     }
 
 options : Markdown.Options
@@ -123,7 +126,8 @@ initDesign user ccURI now =
         ("No license chosen", "", "")
   in
     Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now "" False
-      (text "") (text "") [] (Comment.emptyComment 0)
+      (text "") (text "") [] (Comment.emptyComment 0) 
+      (Array.fromList [False, False, False, True, True, True, True, True, True])
 
 setCfdg : Int -> String -> Design -> Design
 setCfdg id newCfdg design =
@@ -172,6 +176,11 @@ decodeNotesMarkdown : Json.Decode.Decoder (Html MsgId)
 decodeNotesMarkdown =
   Json.Decode.map notesHtml Json.Decode.string
 
+validateDesign : String -> String -> Array.Array Bool
+validateDesign title var =
+  Array.fromList  [ validateTitle title, True, True, True
+                  , validateVariation var, True, True, True, True]
+
 decodeDesign : Json.Decode.Decoder Design
 decodeDesign =
     Json.Decode.Pipeline.decode Design
@@ -198,6 +207,11 @@ decodeDesign =
         |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
         |> Json.Decode.Pipeline.hardcoded []
         |> Json.Decode.Pipeline.required "designid" (Json.Decode.map Comment.emptyComment Json.Decode.int)
+        |> Json.Decode.Pipeline.custom  (Json.Decode.map2 
+                                          validateDesign 
+                                          (Json.Decode.field "title" Json.Decode.string) 
+                                          (Json.Decode.field "variation" Json.Decode.string)
+                                        )
 
 encodeDesign : Design -> Json.Encode.Value
 encodeDesign record =
@@ -221,6 +235,9 @@ type Msg
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
     | CancelEdit
+    | TitleChange String
+    | FileChange Int
+    | VariationChange String
 
 type alias MsgId = (Msg, Int)
 
@@ -246,6 +263,14 @@ update msg design =
         in
           ({design | comments = comments_}, act)
     CancelEdit -> (design, Just (CancelEditAct))
+    TitleChange title_ ->
+      ({design | title = title_
+               , formPartValid = Array.set 0 (validateTitle title_) design.formPartValid}, Nothing)
+    FileChange index ->
+      ({design | formPartValid = Array.set index True design.formPartValid}, Nothing)
+    VariationChange var_ ->
+      ({design | variation = var_
+               , formPartValid = Array.set 4 (validateVariation var_) design.formPartValid}, Nothing)
 
 
 
@@ -266,11 +291,31 @@ updateCommentList (msg, id) comments =
     [] -> ([], Nothing)
         
 
+isAlpha : Char -> Bool
+isAlpha char =
+  Char.isLower char || Char.isUpper char
 
+validateTitle : String -> Bool
+validateTitle title =
+  let
+    titletrim = String.trim title
+  in
+    (clamp 3 100 (String.length titletrim)) == (String.length titletrim)
+
+validateVariation : String -> Bool
+validateVariation var =
+  let
+    vartrim = String.trim var
+  in
+    vartrim == "" || ((String.length vartrim) <= 6 && (String.all isAlpha vartrim))
 
 
 
 -- VIEW
+
+validDesign : Design -> Bool
+validDesign design =
+  Array.foldl (&&) True design.formPartValid
 
 showOnSide : Design -> Bool
 showOnSide design =
@@ -480,7 +525,16 @@ downloadLink filepath content =
     a [href filepath, downloadAs filename, title "Download the cfdg file to your computer."]
       [ content ]
       
+newTextMsg : Int -> (String -> Msg) -> String -> MsgId
+newTextMsg id msg text =
+  (msg text, id)
 
+isValid : Int -> Design -> Bool
+isValid index design =
+  let
+    mValid = Array.get index design.formPartValid
+  in
+    Maybe.withDefault True mValid
 
 view : ViewConfig -> Design -> Html MsgId
 view cfg design =
@@ -746,18 +800,30 @@ view cfg design =
         [ table [class "upload"]
           [ tr []
             [ td [] [b [] [text "Title"], text ":"]
-            , td [] [input [type_ "text", size 30, maxlength 100, name "title", value design.title][]]
-            , td [][]
+            , td [] [input [type_ "text", size 30, maxlength 100, name "title"
+                    , value design.title, onInput (newTextMsg design.designid TitleChange)][]]
+            , td 
+              [ class "alert"
+             , style [("visibility", if (isValid 0 design) then "hidden" else "visible")]
+              ] [text "Title must be between 3 and 100 characters."]
             ]
           , tr []
             [ td [] [b [] [text "CFDG"], text " file:"]
-            , td [] [input [type_ "file", name "cfdgfile"][]]
-            , td [][]
+            , td [] [ input [type_ "file", name "cfdgfile"
+                    , on "change" (Json.Decode.succeed (FileChange 1, design.designid))][]]
+            , td 
+              [ class "alert"
+             , style [("visibility", if (isValid 1 design) then "hidden" else "visible")]
+              ] [text "CFDG file must be chosen."]
             ]
           , tr []
             [ td [] [b [] [text "PNG"], text " file:"]
-            , td [] [input [type_ "file", name "imagefile"] []]
-            , td [][]
+            , td [] [ input [type_ "file", name "imagefile"
+                    , on "change" (Json.Decode.succeed (FileChange 2, design.designid))] []]
+            , td 
+              [ class "alert"
+             , style [("visibility", if (isValid 2 design) then "hidden" else "visible")]
+              ] [text "PNG file must be chosen."]
             ]
           , tr [] 
             [ td [] [text "Image upload compression type:"]
@@ -771,8 +837,12 @@ view cfg design =
             ]
           , tr []
             [ td [] [b [] [text "Variation"], text ":"]
-            , td [] [input [type_ "text", size 9, maxlength 6, name "variation", value design.variation][]]
-            , td [][]
+            , td [] [ input [type_ "text", size 9, maxlength 6, name "variation"
+                    , value design.variation, onInput (newTextMsg design.designid VariationChange)][]]
+            , td 
+             [ class "alert"
+             , style [("visibility", if (isValid 4 design) then "hidden" else "visible")]
+             ] [text "Variation must be 0 to 6 letters."]
             ]
           , tr []
             [ td [] [b [] [text "Tags"], text ":"]
@@ -797,7 +867,7 @@ view cfg design =
               , p [] [text "Please, please, please make sure that any included cfdg files are in the gallery as well and put links to them here."]
               ]
             , td [colspan 2]
-              [ textarea [rows 5, cols 20, name "notes", value design.notes] []
+              [ textarea [rows 5, cols 20, maxlength 1000, name "notes", value design.notes] []
               , div [class "taghelp"]
                 [ p [] [text "CFDG code should be put between [code] ... [/code] tags to get formatted properly. "]
                 , p [] [text "Link tags should be in one of these three forms:"]
@@ -835,11 +905,15 @@ view cfg design =
             ]
           , tr []
             [ td [] 
-              [ input [type_ "submit", value
-                  (if design.designid == 0 then
-                    "Upload Design"
-                  else
-                    "Update Design")] []
+              [ input 
+                [ type_ "submit"
+                , value
+                    (if design.designid == 0 then
+                      "Upload Design"
+                    else
+                      "Update Design")
+                , disabled (not (validDesign design))
+                ] []
               , text " "
               , input [type_ "submit", value "Cancel", onNav (CancelEdit,design.designid)] []
               ]
