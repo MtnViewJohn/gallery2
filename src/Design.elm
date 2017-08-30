@@ -68,6 +68,7 @@ type alias Design =
     , noteshtml : Html MsgId
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
+    , ready2delete : Bool
     , formPartValid : Array.Array Bool
     }
 
@@ -126,7 +127,7 @@ initDesign user ccURI now =
         ("No license chosen", "", "")
   in
     Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now "" False
-      (text "") (text "") [] (Comment.emptyComment 0) 
+      (text "") (text "") [] (Comment.emptyComment 0) False
       (Array.fromList [False, False, False, True, True, True, True, True, True])
 
 setCfdg : Int -> String -> Design -> Design
@@ -207,6 +208,7 @@ decodeDesign =
         |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
         |> Json.Decode.Pipeline.hardcoded []
         |> Json.Decode.Pipeline.required "designid" (Json.Decode.map Comment.emptyComment Json.Decode.int)
+        |> Json.Decode.Pipeline.hardcoded False
         |> Json.Decode.Pipeline.custom  (Json.Decode.map2 
                                           validateDesign 
                                           (Json.Decode.field "title" Json.Decode.string) 
@@ -231,6 +233,7 @@ encodeDesign record =
 
 type Msg
     = DeleteClick
+    | CancelDelete
     | AddFavesClick
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
@@ -248,7 +251,12 @@ commentMsgId id cmsgid =
 update : Msg -> Design -> (Design, Maybe Action)
 update msg design =
   case msg of
-    DeleteClick -> (design, Just (DeleteDesign design.designid))
+    DeleteClick -> 
+      if design.ready2delete then
+        ({design | ready2delete = False}, Just (DeleteDesign design.designid))
+      else
+        ({design | ready2delete = True}, Nothing)
+    CancelDelete -> ({design | ready2delete = False}, Nothing)
     AddFavesClick -> (design, Just (AddFaves design.designid))
     RemoveFavesClick -> (design, Just (RemoveFaves design.designid))
     CommentMsg (cmsg, id) ->
@@ -583,29 +591,42 @@ view cfg design =
             []
         , [ br [] []
           , downloadLink design.filelocation 
-              ( img [ src "graphics/downloadButton.png", alt "Download cfdg",
-                      width 100, height 22] []
+              ( img [ src "graphics/btn_download.png", alt "Download cfdg",
+                      width 126, height 33] []
               )
           , text " "
           , a [ href ("translate.php?id=" ++ toString design.designid),
                 title "Translate to new syntax." ] 
-              [ img [ src "graphics/translateButton.png", alt "Translate to new syntax",
-                      width 83, height 22 ] []
+              [ img [ src "graphics/btn_translate.png", alt "Translate to new syntax",
+                      width 120, height 33 ] []
               ]
           , text " "
           ]
         , if canModify design.owner cfg.currentUser then  
-            [ a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
-                [ img [ src "graphics/deleteButton.png", alt "Delete this design",
-                        width 80, height 22 ][]
-                ]
-            , text " "
-            , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                [ img [ src "graphics/editButton.png", alt "Edit this design",
-                        width 60, height 22 ][]
-                ]
-            , text " "
-            ]
+            if design.ready2delete then
+              [ a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                  [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
+                          width 112, height 33 ][]
+                  ]
+              , text " "
+              , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+                  [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
+                          width 90, height 33 ][]
+                  ]
+              , text " "
+              ]
+            else
+              [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
+                  [ img [ src "graphics/btn_delete.png", alt "Delete this design",
+                          width 98, height 33 ][]
+                  ]
+              , text " "
+              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
+                  [ img [ src "graphics/btn_edit.png", alt "Edit this design",
+                          width 80, height 33 ][]
+                  ]
+              , text " "
+              ]
           else
             [ ]
         , case cfg.currentUser of
@@ -613,14 +634,14 @@ view cfg design =
             Just user ->
               if List.member user.name design.fans then
                 [ a [ href "#", onNav (RemoveFavesClick,design.designid), title "Remove this design from your list of favorites."] 
-                    [ img [ src "graphics/deleteFaveButton.png", alt "Remove from favorites",
-                            width 90, height 22 ][]
+                    [ img [ src "graphics/btn_removefave.png", alt "Remove from favorites",
+                            width 112, height 33 ][]
                     ]
                 ]
               else
                 [ a [ href "#", onNav (AddFavesClick,design.designid), title "Add this design to your list of favorites."] 
-                    [ img [ src "graphics/addFaveButton.png", alt "Add to favorites",
-                            width 65, height 22 ][]
+                    [ img [ src "graphics/btn_addfave.png", alt "Add to favorites",
+                            width 82, height 33 ][]
                     ]
                 ]
         , [ br [][]
@@ -694,28 +715,41 @@ view cfg design =
                 []
           , [ br [] []
             , downloadLink design.filelocation 
-                ( img [ src "graphics/downloadButton.png", alt "Download cfdg",
-                        width 100, height 22] []
+                ( img [ src "graphics/btn_download.png", alt "Download cfdg",
+                        width 126, height 33] []
                 )
             , text " "
             , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
-                [ img [ src "graphics/viewButton.png", alt "View Design",
-                        width 70, height 22 ] []
+                [ img [ src "graphics/btn_view.png", alt "View Design",
+                        width 86, height 33 ] []
                 ]
             , text " "
             ]
-          , if canModify design.owner cfg.currentUser then  
-              [ a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
-                  [ img [ src "graphics/deleteButton.png", alt "Delete this design",
-                          width 80, height 22 ][]
-                  ]
-              , text " "
-              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                  [ img [ src "graphics/editButton.png", alt "Edit this design",
-                          width 60, height 22 ][]
-                  ]
-              , text " "
-              ]
+          , if canModify design.owner cfg.currentUser then
+              if design.ready2delete then
+                [ a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                    [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
+                            width 112, height 33 ][]
+                    ]
+                , text " "
+                , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+                    [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
+                            width 90, height 33 ][]
+                    ]
+                , text " "
+                ]
+              else
+                [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
+                    [ img [ src "graphics/btn_delete.png", alt "Delete this design",
+                            width 98, height 33 ][]
+                    ]
+                , text " "
+                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
+                    [ img [ src "graphics/btn_edit.png", alt "Edit this design",
+                            width 80, height 33 ][]
+                    ]
+                , text " "
+                ]
             else
               [ ]
           , [ br [][]
@@ -753,29 +787,43 @@ view cfg design =
                   []
             , [ br [][]
               , downloadLink design.filelocation 
-                  ( img [ src "graphics/downloadMiniButton.png", alt "Download cfdg",
-                          width 30, height 22] []
+                  ( img [ src "graphics/mbtn_download.png", alt "Download cfdg",
+                          width 34, height 33] []
                   )
               , text " "
               , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
-                  [ img [ src "graphics/viewMiniButton.png", alt "View Design",
-                          width 30, height 22 ] []
+                  [ img [ src "graphics/mbtn_view.png", alt "View Design",
+                          width 34, height 33 ] []
                   ]
               , text " "
               ]
-            , if canModify design.owner cfg.currentUser then  
-                [ br [][]
-                , a [ href "#", onClick (DeleteClick,design.designid), title "Delete this design."] 
-                    [ img [ src "graphics/deleteMiniButton.png", alt "Delete this design",
-                            width 30, height 22 ][]
-                    ]
-                , text " "
-                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                    [ img [ src "graphics/editMiniButton.png", alt "Edit this design",
-                            width 30, height 22 ][]
-                    ]
-                , text " "
-                ]
+            , if canModify design.owner cfg.currentUser then
+                if design.ready2delete then
+                  [ br [][]
+                  , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
+                              width 34, height 33 ][]
+                      ]
+                  , text " "
+                  , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+                      [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
+                              width 34, height 33 ][]
+                      ]
+                  , text " "
+                  ]
+                else
+                  [ br [][]
+                  , a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
+                      [ img [ src "graphics/mbtn_delete.png", alt "Delete this design",
+                              width 34, height 33 ][]
+                      ]
+                  , text " "
+                  , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
+                      [ img [ src "graphics/mbtn_edit.png", alt "Edit this design",
+                              width 34, height 33 ][]
+                      ]
+                  , text " "
+                  ]
               else
                 [ ]
             ])

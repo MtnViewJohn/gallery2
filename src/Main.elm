@@ -192,6 +192,7 @@ type Msg
   | GotTags (Result Http.Error (List TagInfo))
   | NewUsers (Result Http.Error UserList)
   | NewFaves (Result Http.Error FaveInfo)
+  | DeleteTheDesign (Result Http.Error Int)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -505,6 +506,32 @@ update msg model =
             (model, Cmd.none)
         Nothing -> (model, Cmd.none)
       Err _ -> (model, Cmd.none)
+    DeleteTheDesign designidResult ->
+      case designidResult of
+        Ok designid ->
+          let
+            mdesign_ = case model.mainDesign of
+              Nothing -> Nothing
+              Just design ->
+                if design.designid == designid then
+                  Nothing
+                else
+                  Just design
+            dlist = model.designList
+            designs_ = List.filter (\d -> d.designid /= designid) dlist.designs
+            dlist_ = {dlist | designs = designs_}
+            cmd_ = 
+              if mdesign_ == Nothing && model.mainDesign /= Nothing then
+                if List.isEmpty designs_ then
+                  Navigation.newUrl "#"
+                else
+                  Navigation.newUrl ("#" ++ dlist.thislink)
+              else
+                Cmd.none
+          in
+            ({model | mainDesign = mdesign_, designList = dlist_}, cmd_)
+        Err error ->
+          (model, Navigation.newUrl "#error/Delete%20failed%2e")
 
 
 updateDesignList : Design.MsgId -> List Design.Design -> (List Design.Design, Maybe Action)
@@ -942,6 +969,7 @@ resolveAction ma model =
       AddFaves designid -> changeFave "addfave" designid
       RemoveFaves designid -> changeFave "deletefave" designid
       CancelEditAct -> Navigation.back 1
+      DeleteDesign designid -> deleteDesign designid
       _ -> Cmd.none
 
 changeFave : String -> Int -> Cmd Msg
@@ -1018,7 +1046,18 @@ decodeDesigns =
     (Json.Decode.at ["thislink"] Json.Decode.string)
     (Json.Decode.at ["count"]    Json.Decode.int)
 
-      
+deleteDesign : Int -> Cmd Msg
+deleteDesign designid =
+  let
+    url = "http://localhost:5000/delete/" ++ (toString designid)
+  in
+    Http.send DeleteTheDesign (post url Http.emptyBody decodeDesignId)
+
+decodeDesignId : Json.Decode.Decoder Int
+decodeDesignId = 
+  Json.Decode.at ["designid"] Json.Decode.int
+
+
 loginUser : Login.Model -> Cmd Msg
 loginUser lmodel =
   let

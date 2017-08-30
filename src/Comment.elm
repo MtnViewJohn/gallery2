@@ -41,11 +41,12 @@ type alias Comment =
     , screenname : String
     , htmltext : Html Msg
     , displayMode: DisplayType
+    , ready2delete : Bool
     }
 
 emptyComment : Int -> Comment
 emptyComment designid = 
-  Comment "" "" "" 0 designid 0 "" (text "") New
+  Comment "" "" "" 0 designid 0 "" (text "") New False
 
 options : Markdown.Options
 options =
@@ -77,6 +78,7 @@ decodeComment =
         |> Json.Decode.Pipeline.required "screenname" (Json.Decode.string)
         |> Json.Decode.Pipeline.hardcoded (text "")
         |> Json.Decode.Pipeline.hardcoded Normal
+        |> Json.Decode.Pipeline.hardcoded False
 
 encodeComment : Comment -> Json.Encode.Value
 encodeComment record =
@@ -118,6 +120,7 @@ isEditable c =
 
 type Msg
     = DeleteClick
+    | CancelDeleteClick
     | EditClick
     | CancelClick
     | SubmitClick
@@ -129,7 +132,12 @@ update : Msg -> Comment -> (Comment, Maybe Action)
 update msg cmt =
   case msg of
     DeleteClick ->
+      if cmt.ready2delete then
         (cmt, Just (DeleteComment cmt.commentid))
+      else
+        ({cmt | ready2delete = True}, Nothing)
+    CancelDeleteClick ->
+      ({cmt | ready2delete = False}, Nothing)
     EditClick ->
         ({cmt | formcomment = cmt.comment, displayMode = Update}, Nothing)
     CancelClick ->
@@ -203,17 +211,30 @@ view currentUser comment =
     div [class "commentblock", id ("comment" ++ toString comment.commentid)]
         [ Html.map (newMsg comment.commentid) comment.htmltext
         , if commentOwner currentUser comment.screenname then
-            div []
-            [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Delete this comment."] 
-                    [ img [ src "graphics/deleteMiniButton.png", alt "Delete this comment",
-                            width 30, height 22 ][]
-                    ]
-            , text " "
-            , a [ href "#", onNav (EditClick, comment.commentid), title "Edit this comment."] 
-                [ img [ src "graphics/editMiniButton.png", alt "Edit this comment",
-                        width 30, height 22 ][]
-                ]
-            ]
+            if comment.ready2delete then
+              div []
+              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."] 
+                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
+                              width 34, height 33 ][]
+                      ]
+              , text " "
+              , a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."] 
+                  [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
+                          width 34, height 33 ][]
+                  ]
+              ]
+            else
+              div []
+              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Delete this comment."] 
+                      [ img [ src "graphics/mbtn_delete.png", alt "Delete this comment",
+                              width 34, height 33 ][]
+                      ]
+              , text " "
+              , a [ href "#", onNav (EditClick, comment.commentid), title "Edit this comment."] 
+                  [ img [ src "graphics/mbtn_edit.png", alt "Edit this comment",
+                          width 34, height 33 ][]
+                  ]
+              ]
           else
             text ""
         ]
