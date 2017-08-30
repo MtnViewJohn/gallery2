@@ -618,12 +618,12 @@ view cfg design =
             else
               [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
                   [ img [ src "graphics/btn_delete.png", alt "Delete this design",
-                          width 98, height 33 ][]
+                          width 110, height 33 ][]
                   ]
               , text " "
               , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
                   [ img [ src "graphics/btn_edit.png", alt "Edit this design",
-                          width 80, height 33 ][]
+                          width 92, height 33 ][]
                   ]
               , text " "
               ]
@@ -741,12 +741,12 @@ view cfg design =
               else
                 [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
                     [ img [ src "graphics/btn_delete.png", alt "Delete this design",
-                            width 98, height 33 ][]
+                            width 110, height 33 ][]
                     ]
                 , text " "
                 , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
                     [ img [ src "graphics/btn_edit.png", alt "Edit this design",
-                            width 80, height 33 ][]
+                            width 92, height 33 ][]
                     ]
                 , text " "
                 ]
