@@ -339,22 +339,20 @@ update msg model =
             update LoginClick { model | loginform = newLoginModel }
           Nothing ->
             ({ model | loginform = newLoginModel }, Cmd.none) 
-    DesignMsg (dmsg, id) -> case model.mainDesign of
-      Just design ->
-        if design.designid == id then
+    DesignMsg (dmsg, id) ->
+      case designMatch id model.mainDesign of
+        Just design ->
           let
-            (design_, act_) = Design.update dmsg design
+            (design_, mainact_) = Design.update dmsg design
           in
-            ({model | mainDesign = Just design_}, resolveAction act_ model)
-        else
-          (model, Cmd.none)
-      Nothing ->
-        let
-          (dlist_, act_) = updateDesignList (dmsg, id) model.designList.designs
-          designList = model.designList
-          designList_ = {designList | designs = dlist_}
-        in
-          ({model | designList = designList_}, resolveAction act_ model)
+            ({model | mainDesign = Just design_}, resolveAction mainact_ model)
+        Nothing ->
+          let
+            designList = model.designList
+            (dlist_, listact_) = updateDesignList (dmsg, id) designList.designs
+            designList_ = {designList | designs = dlist_}
+          in
+            ({model | designList = designList_}, resolveAction listact_ model)
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
@@ -550,7 +548,15 @@ updateDesignList (dmsg, id) designs =
           (d :: ld_, act_)
     [] -> ([], Nothing)
 
-
+designMatch : Int -> Maybe Design.Design -> Maybe Design.Design
+designMatch id mdesign =
+  case mdesign of
+    Nothing -> Nothing
+    Just design -> 
+      if id == design.designid then
+        mdesign
+      else
+        Nothing
 
 -- VIEW
 
