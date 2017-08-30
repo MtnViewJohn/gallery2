@@ -604,14 +604,14 @@ view cfg design =
           ]
         , if canModify design.owner cfg.currentUser then  
             if design.ready2delete then
-              [ a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                  [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
-                          width 112, height 33 ][]
-                  ]
-              , text " "
-              , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+              [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
                   [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
                           width 90, height 33 ][]
+                  ]
+              , text " "
+              , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                  [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
+                          width 112, height 33 ][]
                   ]
               , text " "
               ]
@@ -727,14 +727,14 @@ view cfg design =
             ]
           , if canModify design.owner cfg.currentUser then
               if design.ready2delete then
-                [ a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                    [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
-                            width 112, height 33 ][]
-                    ]
-                , text " "
-                , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+                [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
                     [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
                             width 90, height 33 ][]
+                    ]
+                , text " "
+                , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                    [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
+                            width 112, height 33 ][]
                     ]
                 , text " "
                 ]
@@ -800,13 +800,13 @@ view cfg design =
             , if canModify design.owner cfg.currentUser then
                 if design.ready2delete then
                   [ br [][]
-                  , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
+                  , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
+                      [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
                               width 34, height 33 ][]
                       ]
                   , text " "
-                  , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
-                      [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
+                  , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
+                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
                               width 34, height 33 ][]
                       ]
                   , text " "
