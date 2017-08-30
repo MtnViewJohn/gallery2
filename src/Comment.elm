@@ -213,13 +213,13 @@ view currentUser comment =
         , if commentOwner currentUser comment.screenname then
             if comment.ready2delete then
               div []
-              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."] 
-                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
-                              width 34, height 33 ][]
-                      ]
-              , text " "
-              , a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."] 
+              [ a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."] 
                   [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
+                          width 34, height 33 ][]
+                  ]
+              , text " "
+              , a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."] 
+                  [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
                           width 34, height 33 ][]
                   ]
               ]
