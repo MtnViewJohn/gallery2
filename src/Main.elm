@@ -203,132 +203,146 @@ update msg model =
     LogoutClick ->
       (model, logoutUser)
     CCcheck cc ->
-      ({ model | limitCC = cc }, Cmd.none)
+      let
+        model_ = {model | limitCC = cc}
+        url_ = (makeQuery model_) ++ "#" ++ model_.designList.thislink
+      in
+        (model_, Navigation.newUrl url_)
     SwitchTo size ->
-      ({model | designMode = size}, Navigation.modifyUrl ("#" ++ model.designList.thislink))
+      let
+        model_ = {model | designMode = size}
+        url_ = (makeQuery model_) ++ "#" ++ model_.designList.thislink
+      in
+        (model_, Navigation.newUrl url_)
     NewURL loc ->
-      case Url.parseHash route loc of
-        Nothing ->
-          (model, Cmd.none)
-        Just route ->
-          case route of
-            Home ->
-              ({model | viewMode = Default
-                      , mainDesign = Nothing
-                      , designList = zeroList}, 
-                Cmd.batch [getDesigns "newest" 0 10, getNewbie])
-            ErrorMsg msg_enc ->
-              let
-                msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
-              in
-                ({model | errorMessage = msg, viewMode = Error}, Cmd.none)
-            DesignID id ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesign id)
-            EditDesign id ->
-              case model.user of
-                Nothing -> (model, Cmd.none)
-                Just user ->
-                  let
-                    cmd_ = if id == 0 then
-                      Task.perform LoadDesign Time.now
-                    else
-                      getDesign id
-                  in
-                    ({model | mainDesign = Nothing, viewMode = Editing}, cmd_)
-            Author name_enc start count ->
-              let
-                name = Maybe.withDefault "" (Http.decodeUri name_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "by" [name]) start count)
-            AuthorInit name_enc start ->
-              let
-                name = Maybe.withDefault "" (Http.decodeUri name_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "by" [name]) start (if model.designMode == Design.Small then 50 else 5))
-            AuthorInit2 name_enc ->
-              let
-                name = Maybe.withDefault "" (Http.decodeUri name_enc)
-              in
-                (model, Navigation.modifyUrl (makeUri "#user" [name, "0"]))
-            Faves name_enc start count ->
-              let
-                name = Maybe.withDefault "" (Http.decodeUri name_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "faves" [name]) start count)
-            FavesInit name_enc start ->
-              let
-                name = Maybe.withDefault "" (Http.decodeUri name_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "faves" [name]) start (if model.designMode == Design.Small then 50 else 5))
-            Newest start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "newest" start count)
-            NewestInit start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "newest" start (if model.designMode == Design.Small then 50 else 5))
-            Oldest start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "oldest" start count)
-            OldestInit start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "oldest" start (if model.designMode == Design.Small then 50 else 5))
-            Title start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "title" start count)
-            TitleInit start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "title" start (if model.designMode == Design.Small then 50 else 5))
-            TitleIndex title ->
-              (model, getTitle title)
-            Popular start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "popular" start count)
-            PopularInit start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns "popular" start (if model.designMode == Design.Small then 50 else 5))
-            RandomDes seed start count ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("random/" ++ (toString seed)) start count)
-            RandomInit seed start ->
-              ({model | mainDesign = Nothing, viewMode = Designs },
-                getDesigns ("random/" ++ (toString seed)) start (if model.designMode == Design.Small then 50 else 5))
-            RandomSeed ->
-              (model, Random.generate NewSeed (Random.int 1 1000000000))
-            Tag tag_enc start count ->
-              let
-                tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "tag" [tag]) start count)
-            TagInit tag_enc start ->
-              let
-                tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
-              in
-                ({model | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns (makeUri "tag" [tag]) start (if model.designMode == Design.Small then 50 else 5))
-            ShowTags tagType ->
-              let
-                comp = 
-                  if tagType == "tag" then
-                    \a b -> compare a.name b.name
-                  else
-                    \a b -> 
-                      if a.count == b.count then
-                        compare a.name b.name
+      let
+        qbits = String.split "&" (String.dropLeft 1 loc.search)
+        cc_ = List.member "cc" qbits
+        mode_ = if (List.member "large" qbits) then Design.Medium else Design.Small
+        model_ = {model | limitCC = cc_, designMode = mode_}
+      in
+        case Url.parseHash route loc of
+          Nothing ->
+            (model_, Cmd.none)
+          Just route ->
+            case route of
+              Home ->
+                ({model_ | viewMode = Default
+                         , mainDesign = Nothing
+                         , designList = zeroList}, 
+                  Cmd.batch [getDesigns "newest" 0 10, getNewbie])
+              ErrorMsg msg_enc ->
+                let
+                  msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
+                in
+                  ({model_ | errorMessage = msg, viewMode = Error}, Cmd.none)
+              DesignID id ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesign id)
+              EditDesign id ->
+                case model_.user of
+                  Nothing -> (model_, Cmd.none)
+                  Just user ->
+                    let
+                      cmd_ = if id == 0 then
+                        Task.perform LoadDesign Time.now
                       else
-                        compare b.count a.count   -- descending order
-              in
-                ({model| tagList = List.sortWith comp model.tagList, viewMode = Tags}, Cmd.none)
-            Users utype start count ->
-              if List.member utype ["name", "posts", "joined"] then
-                ({model | viewMode = People}, getUsers ("users/" ++ utype) start count)
-              else
-                (model, Cmd.none)
+                        getDesign id
+                    in
+                      ({model_ | mainDesign = Nothing, viewMode = Editing}, cmd_)
+              Author name_enc start count ->
+                let
+                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "by" [name]) start count)
+              AuthorInit name_enc start ->
+                let
+                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "by" [name]) start (if model_.designMode == Design.Small then 50 else 5))
+              AuthorInit2 name_enc ->
+                let
+                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                in
+                  (model_, Navigation.modifyUrl (makeUri "#user" [name, "0"]))
+              Faves name_enc start count ->
+                let
+                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "faves" [name]) start count)
+              FavesInit name_enc start ->
+                let
+                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "faves" [name]) start (if model_.designMode == Design.Small then 50 else 5))
+              Newest start count ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "newest" start count)
+              NewestInit start ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "newest" start (if model_.designMode == Design.Small then 50 else 5))
+              Oldest start count ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "oldest" start count)
+              OldestInit start ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "oldest" start (if model_.designMode == Design.Small then 50 else 5))
+              Title start count ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "title" start count)
+              TitleInit start ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "title" start (if model_.designMode == Design.Small then 50 else 5))
+              TitleIndex title ->
+                (model_, getTitle title)
+              Popular start count ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "popular" start count)
+              PopularInit start ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns "popular" start (if model_.designMode == Design.Small then 50 else 5))
+              RandomDes seed start count ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns ("random/" ++ (toString seed)) start count)
+              RandomInit seed start ->
+                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  getDesigns ("random/" ++ (toString seed)) start (if model_.designMode == Design.Small then 50 else 5))
+              RandomSeed ->
+                (model_, Random.generate NewSeed (Random.int 1 1000000000))
+              Tag tag_enc start count ->
+                let
+                  tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "tag" [tag]) start count)
+              TagInit tag_enc start ->
+                let
+                  tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+                in
+                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                    getDesigns (makeUri "tag" [tag]) start (if model_.designMode == Design.Small then 50 else 5))
+              ShowTags tagType ->
+                let
+                  comp = 
+                    if tagType == "tag" then
+                      \a b -> compare a.name b.name
+                    else
+                      \a b -> 
+                        if a.count == b.count then
+                          compare a.name b.name
+                        else
+                          compare b.count a.count   -- descending order
+                in
+                  ({model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}, Cmd.none)
+              Users utype start count ->
+                if List.member utype ["name", "posts", "joined"] then
+                  ({model_ | viewMode = People}, getUsers ("users/" ++ utype) start count)
+                else
+                  (model_, Cmd.none)
     NewSeed seed ->
       (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
@@ -531,6 +545,14 @@ update msg model =
             ({model | mainDesign = mdesign_, designList = dlist_}, cmd_)
         Err error ->
           (model, Navigation.newUrl "#error/Delete%20failed%2e")
+
+makeQuery : Model -> String
+makeQuery model =
+  case (model.limitCC, model.designMode == Design.Medium) of
+    (True , True ) -> "?cc&large"
+    (True , False) -> "?cc"
+    (False, True ) -> "?large"
+    (False, False) -> "?"
 
 
 updateDesignList : Design.MsgId -> List Design.Design -> (List Design.Design, Maybe Action)
@@ -735,30 +757,34 @@ view model =
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ a [href "#users/name/0/25"] [text "People" ]]
       , li [] [ a [href "#tags/tag"] [text "Tags"] ]
-      , li [] 
-        [ label []
-          [ input [ type_ "checkbox", onCheck CCcheck, checked model.limitCC ] []
-          , img 
-            [ class "top"
-            , style [ ("padding", "0px 5px") ]
-            , src "graphics/CC.badge.png"
-            , alt "Creative Commons badge"
-            ] []
-          , text "Only"
-          ]
-        ]
-      , li [] [ text "List mode:" ]
-      , let
+      ]
+    , h5 [] [ text "Display Mode:" ]
+    , ( let
           disable = not (model.viewMode == Designs && model.mainDesign == Nothing)
         in
-          li []
-          [ fieldset []
-            [ radio "Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable
-            , text " "
-            , radio "Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable
+        ul [style [("color", if disable then "#d8cb9f" else "inherit")]]
+        [ li [] 
+            [ label []
+              [ input
+                [ type_ "checkbox", onCheck CCcheck, checked model.limitCC, disabled disable] []
+              , img 
+                [ class "top"
+                , style [ ("padding", "0px 5px") ]
+                , src "graphics/CC.badge.png"
+                , alt "Creative Commons badge"
+                ] []
+              , text "Only"
+              ]
             ]
-          ]
-      ]
+          , li [] [ text "Display size:" ]
+          , li []
+            [ fieldset []
+              [ radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable
+              , text " "
+              , radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable
+              ]
+            ]
+          ])
     , h5 [] [ text "Lookup" ]
     , ul []
       [ li [] 
