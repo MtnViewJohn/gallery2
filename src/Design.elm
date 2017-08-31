@@ -339,7 +339,7 @@ makeTagLink tag =
 
 makeFanLink : String -> Html MsgId
 makeFanLink fan = 
-  a [href (makeUri "#user" [fan, "0"])] [b [] [text (fan ++ " ")]]
+  a [href (makeUri "#faves" [fan, "0"])] [b [] [text (fan ++ " ")]]
 
 fanCount : Int -> String
 fanCount cnt =
