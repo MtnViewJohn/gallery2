@@ -77,6 +77,7 @@ type alias Model =
   , tagList : List TagInfo
   , userList : UserList
   , errorMessage : String
+  , initUrl : String
   }
 
 zeroList : DesignList
@@ -87,8 +88,8 @@ zeroUList = UserList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList "", 
-    Cmd.batch [loginSession, getTags, Navigation.modifyUrl loc.href])
+  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList "" loc.href, 
+    loginSession)
 
 designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
 designMap mapping oldList =
@@ -407,9 +408,9 @@ update msg model =
     SessionUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user}, Cmd.none)
+          ({model | user = Just user}, getTags)
         Err error ->
-          (model, Cmd.none)
+          (model, getTags)
     LogoutUser logoutResult ->
       case logoutResult of
         Ok yes ->
@@ -473,7 +474,7 @@ update msg model =
     GotTags tagsResult ->
       case tagsResult of
         Ok tags ->
-          ({ model | tagList = tags}, Cmd.none)
+          ({ model | tagList = tags}, Navigation.modifyUrl model.initUrl)
         Err error ->
           {- let
             _ = case error of
@@ -483,7 +484,7 @@ update msg model =
               Http.BadStatus resp -> Debug.log "BadStatus" resp.status.message
               Http.BadPayload msg resp -> Debug.log "BadPayload" msg
           in -}
-            (model, Cmd.none)
+            (model, Navigation.modifyUrl model.initUrl)
     NewUsers usersResult ->
       case usersResult of
         Ok users ->
