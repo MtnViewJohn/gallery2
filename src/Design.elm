@@ -449,7 +449,6 @@ thumbImageAttributes design =
         , style
           [ ("background-image", imageurl)
           , ("background-repeat", "repeat-x")
-          , ("height", toString sz.height ++ "px")
           , ("text-align", "left")
           , ("width", "100%")
           ]
@@ -460,7 +459,8 @@ thumbImageAttributes design =
           [ ("background-image", imageurl)
           , ("background-repeat", "repeat-y")
           , ("background-position", "right")
-          , ("min-height", toString (2 * sz.height) ++ "px")
+          , ("height", "100%")
+          , ("position", "absolute")
           , ("float", "left")
           ]
         ]
@@ -469,7 +469,8 @@ thumbImageAttributes design =
         , style
           [ ("background-image", imageurl)
           , ("background-repeat", "repeat")
-          , ("min-height", toString (2 * sz.height) ++ "px")
+          , ("height", "100%")
+          , ("position", "absolute")
           , ("float", "left")
           ]
         ]
@@ -510,6 +511,18 @@ thumbImage design =
             , height 300
             , alt "design thumbnail"
             ] []]
+
+minHeight : Design -> Int
+minHeight design =
+  let
+    sz = Maybe.withDefault (Size 300 300) design.imagesize
+  in
+    case design.tiled of
+      Untiled -> sz.height + 5
+      Hfrieze -> sz.height + 5
+      Vfrieze -> 2 * sz.height + 5
+      Tiled   -> 2 * sz.height + 5
+
 
 viewCC : Design -> Html MsgId
 viewCC design =
@@ -685,7 +698,13 @@ view cfg design =
         ])
       ]
     Medium ->
-      div [style [("overflow", "auto")]]
+      div 
+      [ style 
+        [("overflow", "auto")
+        , ("position", "relative")
+        , ("min-height", toString (minHeight design) ++ "px")
+        ]
+      ]
       [ div (thumbImageAttributes design)
         [ thumbImage design ]
       , div [style [("padding-left", "310px")]]
