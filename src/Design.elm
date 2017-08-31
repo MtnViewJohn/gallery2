@@ -524,14 +524,15 @@ viewCC design =
     , text design.ccName
     ]
 
-downloadLink : String -> Html MsgId -> Html MsgId
+downloadLink : String -> String -> Html MsgId
 downloadLink filepath content =
   let
     mfilename = List.head <| List.reverse <| (String.split "/" filepath)
     filename = Maybe.withDefault filepath mfilename
   in
-    a [href filepath, downloadAs filename, title "Download the cfdg file to your computer."]
-      [ content ]
+    a [href filepath, downloadAs filename, title "Download the cfdg file to your computer."
+      , class "button download"
+      ] [ text content ]
       
 newTextMsg : Int -> (String -> Msg) -> String -> MsgId
 newTextMsg id msg text =
@@ -582,49 +583,41 @@ view cfg design =
             ]
           else
             []
-        , if not (List.isEmpty design.fans) then
-            [ div [id "favelist"] 
-               ([text (fanCount design.numvotes), text ": "] ++ 
-                (List.map makeFanLink design.fans))
-            ]
-          else
-            []
-        , [ br [] []
-          , downloadLink design.filelocation 
-              ( img [ src "graphics/btn_download.png", alt "Download cfdg",
-                      width 126, height 33] []
+        , [ div [id "favelist"] 
+              ( if not (List.isEmpty design.fans) then
+                ( [text (fanCount design.numvotes), text ": "] ++ 
+                  (List.map makeFanLink design.fans)
+                )
+                else
+                  []
               )
+          ]
+        , [ downloadLink design.filelocation "Download"
           , text " "
-          , a [ href ("translate.php?id=" ++ toString design.designid),
-                title "Translate to new syntax." ] 
-              [ img [ src "graphics/btn_translate.png", alt "Translate to new syntax",
-                      width 120, height 33 ] []
-              ]
+          , a [ href ("translate.php?id=" ++ toString design.designid)
+              , title "Translate to new syntax.", class "button translate" 
+              ] [ text "Translate"]
           , text " "
           ]
         , if canModify design.owner cfg.currentUser then  
             if design.ready2delete then
-              [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
-                  [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
-                          width 90, height 33 ][]
-                  ]
+              [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+                  , class "keepbutton"
+                  ] [ text "Cancel"]
               , text " "
-              , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                  [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
-                          width 112, height 33 ][]
-                  ]
+              , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+                  , class "confirmbutton"
+                  ] [ text "Confirm"]
               , text " "
               ]
             else
-              [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
-                  [ img [ src "graphics/btn_delete.png", alt "Delete this design",
-                          width 110, height 33 ][]
-                  ]
+              [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+                  , class "button deletebutton" 
+                  ] [ text "Delete"]
               , text " "
-              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                  [ img [ src "graphics/btn_edit.png", alt "Edit this design",
-                          width 92, height 33 ][]
-                  ]
+              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+                  , class "button editbutton"
+                  ] [ text "Edit"]
               , text " "
               ]
           else
@@ -633,19 +626,19 @@ view cfg design =
             Nothing -> [ ]
             Just user ->
               if List.member user.name design.fans then
-                [ a [ href "#", onNav (RemoveFavesClick,design.designid), title "Remove this design from your list of favorites."] 
-                    [ img [ src "graphics/btn_removefave.png", alt "Remove from favorites",
-                            width 112, height 33 ][]
-                    ]
+                [ a [ href "#", onNav (RemoveFavesClick,design.designid)
+                    , title "Remove this design from your list of favorites."
+                    , class "button removefave"
+                    ] [ text "Remove"]
                 ]
               else
-                [ a [ href "#", onNav (AddFavesClick,design.designid), title "Add this design to your list of favorites."] 
-                    [ img [ src "graphics/btn_addfave.png", alt "Add to favorites",
-                            width 82, height 33 ][]
-                    ]
+                [ a [ href "#", onNav (AddFavesClick,design.designid)
+                    , title "Add this design to your list of favorites."
+                    , class "button addfave"
+                    ] [ text "Add"]
                 ]
         , [ br [][]
-          , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
+          , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link] ")
           ]
         , [ viewCC design ]
         , [ br [] [] 
@@ -708,52 +701,40 @@ view cfg design =
               , text (", uploaded on " ++ (makeDate design.uploaddate))
               ]
             , if design.numvotes > 0 then
-                [ br [] []
-                , span [class "small"] [text (fanCount design.numvotes) ]
+                [ div [class "small"] [text (fanCount design.numvotes) ]
                 ]
               else
-                []
-          , [ br [] []
-            , downloadLink design.filelocation 
-                ( img [ src "graphics/btn_download.png", alt "Download cfdg",
-                        width 126, height 33] []
-                )
+                [div [] []]
+          , [ downloadLink design.filelocation "Download"
             , text " "
-            , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
-                [ img [ src "graphics/btn_view.png", alt "View Design",
-                        width 86, height 33 ] []
-                ]
+            , a [ href ("#design/" ++ (toString design.designid)), title "View design."
+                , class "button viewbutton" 
+                ] [ text "View"]
             , text " "
             ]
           , if canModify design.owner cfg.currentUser then
               if design.ready2delete then
-                [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
-                    [ img [ src "graphics/btn_cancel.png", alt "Cancel deletion",
-                            width 90, height 33 ][]
-                    ]
+                [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+                    , class "keepbutton"
+                    ] [ text "Cancel"]
                 , text " "
-                , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                    [ img [ src "graphics/btn_confirm.png", alt "Confirm deletion",
-                            width 112, height 33 ][]
-                    ]
-                , text " "
+                , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+                    , class "confirmbutton"
+                    ] [ text "Confirm"]
                 ]
               else
-                [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
-                    [ img [ src "graphics/btn_delete.png", alt "Delete this design",
-                            width 110, height 33 ][]
-                    ]
+                [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+                    , class "button deletebutton" 
+                    ] [ text "Delete"]
                 , text " "
-                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                    [ img [ src "graphics/btn_edit.png", alt "Edit this design",
-                            width 92, height 33 ][]
-                    ]
-                , text " "
+                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+                    , class "button editbutton"
+                    ] [ text "Edit"]
                 ]
             else
               [ ]
           , [ br [][]
-            , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link]")
+            , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link] ")
             ]
           , [ viewCC design ]
           , [ br [] []
@@ -785,44 +766,37 @@ view cfg design =
                   ]
                 else
                   []
-            , [ br [][]
-              , downloadLink design.filelocation 
-                  ( img [ src "graphics/mbtn_download.png", alt "Download cfdg",
-                          width 34, height 33] []
-                  )
-              , text " "
-              , a [ href ("#design/" ++ (toString design.designid)), title "View design." ] 
-                  [ img [ src "graphics/mbtn_view.png", alt "View Design",
-                          width 34, height 33 ] []
-                  ]
-              , text " "
+            , [ div [style [("margin-bottom", "5px")]]
+                [ downloadLink design.filelocation ""
+                , text " "
+                , a [ href ("#design/" ++ (toString design.designid)), title "View design."
+                    , class "button viewbutton" 
+                    ] [ ]
+                , text " "
+                ]
               ]
             , if canModify design.owner cfg.currentUser then
                 if design.ready2delete then
-                  [ br [][]
-                  , a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."] 
-                      [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
-                              width 34, height 33 ][]
-                      ]
-                  , text " "
-                  , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."] 
-                      [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
-                              width 34, height 33 ][]
-                      ]
-                  , text " "
+                  [ div [] 
+                    [a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+                        , class "keepbutton"
+                        ] [ ]
+                    , text " "
+                    , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+                        , class "confirmbutton"
+                        ] [ ]
+                    ]
                   ]
                 else
-                  [ br [][]
-                  , a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."] 
-                      [ img [ src "graphics/mbtn_delete.png", alt "Delete this design",
-                              width 34, height 33 ][]
-                      ]
-                  , text " "
-                  , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."] 
-                      [ img [ src "graphics/mbtn_edit.png", alt "Edit this design",
-                              width 34, height 33 ][]
-                      ]
-                  , text " "
+                  [ div [] 
+                    [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+                        , class "button deletebutton"
+                        ] [ ]
+                    , text " "
+                    , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+                        , class "button editbutton"
+                        ] [ ]
+                    ]
                   ]
               else
                 [ ]

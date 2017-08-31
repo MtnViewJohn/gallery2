@@ -213,27 +213,23 @@ view currentUser comment =
         , if commentOwner currentUser comment.screenname then
             if comment.ready2delete then
               div []
-              [ a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."] 
-                  [ img [ src "graphics/mbtn_cancel.png", alt "Cancel deletion",
-                          width 34, height 33 ][]
-                  ]
+              [ a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."
+                  , class "keepbutton"
+                  ] [ ]
               , text " "
-              , a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."] 
-                  [ img [ src "graphics/mbtn_confirm.png", alt "Confirm deletion",
-                          width 34, height 33 ][]
-                  ]
+              , a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."
+                  , class "confirmbutton"
+                  ] [ ]
               ]
             else
               div []
-              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Delete this comment."] 
-                      [ img [ src "graphics/mbtn_delete.png", alt "Delete this comment",
-                              width 34, height 33 ][]
-                      ]
+              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Delete this comment."
+                  , class "button deletebutton commentbutton"
+                  ] [ ]
               , text " "
-              , a [ href "#", onNav (EditClick, comment.commentid), title "Edit this comment."] 
-                  [ img [ src "graphics/mbtn_edit.png", alt "Edit this comment",
-                          width 34, height 33 ][]
-                  ]
+              , a [ href "#", onNav (EditClick, comment.commentid), title "Edit this comment."
+                  , class "button editbutton commentbutton"
+                  ] [ ]
               ]
           else
             text ""
