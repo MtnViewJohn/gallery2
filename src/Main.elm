@@ -1014,7 +1014,7 @@ deleteComment commentid =
 
 decodeCommentId : Json.Decode.Decoder Int
 decodeCommentId =
-  Json.Decode.at ["commentid"] Json.Decode.int
+  Json.Decode.field "commentid" Json.Decode.int
       
 getNewbie : Cmd Msg
 getNewbie =
@@ -1033,7 +1033,7 @@ getDesign id =
 
 decodeDesign : Json.Decode.Decoder Design.Design
 decodeDesign =
-   Json.Decode.at ["design"] Design.decodeDesign
+   Json.Decode.field "design" Design.decodeDesign
 
 getDesigns : String -> Int -> Int -> Cmd Msg
 getDesigns query start count =
@@ -1046,11 +1046,11 @@ getDesigns query start count =
 decodeDesigns : Json.Decode.Decoder DesignList
 decodeDesigns = 
   Json.Decode.map5 DesignList
-    (Json.Decode.at ["designs"] (Json.Decode.list Design.decodeDesign))
-    (Json.Decode.at ["prevlink"] Json.Decode.string)
-    (Json.Decode.at ["nextlink"] Json.Decode.string)
-    (Json.Decode.at ["thislink"] Json.Decode.string)
-    (Json.Decode.at ["count"]    Json.Decode.int)
+    (Json.Decode.field "designs" (Json.Decode.list Design.decodeDesign))
+    (Json.Decode.field "prevlink" Json.Decode.string)
+    (Json.Decode.field "nextlink" Json.Decode.string)
+    (Json.Decode.field "thislink" Json.Decode.string)
+    (Json.Decode.field "count"    Json.Decode.int)
 
 deleteDesign : Int -> Cmd Msg
 deleteDesign designid =
@@ -1061,7 +1061,7 @@ deleteDesign designid =
 
 decodeDesignId : Json.Decode.Decoder Int
 decodeDesignId = 
-  Json.Decode.at ["designid"] Json.Decode.int
+  Json.Decode.field "designid" Json.Decode.int
 
 
 loginUser : Login.Model -> Cmd Msg
@@ -1085,7 +1085,7 @@ loginSession =
 
 decodeUser : Json.Decode.Decoder User.User
 decodeUser =
-  Json.Decode.at ["userinfo"] User.decodeUser
+  Json.Decode.field "userinfo" User.decodeUser
 
 logoutUser : Cmd Msg
 logoutUser = 
@@ -1096,7 +1096,7 @@ logoutUser =
 
 decodeUserLogout : Json.Decode.Decoder Bool
 decodeUserLogout =
-  Json.Decode.at ["logout_success"] Json.Decode.bool
+  Json.Decode.field "logout_success" Json.Decode.bool
 
 getCfdg : Int -> Cmd Msg
 getCfdg id =
@@ -1118,7 +1118,7 @@ getComments id =
 
 decodeComments : Json.Decode.Decoder (List Comment.Comment)
 decodeComments =
-  Json.Decode.at ["comments"] (Json.Decode.list Comment.decodeComment)
+  Json.Decode.field "comments" (Json.Decode.list Comment.decodeComment)
 
 getTitle : String -> Cmd Msg
 getTitle title =
@@ -1129,7 +1129,7 @@ getTitle title =
 
 decodeTitleIndex : Json.Decode.Decoder Int
 decodeTitleIndex = 
-  Json.Decode.at ["index"] Json.Decode.int
+  Json.Decode.field "index" Json.Decode.int
 
 getTags : Cmd Msg
 getTags = 
@@ -1140,7 +1140,7 @@ getTags =
 
 decodeTags : Json.Decode.Decoder (List TagInfo)
 decodeTags =
-  Json.Decode.at ["tags"] (Json.Decode.list decodeTagInfo)
+  Json.Decode.field "tags" (Json.Decode.list decodeTagInfo)
 
 decodeTagInfo : Json.Decode.Decoder TagInfo
 decodeTagInfo =
@@ -1160,9 +1160,9 @@ getUsers query start count =
 decodeUsers : Json.Decode.Decoder UserList
 decodeUsers =
   Json.Decode.map5 UserList
-    (Json.Decode.at ["users"] (Json.Decode.list User.decodeMiniUser))
-    (Json.Decode.at ["prevlink"] Json.Decode.string)
-    (Json.Decode.at ["nextlink"] Json.Decode.string)
-    (Json.Decode.at ["thislink"] Json.Decode.string)
-    (Json.Decode.at ["count"]    Json.Decode.int)
+    (Json.Decode.field "users"    (Json.Decode.list User.decodeMiniUser))
+    (Json.Decode.field "prevlink"  Json.Decode.string)
+    (Json.Decode.field "nextlink"  Json.Decode.string)
+    (Json.Decode.field "thislink"  Json.Decode.string)
+    (Json.Decode.field "count"     Json.Decode.int)
       
