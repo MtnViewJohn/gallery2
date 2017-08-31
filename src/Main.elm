@@ -220,6 +220,7 @@ update msg model =
         cc_ = List.member "cc" qbits
         mode_ = if (List.member "large" qbits) then Design.Medium else Design.Small
         model_ = {model | limitCC = cc_, designMode = mode_}
+        dcount = if model_.designMode == Design.Small then 50 else 5
       in
         case Url.parseHash route loc of
           Nothing ->
@@ -230,7 +231,7 @@ update msg model =
                 ({model_ | viewMode = Default
                          , mainDesign = Nothing
                          , designList = zeroList}, 
-                  Cmd.batch [getDesigns "newest" 0 10, getNewbie])
+                  Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie])
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
@@ -255,13 +256,13 @@ update msg model =
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "by" [name]) start count)
+                    getDesigns model_ (makeUri "by" [name]) start count)
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "by" [name]) start (if model_.designMode == Design.Small then 50 else 5))
+                    getDesigns model_ (makeUri "by" [name]) start dcount)
               AuthorInit2 name_enc ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -272,45 +273,45 @@ update msg model =
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "faves" [name]) start count)
+                    getDesigns model_ (makeUri "faves" [name]) start count)
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "faves" [name]) start (if model_.designMode == Design.Small then 50 else 5))
+                    getDesigns model_ (makeUri "faves" [name]) start dcount)
               Newest start count ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "newest" start count)
+                  getDesigns model_ "newest" start count)
               NewestInit start ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "newest" start (if model_.designMode == Design.Small then 50 else 5))
+                  getDesigns model_ "newest" start dcount)
               Oldest start count ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "oldest" start count)
+                  getDesigns model_ "oldest" start count)
               OldestInit start ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "oldest" start (if model_.designMode == Design.Small then 50 else 5))
+                  getDesigns model_ "oldest" start dcount)
               Title start count ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "title" start count)
+                  getDesigns model_ "title" start count)
               TitleInit start ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "title" start (if model_.designMode == Design.Small then 50 else 5))
+                  getDesigns model_ "title" start dcount)
               TitleIndex title ->
-                (model_, getTitle title)
+                (model_, getTitle model_ title)
               Popular start count ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "popular" start count)
+                  getDesigns model_ "popular" start count)
               PopularInit start ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns "popular" start (if model_.designMode == Design.Small then 50 else 5))
+                  getDesigns model_ "popular" start dcount)
               RandomDes seed start count ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns ("random/" ++ (toString seed)) start count)
+                  getDesigns model_ ("random/" ++ (toString seed)) start count)
               RandomInit seed start ->
                 ({model_ | mainDesign = Nothing, viewMode = Designs },
-                  getDesigns ("random/" ++ (toString seed)) start (if model_.designMode == Design.Small then 50 else 5))
+                  getDesigns model_ ("random/" ++ (toString seed)) start dcount)
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
               Tag tag_enc start count ->
@@ -318,13 +319,13 @@ update msg model =
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "tag" [tag]) start count)
+                    getDesigns model_ (makeUri "tag" [tag]) start count)
               TagInit tag_enc start ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
                   ({model_ | mainDesign = Nothing, viewMode = Designs },
-                    getDesigns (makeUri "tag" [tag]) start (if model_.designMode == Design.Small then 50 else 5))
+                    getDesigns model_ (makeUri "tag" [tag]) start dcount)
               ShowTags tagType ->
                 let
                   comp = 
@@ -1062,10 +1063,11 @@ decodeDesign : Json.Decode.Decoder Design.Design
 decodeDesign =
    Json.Decode.field "design" Design.decodeDesign
 
-getDesigns : String -> Int -> Int -> Cmd Msg
-getDesigns query start count =
+getDesigns : Model -> String -> Int -> Int -> Cmd Msg
+getDesigns model query start count =
   let
-    url = String.join "/" ["http://localhost:5000", query, 
+    ccquery = if model.limitCC then "cc" ++ query else query
+    url = String.join "/" ["http://localhost:5000", ccquery, 
                            toString(start), toString(count)]
   in
     Http.send NewDesigns (get url decodeDesigns)
@@ -1147,10 +1149,14 @@ decodeComments : Json.Decode.Decoder (List Comment.Comment)
 decodeComments =
   Json.Decode.field "comments" (Json.Decode.list Comment.decodeComment)
 
-getTitle : String -> Cmd Msg
-getTitle title =
+getTitle : Model -> String -> Cmd Msg
+getTitle model title =
   let
-    url = "http://localhost:5000/titleindex/" ++ (Http.encodeUri title)
+    url = 
+      if model.limitCC then
+        "http://localhost:5000/cctitleindex/" ++ (Http.encodeUri title)
+      else
+        "http://localhost:5000/titleindex/" ++ (Http.encodeUri title)
   in
     Http.send GotTitleIndex (get url decodeTitleIndex)
 
