@@ -5,6 +5,7 @@ module GalleryUtils exposing
   , onNav
   , firstJust
   , justAccum
+  , tagHelp
   , Action (..)
   )
 
@@ -12,6 +13,7 @@ import Time
 import Date
 import Http
 import Html exposing (..)
+import Html.Attributes exposing (..)
 import Html.Events exposing (onWithOptions)
 import Json.Decode
 
@@ -91,3 +93,22 @@ justAccum ma mb = case ma of
   Just a -> ma
   Nothing -> mb
 
+tagHelp : Html msg
+tagHelp =
+  div [class "taghelp"]
+    [ p [] [text "CFDG code should be put between [code] ... [/code] tags to get formatted properly. "]
+    , p [] 
+      [ text "Formatting using "
+      , a [ href "https://help.github.com/articles/basic-writing-and-formatting-syntax/"
+          , target "_blank"
+          ] 
+          [text "Github-flavored Markdown"]
+      , text " is also supported. This means that you must \\-escape markdown characters in your text."
+      ]
+    , p [] [text "Link tags should be in one of these three forms:"]
+    , ul []
+      [ li [] [text "[link design:505]Decreasing Aperture[/link]"]
+      , li [] [text "[link user:Sykil]other stuff by Sykil[/link]"]
+      , li [] [text "[link http://...]link to some other site[/link]"]
+      ]
+    ]

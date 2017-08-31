@@ -77,7 +77,9 @@ options =
   let
     opts = Markdown.defaultOptions
   in
-    { opts | sanitize = True, defaultHighlighting = Just "cfdg" }
+    { opts | githubFlavored = Just { tables = False, breaks = True }
+           , sanitize = True
+           , defaultHighlighting = Just "cfdg" }
 
 toHtml : String -> Html MsgId
 toHtml = Markdown.toHtmlWith options []
@@ -890,15 +892,7 @@ view cfg design =
               ]
             , td [colspan 2]
               [ textarea [rows 5, cols 20, maxlength 1000, name "notes", value design.notes] []
-              , div [class "taghelp"]
-                [ p [] [text "CFDG code should be put between [code] ... [/code] tags to get formatted properly. "]
-                , p [] [text "Link tags should be in one of these three forms:"]
-                , ul []
-                  [ li [] [text "[link design:505]Decreasing Aperture[/link]"]
-                  , li [] [text "[link user:Sykil]other stuff by Sykil[/link]"]
-                  , li [] [text "[link http://...]link to some other site[/link]"]
-                  ]
-                ]
+              , tagHelp
               ]
             ]
           , tr []

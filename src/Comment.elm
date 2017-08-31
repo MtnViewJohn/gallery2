@@ -53,9 +53,9 @@ options =
   let
     opts = Markdown.defaultOptions
   in
-    { opts | githubFlavored = Just { tables = False, breaks = True }, 
-             sanitize = True, 
-             defaultHighlighting = Just "cfdg" }
+    { opts | githubFlavored = Just { tables = False, breaks = True }
+           , sanitize = True
+           , defaultHighlighting = Just "cfdg" }
 
 toHtml : String -> Html Msg
 toHtml = Markdown.toHtmlWith options []
@@ -190,15 +190,7 @@ view currentUser comment =
           text "Edit a comment:"
       , textarea [rows 5, cols 20, class "addcommenttext", value comment.formcomment,
           onInput (newTextMsg comment.commentid), name "comment"] []
-      , p []
-        [ text "CFDG code should be put between [code] ... [/code] tags to get formatted properly. " ]
-      , p []
-        [ text "Link tags should be in one of these three forms:" ]
-      , ul []
-        [ li [] [text "[link design:290]Random galaxies[/link]"]
-        , li [] [text "[link user:IG14]other stuff by IG14[/link]"]
-        , li [] [text "[link http://...]link to some other site[/link]"]
-        ]
+      , tagHelp
       , input [type_ "submit", value
         (if comment.displayMode == New then
           "Add comment"
