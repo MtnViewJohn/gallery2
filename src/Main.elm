@@ -673,7 +673,7 @@ viewDesigns model =
   (makeHeader model.designList.thislink)
   ::
   if List.isEmpty model.designList.designs then
-    [ text "Nothing to show" ]
+    [ div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]]
   else
     (makePNbar model.designList)
     ::
