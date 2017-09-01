@@ -607,11 +607,11 @@ view cfg design =
                   []
               )
           ]
-        , [ downloadLink design.filelocation "Download"
+        , [ downloadLink design.filelocation " Download "
           , text " "
           , a [ href ("translate.php?id=" ++ toString design.designid)
               , title "Translate to new syntax.", class "button translate" 
-              ] [ text "Translate"]
+              ] [ text " Translate "]
           , text " "
           ]
         , if canModify design.owner cfg.currentUser then  
@@ -628,11 +628,11 @@ view cfg design =
             else
               [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
                   , class "button deletebutton" 
-                  ] [ text "Delete"]
+                  ] [ text " Delete "]
               , text " "
               , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
                   , class "button editbutton"
-                  ] [ text "Edit"]
+                  ] [ text " Edit "]
               , text " "
               ]
           else
@@ -644,13 +644,13 @@ view cfg design =
                 [ a [ href "#", onNav (RemoveFavesClick,design.designid)
                     , title "Remove this design from your list of favorites."
                     , class "button removefave"
-                    ] [ text "Remove"]
+                    ] [ text " Remove "]
                 ]
               else
                 [ a [ href "#", onNav (AddFavesClick,design.designid)
                     , title "Add this design to your list of favorites."
                     , class "button addfave"
-                    ] [ text "Add"]
+                    ] [ text " Add "]
                 ]
         , [ br [][]
           , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link] ")
@@ -726,11 +726,11 @@ view cfg design =
                 ]
               else
                 [div [] []]
-          , [ downloadLink design.filelocation "Download"
+          , [ downloadLink design.filelocation " Download "
             , text " "
             , a [ href ("#design/" ++ (toString design.designid)), title "View design."
                 , class "button viewbutton" 
-                ] [ text "View"]
+                ] [ text " View "]
             , text " "
             ]
           , if canModify design.owner cfg.currentUser then
@@ -746,11 +746,11 @@ view cfg design =
               else
                 [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
                     , class "button deletebutton" 
-                    ] [ text "Delete"]
+                    ] [ text " Delete "]
                 , text " "
                 , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
                     , class "button editbutton"
-                    ] [ text "Edit"]
+                    ] [ text " Edit "]
                 ]
             else
               [ ]
