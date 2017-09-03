@@ -15,7 +15,7 @@ import Http
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onWithOptions)
-import Json.Decode
+import Json.Decode as JD
 
 type Action 
     = DeleteDesign Int
@@ -72,7 +72,7 @@ makeUri base rest =
 
 onNav : msg -> Attribute msg
 onNav msg =
-    onWithOptions "click" { stopPropagation = False, preventDefault = True } (Json.Decode.succeed msg)
+    onWithOptions "click" { stopPropagation = False, preventDefault = True } (JD.succeed msg)
 
 
 {-mConcat : List (Maybe a) -> Maybe a

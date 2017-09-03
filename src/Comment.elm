@@ -13,9 +13,9 @@ module Comment exposing
   , view
   )
 
-import Json.Encode
-import Json.Decode
-import Json.Decode.Pipeline
+import Json.Encode as JE
+import Json.Decode as JD
+import Json.Decode.Pipeline as JPipe
 import Time
 import Html exposing (..)
 import Html.Attributes exposing (..)
@@ -66,26 +66,26 @@ int2Time i =
   (toFloat i) * 1000.0
 
 
-decodeComment : Json.Decode.Decoder Comment
+decodeComment : JD.Decoder Comment
 decodeComment =
-    Json.Decode.Pipeline.decode Comment
-        |> Json.Decode.Pipeline.required "comment" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "commentmd" (Json.Decode.string)
-        |> Json.Decode.Pipeline.hardcoded ""
-        |> Json.Decode.Pipeline.required "commentid" (Json.Decode.int)
-        |> Json.Decode.Pipeline.hardcoded 0
-        |> Json.Decode.Pipeline.required "postdate" (Json.Decode.map int2Time Json.Decode.int)
-        |> Json.Decode.Pipeline.required "screenname" (Json.Decode.string)
-        |> Json.Decode.Pipeline.hardcoded (text "")
-        |> Json.Decode.Pipeline.hardcoded Normal
-        |> Json.Decode.Pipeline.hardcoded False
+    JPipe.decode Comment
+        |> JPipe.required "comment" (JD.string)
+        |> JPipe.required "commentmd" (JD.string)
+        |> JPipe.hardcoded ""
+        |> JPipe.required "commentid" (JD.int)
+        |> JPipe.hardcoded 0
+        |> JPipe.required "postdate" (JD.map int2Time JD.int)
+        |> JPipe.required "screenname" (JD.string)
+        |> JPipe.hardcoded (text "")
+        |> JPipe.hardcoded Normal
+        |> JPipe.hardcoded False
 
-encodeComment : Comment -> Json.Encode.Value
+encodeComment : Comment -> JE.Value
 encodeComment record =
-    Json.Encode.object
-        [ ("comment",     Json.Encode.string  <| record.comment)
-        , ("commentid",   Json.Encode.int     <| record.commentid)
-        , ("screenname",  Json.Encode.string  <| record.screenname)
+    JE.object
+        [ ("comment",     JE.string  <| record.comment)
+        , ("commentid",   JE.int     <| record.commentid)
+        , ("screenname",  JE.string  <| record.screenname)
         ]
 
 

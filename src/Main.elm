@@ -6,7 +6,7 @@ import Login
 import Design
 import Comment
 import User exposing (..)
-import Json.Decode
+import Json.Decode as JD
 import Http
 import Navigation
 import UrlParser as Url exposing ((</>), (<?>), s, int, stringParam, top)
@@ -1029,7 +1029,7 @@ view model =
 
 -- HTTP
 
-post : String -> Http.Body -> Json.Decode.Decoder a -> Http.Request a
+post : String -> Http.Body -> JD.Decoder a -> Http.Request a
 post url body decoder =
   Http.request
     { method = "POST"
@@ -1041,7 +1041,7 @@ post url body decoder =
     , withCredentials = True
     }
 
-put : String -> Http.Body -> Json.Decode.Decoder a -> Http.Request a
+put : String -> Http.Body -> JD.Decoder a -> Http.Request a
 put url body decoder =
   Http.request
     { method = "PUT"
@@ -1053,7 +1053,7 @@ put url body decoder =
     , withCredentials = True
     }
 
-get : String -> Json.Decode.Decoder a -> Http.Request a
+get : String -> JD.Decoder a -> Http.Request a
 get url decoder =
   Http.request
     { method = "GET"
@@ -1091,11 +1091,11 @@ changeFave change designid =
   in
     Http.send NewFaves (post url Http.emptyBody decodeFaves)
 
-decodeFaves : Json.Decode.Decoder FaveInfo
+decodeFaves : JD.Decoder FaveInfo
 decodeFaves =
-  Json.Decode.map2 FaveInfo
-    (Json.Decode.field "designid"  Json.Decode.int)
-    (Json.Decode.field "faves" (Json.Decode.list Json.Decode.string))
+  JD.map2 FaveInfo
+    (JD.field "designid"  JD.int)
+    (JD.field "faves" (JD.list JD.string))
 
 sendComment : Int -> String -> Cmd Msg
 sendComment commentid comment_ =
@@ -1118,9 +1118,9 @@ deleteComment commentid =
   in
     Http.send RemoveComment (post url Http.emptyBody decodeCommentId)
 
-decodeCommentId : Json.Decode.Decoder Int
+decodeCommentId : JD.Decoder Int
 decodeCommentId =
-  Json.Decode.field "commentid" Json.Decode.int
+  JD.field "commentid" JD.int
       
 getNewbie : Cmd Msg
 getNewbie =
@@ -1144,13 +1144,13 @@ loadEditDesign id =
   in
     Http.send NewEditDesign (get url decodeEDesign)
 
-decodeDesign : Json.Decode.Decoder Design.DisplayDesign
+decodeDesign : JD.Decoder Design.DisplayDesign
 decodeDesign =
-   Json.Decode.field "design" Design.decodeDDesign
+   JD.field "design" Design.decodeDDesign
 
-decodeEDesign : Json.Decode.Decoder Design.EditDesign
+decodeEDesign : JD.Decoder Design.EditDesign
 decodeEDesign =
-   Json.Decode.field "design" Design.decodeEDesign
+   JD.field "design" Design.decodeEDesign
 
 uploadDesign : Design.EditDesign -> Cmd Msg
 uploadDesign edesign =
@@ -1169,14 +1169,14 @@ getDesigns model query start count =
   in
     Http.send NewDesigns (get url decodeDesigns)
 
-decodeDesigns : Json.Decode.Decoder DesignList
+decodeDesigns : JD.Decoder DesignList
 decodeDesigns = 
-  Json.Decode.map5 DesignList
-    (Json.Decode.field "designs" (Json.Decode.array Design.decodeDDesign))
-    (Json.Decode.field "prevlink" Json.Decode.string)
-    (Json.Decode.field "nextlink" Json.Decode.string)
-    (Json.Decode.field "thislink" Json.Decode.string)
-    (Json.Decode.field "count"    Json.Decode.int)
+  JD.map5 DesignList
+    (JD.field "designs" (JD.array Design.decodeDDesign))
+    (JD.field "prevlink" JD.string)
+    (JD.field "nextlink" JD.string)
+    (JD.field "thislink" JD.string)
+    (JD.field "count"    JD.int)
 
 deleteDesign : Int -> Cmd Msg
 deleteDesign designid =
@@ -1185,9 +1185,9 @@ deleteDesign designid =
   in
     Http.send DeleteADesign (post url Http.emptyBody decodeDesignId)
 
-decodeDesignId : Json.Decode.Decoder Int
+decodeDesignId : JD.Decoder Int
 decodeDesignId = 
-  Json.Decode.field "designid" Json.Decode.int
+  JD.field "designid" JD.int
 
 
 loginUser : Login.Model -> Cmd Msg
@@ -1209,9 +1209,9 @@ loginSession =
   in
     Http.send SessionUser (get url decodeUser)
 
-decodeUser : Json.Decode.Decoder User.User
+decodeUser : JD.Decoder User.User
 decodeUser =
-  Json.Decode.field "userinfo" User.decodeUser
+  JD.field "userinfo" User.decodeUser
 
 logoutUser : Cmd Msg
 logoutUser = 
@@ -1220,9 +1220,9 @@ logoutUser =
   in
     Http.send LogoutUser (post url Http.emptyBody decodeUserLogout)
 
-decodeUserLogout : Json.Decode.Decoder Bool
+decodeUserLogout : JD.Decoder Bool
 decodeUserLogout =
-  Json.Decode.field "logout_success" Json.Decode.bool
+  JD.field "logout_success" JD.bool
 
 getCfdg : Int -> Cmd Msg
 getCfdg id =
@@ -1242,9 +1242,9 @@ getComments id =
   in
     Http.send NewComments (get url decodeComments)
 
-decodeComments : Json.Decode.Decoder (List Comment.Comment)
+decodeComments : JD.Decoder (List Comment.Comment)
 decodeComments =
-  Json.Decode.field "comments" (Json.Decode.list Comment.decodeComment)
+  JD.field "comments" (JD.list Comment.decodeComment)
 
 getTitle : Model -> String -> Cmd Msg
 getTitle model title =
@@ -1257,9 +1257,9 @@ getTitle model title =
   in
     Http.send GotTitleIndex (get url decodeTitleIndex)
 
-decodeTitleIndex : Json.Decode.Decoder Int
+decodeTitleIndex : JD.Decoder Int
 decodeTitleIndex = 
-  Json.Decode.field "index" Json.Decode.int
+  JD.field "index" JD.int
 
 getTags : Cmd Msg
 getTags = 
@@ -1268,15 +1268,15 @@ getTags =
   in
     Http.send GotTags (get url decodeTags)
 
-decodeTags : Json.Decode.Decoder (List TagInfo)
+decodeTags : JD.Decoder (List TagInfo)
 decodeTags =
-  Json.Decode.field "tags" (Json.Decode.list decodeTagInfo)
+  JD.field "tags" (JD.list decodeTagInfo)
 
-decodeTagInfo : Json.Decode.Decoder TagInfo
+decodeTagInfo : JD.Decoder TagInfo
 decodeTagInfo =
-  Json.Decode.map2 TagInfo
-    (Json.Decode.field "name"  Json.Decode.string)
-    (Json.Decode.field "count" Json.Decode.int)
+  JD.map2 TagInfo
+    (JD.field "name"  JD.string)
+    (JD.field "count" JD.int)
 
       
 getUsers: String -> Int -> Int -> Cmd Msg
@@ -1287,14 +1287,14 @@ getUsers query start count =
   in
     Http.send NewUsers (get url decodeUsers)
 
-decodeUsers : Json.Decode.Decoder UserList
+decodeUsers : JD.Decoder UserList
 decodeUsers =
-  Json.Decode.map5 UserList
-    (Json.Decode.field "users"    (Json.Decode.list User.decodeMiniUser))
-    (Json.Decode.field "prevlink"  Json.Decode.string)
-    (Json.Decode.field "nextlink"  Json.Decode.string)
-    (Json.Decode.field "thislink"  Json.Decode.string)
-    (Json.Decode.field "count"     Json.Decode.int)
+  JD.map5 UserList
+    (JD.field "users"    (JD.list User.decodeMiniUser))
+    (JD.field "prevlink"  JD.string)
+    (JD.field "nextlink"  JD.string)
+    (JD.field "thislink"  JD.string)
+    (JD.field "count"     JD.int)
       
 
 -- Subscriptions

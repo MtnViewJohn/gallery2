@@ -7,8 +7,8 @@ module User exposing
   )
 
 
-import Json.Decode
-import Json.Decode.Pipeline
+import Json.Decode as JD
+import Json.Decode.Pipeline as JPipe
 import Time
 import GalleryUtils exposing (..)
 
@@ -32,25 +32,25 @@ type alias MiniUser =
 
 
 
-decodeUser : Json.Decode.Decoder User
+decodeUser : JD.Decoder User
 decodeUser =
-    Json.Decode.Pipeline.decode User
-        |> Json.Decode.Pipeline.required "username" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "email" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "admin" (Json.Decode.bool)
-        |> Json.Decode.Pipeline.required "lastlogin" (Json.Decode.map int2Time Json.Decode.int)
-        |> Json.Decode.Pipeline.required "joinedon" (Json.Decode.map int2Time Json.Decode.int)
-        |> Json.Decode.Pipeline.required "numposts" (Json.Decode.int)
-        |> Json.Decode.Pipeline.required "numlogins" (Json.Decode.int)
-        |> Json.Decode.Pipeline.required "notify" (Json.Decode.bool)
-        |> Json.Decode.Pipeline.required "ccURI" (Json.Decode.string)
+    JPipe.decode User
+        |> JPipe.required "username" (JD.string)
+        |> JPipe.required "email" (JD.string)
+        |> JPipe.required "admin" (JD.bool)
+        |> JPipe.required "lastlogin" (JD.map int2Time JD.int)
+        |> JPipe.required "joinedon" (JD.map int2Time JD.int)
+        |> JPipe.required "numposts" (JD.int)
+        |> JPipe.required "numlogins" (JD.int)
+        |> JPipe.required "notify" (JD.bool)
+        |> JPipe.required "ccURI" (JD.string)
 
-decodeMiniUser : Json.Decode.Decoder MiniUser
+decodeMiniUser : JD.Decoder MiniUser
 decodeMiniUser =
-    Json.Decode.Pipeline.decode MiniUser
-        |> Json.Decode.Pipeline.required "username" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "joinedon" (Json.Decode.map int2Time Json.Decode.int)
-        |> Json.Decode.Pipeline.required "numposts" (Json.Decode.int)
+    JPipe.decode MiniUser
+        |> JPipe.required "username" (JD.string)
+        |> JPipe.required "joinedon" (JD.map int2Time JD.int)
+        |> JPipe.required "numposts" (JD.int)
 
 
 

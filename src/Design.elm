@@ -30,9 +30,9 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on, targetValue)
 import String exposing (isEmpty, trimLeft)
-import Json.Encode
-import Json.Decode
-import Json.Decode.Pipeline
+import Json.Encode as JE
+import Json.Decode as JD
+import Json.Decode.Pipeline as JPipe
 import Time
 import User exposing (..)
 import Comment
@@ -205,76 +205,76 @@ removeComment deleteid ddesign =
     {ddesign | comments = comments_}      
 
 
-decodeSize : Json.Decode.Decoder Size
+decodeSize : JD.Decoder Size
 decodeSize = 
-  Json.Decode.map2 Size
-    (Json.Decode.field "width" Json.Decode.int)
-    (Json.Decode.field "height" Json.Decode.int)
+  JD.map2 Size
+    (JD.field "width" JD.int)
+    (JD.field "height" JD.int)
 
-decodeNotesMarkdown : Json.Decode.Decoder (Html MsgId)
+decodeNotesMarkdown : JD.Decoder (Html MsgId)
 decodeNotesMarkdown =
-  Json.Decode.map notesHtml Json.Decode.string
+  JD.map notesHtml JD.string
 
 
-decodeDesign : Json.Decode.Decoder Design
+decodeDesign : JD.Decoder Design
 decodeDesign =
-    Json.Decode.Pipeline.decode Design
-        |> Json.Decode.Pipeline.required "ccImage" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "ccName" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "ccURI" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "designid" (Json.Decode.int)
-        |> Json.Decode.Pipeline.optional "fans" (Json.Decode.list Json.Decode.string) []
-        |> Json.Decode.Pipeline.required "filelocation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "imagelocation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.optional "imagesize" (Json.Decode.maybe decodeSize) Nothing
-        |> Json.Decode.Pipeline.required "notes" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "numvotes" (Json.Decode.int)
-        |> Json.Decode.Pipeline.required "owner" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "smthumblocation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.optional "tags" (Json.Decode.list Json.Decode.string) []
-        |> Json.Decode.Pipeline.required "thumblocation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "tiled" (Json.Decode.map int2Tiled Json.Decode.int)
-        |> Json.Decode.Pipeline.required "title" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "uploaddate" (Json.Decode.map int2Time Json.Decode.int)
-        |> Json.Decode.Pipeline.required "variation" (Json.Decode.string)
+    JPipe.decode Design
+        |> JPipe.required "ccImage" (JD.string)
+        |> JPipe.required "ccName" (JD.string)
+        |> JPipe.required "ccURI" (JD.string)
+        |> JPipe.required "designid" (JD.int)
+        |> JPipe.optional "fans" (JD.list JD.string) []
+        |> JPipe.required "filelocation" (JD.string)
+        |> JPipe.required "imagelocation" (JD.string)
+        |> JPipe.optional "imagesize" (JD.maybe decodeSize) Nothing
+        |> JPipe.required "notes" (JD.string)
+        |> JPipe.required "numvotes" (JD.int)
+        |> JPipe.required "owner" (JD.string)
+        |> JPipe.required "smthumblocation" (JD.string)
+        |> JPipe.optional "tags" (JD.list JD.string) []
+        |> JPipe.required "thumblocation" (JD.string)
+        |> JPipe.required "tiled" (JD.map int2Tiled JD.int)
+        |> JPipe.required "title" (JD.string)
+        |> JPipe.required "uploaddate" (JD.map int2Time JD.int)
+        |> JPipe.required "variation" (JD.string)
 
-decodeDDesign : Json.Decode.Decoder DisplayDesign
+decodeDDesign : JD.Decoder DisplayDesign
 decodeDDesign =
-  Json.Decode.map makeDDesign decodeDesign
+  JD.map makeDDesign decodeDesign
 
-decodeEDesign : Json.Decode.Decoder EditDesign
+decodeEDesign : JD.Decoder EditDesign
 decodeEDesign =
-  Json.Decode.map makeEDesign decodeDesign
+  JD.map makeEDesign decodeDesign
 
-encodeDesign : EditDesign -> Json.Encode.Value
+encodeDesign : EditDesign -> JE.Value
 encodeDesign record =
-    Json.Encode.object
-        [ ("ccImage",    Json.Encode.string  <| record.design.ccImage)
-        , ("ccName",     Json.Encode.string  <| record.design.ccName)
-        , ("ccURI",      Json.Encode.string  <| record.design.ccURI)
-        , ("cclicense",  Json.Encode.string  <| record.ccLicense)
-        , ("designid",   Json.Encode.int     <| record.design.designid)
-        , ("tags",       Json.Encode.list    <| List.map Json.Encode.string <| realTags <| record.design.tags)
-        , ("notes",      Json.Encode.string  <| record.design.notes)
-        , ("tiled",      Json.Encode.int     <| (tiled2Int record.design.tiled))
-        , ("title",      Json.Encode.string  <| record.design.title)
-        , ("variation",  Json.Encode.string  <| record.design.variation)
-        , ("compression",Json.Encode.bool    <| record.uploadPNG)
+    JE.object
+        [ ("ccImage",    JE.string  <| record.design.ccImage)
+        , ("ccName",     JE.string  <| record.design.ccName)
+        , ("ccURI",      JE.string  <| record.design.ccURI)
+        , ("cclicense",  JE.string  <| record.ccLicense)
+        , ("designid",   JE.int     <| record.design.designid)
+        , ("tags",       JE.list    <| List.map JE.string <| realTags <| record.design.tags)
+        , ("notes",      JE.string  <| record.design.notes)
+        , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
+        , ("title",      JE.string  <| record.design.title)
+        , ("variation",  JE.string  <| record.design.variation)
+        , ("compression",JE.bool    <| record.uploadPNG)
         , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
         , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
         ]
 
-encodeFileData : FilePortData -> Json.Encode.Value
+encodeFileData : FilePortData -> JE.Value
 encodeFileData fpd =
-    Json.Encode.object
-        [ ("filename", Json.Encode.string <| fpd.filename)
-        , ("contents", Json.Encode.string <| stripUrl <| fpd.contents)
+    JE.object
+        [ ("filename", JE.string <| fpd.filename)
+        , ("contents", JE.string <| stripUrl <| fpd.contents)
         ]
 
-encodeMaybe : (a -> Json.Encode.Value) -> (Maybe a) -> Json.Encode.Value
+encodeMaybe : (a -> JE.Value) -> (Maybe a) -> JE.Value
 encodeMaybe valEncode mVal =
   case mVal of
-    Nothing -> Json.Encode.null
+    Nothing -> JE.null
     Just val -> valEncode val
 
 stripUrl : String -> String
@@ -669,7 +669,7 @@ makeSelectAttrs val state =
 
 onSelect : (String -> EMsg) -> Attribute EMsg
 onSelect tagger =
-  on "change" (Json.Decode.map tagger targetValue)
+  on "change" (JD.map tagger targetValue)
 
 view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
@@ -966,7 +966,7 @@ viewEdit edesign =
           , tr []
             [ td [] [b [] [text "CFDG"], text " file:"]
             , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
-                    , on "change" (Json.Decode.succeed (FileChange "cfdgfile"))][]]
+                    , on "change" (JD.succeed (FileChange "cfdgfile"))][]]
             , td 
               [ class "alert"
              , style [("visibility", if (validateCfdg edesign) then "hidden" else "visible")]
@@ -975,7 +975,7 @@ viewEdit edesign =
           , tr []
             [ td [] [b [] [text "PNG"], text " file:"]
             , td [] [ input [type_ "file", name "imagefile", id "imagefile"
-                    , on "change" (Json.Decode.succeed (FileChange "imagefile"))] []]
+                    , on "change" (JD.succeed (FileChange "imagefile"))] []]
             , td 
               [ class "alert"
              , style [("visibility", if (validateImage edesign) then "hidden" else "visible")]
