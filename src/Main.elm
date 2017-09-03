@@ -14,6 +14,8 @@ import Random
 import GalleryUtils exposing (..)
 import Time exposing (Time)
 import Task
+import Array exposing (Array)
+import Ports exposing (FilePortData, fileSelected, fileContentRead)
 
 main : Program Never Model Msg
 main =
@@ -22,7 +24,7 @@ main =
     { init = initModel
     , view = view
     , update = update
-    , subscriptions = (\_ -> Sub.none)
+    , subscriptions = subscriptions
     }
 
 
@@ -39,7 +41,7 @@ type ViewMode
   | Error
 
 type alias DesignList =
-  { designs : List Design.Design
+  { designs : Array Design.DisplayDesign
   , prevlink : String
   , nextlink : String
   , thislink : String
@@ -71,8 +73,9 @@ type alias Model =
   , authorLookup : String
   , designLookup : Int
   , viewMode : ViewMode
-  , mainDesign : Maybe Design.Design
+  , mainDesign : Int
   , designList : DesignList
+  , editDesign : Maybe Design.EditDesign
   , designMode : Design.ViewSize
   , tagList : List TagInfo
   , userList : UserList
@@ -81,20 +84,40 @@ type alias Model =
   }
 
 zeroList : DesignList
-zeroList = DesignList [] "" "" "" 0
+zeroList = DesignList Array.empty "" "" "" 0
 
 zeroUList : UserList
 zeroUList = UserList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs Nothing zeroList Design.Small [] zeroUList "" loc.href, 
+  (Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing Design.Small [] zeroUList "" loc.href, 
     loginSession)
 
-designMap : (Design.Design -> Design.Design) -> DesignList -> DesignList
+designMap : (Design.DisplayDesign -> Design.DisplayDesign) -> DesignList -> DesignList
 designMap mapping oldList =
-  { oldList | designs = List.map mapping oldList.designs }
+  { oldList | designs = Array.map mapping oldList.designs }
 
+noDesign : Int
+noDesign = -1
+
+designFind : Int -> (Array Design.DisplayDesign) -> (Int, Maybe Design.DisplayDesign)
+designFind id darray =
+  let
+    find2 = \index ->
+      if index < 0 then
+        (noDesign, Nothing)
+      else case Array.get index darray of
+        Nothing -> (noDesign, Nothing)
+        Just design ->
+          if design.design.designid == id then
+            (index, Just design)
+          else
+            find2 (index - 1)
+  in
+    find2 ((Array.length darray) - 1)
+      
+      
 
 -- URL PARSING
 
@@ -173,6 +196,7 @@ type Msg
   | NewURL Navigation.Location
   | LoginMsg Login.Msg
   | DesignMsg Design.MsgId
+  | EDesignMsg Design.EMsg
   | LookupName
   | LookupDesign
   | AuthorText String
@@ -180,7 +204,8 @@ type Msg
   | NewSeed Int
   | DismissDesign
   | LoadDesign Time
-  | NewDesign (Result Http.Error Design.Design)
+  | NewDesign (Result Http.Error Design.DisplayDesign)
+  | NewEditDesign (Result Http.Error Design.EditDesign)
   | NewDesigns (Result Http.Error DesignList)
   | NewUser (Result Http.Error User.User)
   | SessionUser (Result Http.Error User.User)
@@ -193,7 +218,9 @@ type Msg
   | GotTags (Result Http.Error (List TagInfo))
   | NewUsers (Result Http.Error UserList)
   | NewFaves (Result Http.Error FaveInfo)
-  | DeleteTheDesign (Result Http.Error Int)
+  | DeleteADesign (Result Http.Error Int)
+  | UploadResponse (Result Http.Error Design.DisplayDesign)
+  | FileRead FilePortData
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -229,7 +256,7 @@ update msg model =
             case route of
               Home ->
                 ({model_ | viewMode = Default
-                         , mainDesign = Nothing
+                         , mainDesign = noDesign
                          , designList = zeroList}, 
                   Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie])
               ErrorMsg msg_enc ->
@@ -238,30 +265,39 @@ update msg model =
                 in
                   ({model_ | errorMessage = msg, viewMode = Error}, Cmd.none)
               DesignID id ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesign id)
               EditDesign id ->
                 case model_.user of
                   Nothing -> (model_, Cmd.none)
                   Just user ->
-                    let
-                      cmd_ = if id == 0 then
-                        Task.perform LoadDesign Time.now
-                      else
-                        getDesign id
-                    in
-                      ({model_ | mainDesign = Nothing, viewMode = Editing}, cmd_)
+                    if id == 0 then
+                      ({model_ | editDesign = Nothing, viewMode = Editing}
+                      , Task.perform LoadDesign Time.now)
+                    else
+                      let
+                        (index, mddesign) = designFind id model_.designList.designs
+                      in case mddesign of
+                          Nothing ->
+                            ({model_ | editDesign = Nothing, viewMode = Editing},
+                              loadEditDesign id)
+                          Just ddesign ->
+                            let
+                              edesign_ = Design.makeEDesign ddesign.design
+                            in
+                              ({model_ | editDesign = Just edesign_, viewMode = Editing}
+                              , Cmd.none)
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "by" [name]) start count)
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "by" [name]) start dcount)
               AuthorInit2 name_enc ->
                 let
@@ -272,45 +308,45 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "faves" [name]) start count)
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "faves" [name]) start dcount)
               Newest start count ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "newest" start count)
               NewestInit start ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "newest" start dcount)
               Oldest start count ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "oldest" start count)
               OldestInit start ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "oldest" start dcount)
               Title start count ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "title" start count)
               TitleInit start ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "title" start dcount)
               TitleIndex title ->
                 (model_, getTitle model_ title)
               Popular start count ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "popular" start count)
               PopularInit start ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ "popular" start dcount)
               RandomDes seed start count ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ ("random/" ++ (toString seed)) start count)
               RandomInit seed start ->
-                ({model_ | mainDesign = Nothing, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs },
                   getDesigns model_ ("random/" ++ (toString seed)) start dcount)
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
@@ -318,13 +354,13 @@ update msg model =
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "tag" [tag]) start count)
               TagInit tag_enc start ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = Nothing, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs },
                     getDesigns model_ (makeUri "tag" [tag]) start dcount)
               ShowTags tagType ->
                 let
@@ -356,24 +392,31 @@ update msg model =
           Nothing ->
             ({ model | loginform = newLoginModel }, Cmd.none) 
     DesignMsg (dmsg, id) ->
-      case designMatch id model.mainDesign of
-        Just design ->
-          let
-            (design_, mainact_) = Design.update dmsg design
-          in
-            ({model | mainDesign = Just design_}, resolveAction mainact_ model)
-        Nothing ->
-          let
-            designList = model.designList
-            (dlist_, listact_) = updateDesignList (dmsg, id) designList.designs
-            designList_ = {designList | designs = dlist_}
-          in
-            ({model | designList = designList_}, resolveAction listact_ model)
+      let
+        (index, mddesign) = designFind id model.designList.designs
+        designList = model.designList
+      in
+        case mddesign of
+          Nothing -> (model, Cmd.none)
+          Just ddesign ->
+            let
+              (ddesign_, act_) = Design.update dmsg ddesign
+              designList_ = {designList | designs = Array.set index ddesign_ model.designList.designs}
+              model_ = {model | designList = designList_}
+            in
+              (model_, resolveAction act_ model_)
+    EDesignMsg emsg -> case model.editDesign of
+      Nothing -> (model, Cmd.none)
+      Just edesign ->
+        let
+          (edesign_, act_) = Design.editupdate emsg edesign
+          model_ = {model | editDesign = Just edesign_}
+        in
+          (model_, resolveAction act_ model_)
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
-      ({model | designList = zeroList}, 
-        Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
+      (model, Navigation.newUrl ("#design/" ++ (toString model.designLookup)))
     AuthorText author ->
       ({ model | authorLookup = trimLeft author }, Cmd.none)
     DesignText desText ->
@@ -385,30 +428,39 @@ update msg model =
         else
           ({ model | designLookup = des }, Cmd.none)
     DismissDesign ->
-      ({model | mainDesign = Nothing}, Navigation.back 1)
+      ({model | mainDesign = noDesign}, Navigation.back 1)
     LoadDesign time ->
       case model.user of
         Nothing -> (model, Cmd.none)
         Just user ->
           let
-            design_ = Design.initDesign user.name user.defaultccURI time
+            edesign_ = Design.initDesign user.name user.defaultccURI time
           in
-            ({model | mainDesign = Just design_}, Cmd.none)
+            ({model | editDesign = Just edesign_}, Cmd.none)
     NewDesign designResult ->
       case designResult of
         Ok design ->
-          ({ model | mainDesign = Just design}, 
-            Cmd.batch [getComments design.designid, getCfdg design.designid])
+          let
+            designList_ = DesignList (Array.fromList [design]) "" "" "" 1
+          in
+            ({model | designList = designList_, mainDesign = 0},
+              Cmd.batch [getComments design.design.designid, getCfdg design.design.designid])
         Err error ->
-          ({ model | mainDesign = Nothing}, Cmd.none)
+          ({ model | mainDesign = noDesign}, Cmd.none)
+    NewEditDesign designResult ->
+      case designResult of
+        Ok design ->
+          ({model | editDesign = Just design}, Cmd.none)
+        Err error ->
+          ({ model | editDesign = Nothing}, Cmd.none)
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | designList = designs},         
+          ({model | designList = designs, mainDesign = noDesign},         
             if model.designMode == Design.Small then
               Cmd.none
             else
-              Cmd.batch (List.map getCfdgfromDesign designs.designs))
+              Cmd.batch (List.map getCfdgfromDesign (Array.toList designs.designs)))
         Err error ->
           ({model | designList = zeroList}, Cmd.none)
     NewUser loginResult ->
@@ -434,51 +486,62 @@ update msg model =
           let
             newLoginModel = Login.fail "Logout failed" model.loginform          
           in
-            ({ model | loginform = newLoginModel }, Cmd.none) 
+            ({ model | loginform = newLoginModel}, Cmd.none) 
     ReceiveCfdg id cfdgResult ->
       case cfdgResult of
         Ok cfdgText ->
           let
-            setCfdg = Design.setCfdg id cfdgText
-          in
-            ( { model
-              | mainDesign = Maybe.map setCfdg model.mainDesign
-              , designList = designMap setCfdg model.designList
-              }, Cmd.none)
+            (index, mddesign) = designFind id model.designList.designs
+          in case mddesign of
+            Nothing -> (model, Cmd.none)  -- Shouldn't happen
+            Just ddesign ->
+              let
+                ddesign_ = Design.setCfdg cfdgText ddesign
+                designList = model.designList
+                designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
+              in
+                ({model | designList = designList_}, Cmd.none)
         Err _ ->
           (model, Cmd.none)
     NewComments commentResult ->
       case commentResult of
         Ok comments ->
-          case model.mainDesign of
-            Just oldDesign ->
+          let
+            index = model.mainDesign
+          in case Array.get index model.designList.designs of
+            Nothing -> (model, Cmd.none)  -- Shouldn't happpen
+            Just ddesign ->
               let
-                newDesign = Design.setComments comments oldDesign
+                ddesign_ = Design.setComments comments ddesign
+                designList = model.designList
+                designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                ({model | mainDesign = Just newDesign}, Cmd.none)
-            Nothing ->            -- Shouldn't happen
-              (model, Cmd.none)   -- Just drop it
+                ({model | designList = designList_}, Cmd.none)
         Err _ ->
           (model, Cmd.none)
     NewComment commentResult ->
       case commentResult of
-        Ok comment -> case model.mainDesign of
-          Just design ->
+        Ok comment -> case Array.get model.mainDesign model.designList.designs of
+          Nothing -> (model, Cmd.none)  -- Shouldn't happpen
+          Just ddesign ->
             let
-              design_ = Design.setComment comment design
+              ddesign_ = Design.setComment comment ddesign
+              designList = model.designList
+              designList_ = {designList | designs = Array.set model.mainDesign ddesign_ designList.designs}
             in
-              ({model | mainDesign = Just design_}, Cmd.none)
-          Nothing -> (model, Cmd.none)
+              ({model | designList = designList_}, Cmd.none)
         Err _ -> (model, Cmd.none)
     RemoveComment commentidResult ->
       case commentidResult of
-        Ok commentid -> case model.mainDesign of
-          Just design ->
+        Ok commentid -> case Array.get model.mainDesign model.designList.designs of
+          Nothing -> (model, Cmd.none)  -- Shouldn't happpen
+          Just ddesign ->
             let
-              design_ = Design.removeComment commentid design
+              ddesign_ = Design.removeComment commentid ddesign
+              designList = model.designList
+              designList_ = {designList | designs = Array.set model.mainDesign ddesign_ designList.designs}
             in
-              ({model | mainDesign = Just design_}, Cmd.none)
-          Nothing -> (model, Cmd.none)
+              ({model | designList = designList_}, Cmd.none)
         Err _ -> (model, Cmd.none)
     GotTitleIndex indexResult ->
       case indexResult of
@@ -507,45 +570,84 @@ update msg model =
         Err error ->
           (model,Cmd.none)
     NewFaves favesResults -> case favesResults of
-      Ok faveinfo -> case model.mainDesign of
-        Just design ->
-          if design.designid == faveinfo.designid then
+      Ok faveinfo -> case Array.get model.mainDesign model.designList.designs of
+        Just ddesign ->
+          if ddesign.design.designid == faveinfo.designid then
             let
+              design = ddesign.design
               design_ = {design
                          | fans = faveinfo.fans
                          , numvotes = List.length faveinfo.fans}
+              ddesign_ = {ddesign | design = design_}
+              designList = model.designList
+              designList_ = {designList | designs = Array.set model.mainDesign ddesign_ model.designList.designs}
             in
-              ({model | mainDesign = Just design_}, Cmd.none)
+              ({model | designList = designList_}, Cmd.none)
           else
-            (model, Cmd.none)
-        Nothing -> (model, Cmd.none)
+            (model, Cmd.none)         -- Shouldn't happen
+        Nothing -> (model, Cmd.none)  -- ditto
       Err _ -> (model, Cmd.none)
-    DeleteTheDesign designidResult ->
+    DeleteADesign designidResult ->
       case designidResult of
         Ok designid ->
           let
-            mdesign_ = case model.mainDesign of
-              Nothing -> Nothing
-              Just design ->
-                if design.designid == designid then
-                  Nothing
-                else
-                  Just design
-            dlist = model.designList
-            designs_ = List.filter (\d -> d.designid /= designid) dlist.designs
-            dlist_ = {dlist | designs = designs_}
+            designList = model.designList
+            designs_ = Array.filter (\dd -> dd.design.designid /= designid) designList.designs
+            designList_ = {designList | designs = designs_}
             cmd_ = 
-              if mdesign_ == Nothing && model.mainDesign /= Nothing then
-                if List.isEmpty designs_ then
-                  Navigation.newUrl "#"
-                else
-                  Navigation.newUrl ("#" ++ dlist.thislink)
+              if Array.isEmpty designs_ then
+                Navigation.newUrl "#"
               else
-                Cmd.none
+                Navigation.newUrl ("#" ++ designList_.thislink)
           in
-            ({model | mainDesign = mdesign_, designList = dlist_}, cmd_)
+            ({model | designList = designList_, mainDesign = noDesign}, cmd_)
         Err error ->
           (model, Navigation.newUrl "#error/Delete%20failed%2e")
+    UploadResponse uploadResponse ->
+      case uploadResponse of
+        Ok ddesign_ -> 
+          let
+            designList = model.designList
+            (index, _) = designFind ddesign_.design.designid designList.designs
+            designs_ = 
+              if index == noDesign then
+                Array.fromList [ddesign_]
+              else
+                Array.set index ddesign_ designList.designs
+            mainDesign_ = if index == noDesign then 0 else index
+            designList_ =
+              if index == noDesign then
+                DesignList designs_ "" "" "" 1
+              else
+                {designList | designs = designs_}
+            cmd_ =
+              if index == noDesign  || index /= model.mainDesign then
+                Navigation.modifyUrl ("#design/" ++ (toString ddesign_.design.designid))
+              else
+                Navigation.back 1
+          in
+            ({model 
+              | designList = designList_, editDesign = Nothing
+              , viewMode = Designs, mainDesign = mainDesign_}, cmd_)
+        Err error ->
+          let
+            _ = case error of
+              Http.BadUrl url -> Debug.log "BadUrl" url
+              Http.Timeout -> Debug.log "Timeout" ""
+              Http.NetworkError -> Debug.log "NetworkError" ""
+              Http.BadStatus resp -> Debug.log "BadStatus" resp.status.message
+              Http.BadPayload msg resp -> Debug.log "BadPayload" msg
+          in
+            (model, Navigation.newUrl "#error/Upload%20failed%2e")
+    FileRead fpd ->
+      case model.editDesign of
+        Nothing -> (model, Cmd.none)
+        Just edesign ->
+          let
+            edesign_ = Design.setFile fpd edesign
+          in
+            ({model | editDesign = Just edesign_}, Cmd.none)
+
 
 makeQuery : Model -> String
 makeQuery model =
@@ -556,31 +658,6 @@ makeQuery model =
     (False, False) -> "?"
 
 
-updateDesignList : Design.MsgId -> List Design.Design -> (List Design.Design, Maybe Action)
-updateDesignList (dmsg, id) designs =
-  case designs of
-    d :: ld -> 
-      if d.designid == id then
-        let
-          (d_, act_) = Design.update dmsg d
-        in
-          (d_ :: ld, act_)
-      else
-        let
-          (ld_, act_) = updateDesignList (dmsg, id) ld
-        in
-          (d :: ld_, act_)
-    [] -> ([], Nothing)
-
-designMatch : Int -> Maybe Design.Design -> Maybe Design.Design
-designMatch id mdesign =
-  case mdesign of
-    Nothing -> Nothing
-    Just design -> 
-      if id == design.designid then
-        mdesign
-      else
-        Nothing
 
 -- VIEW
 
@@ -672,7 +749,7 @@ viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
   (makeHeader model.designList.thislink)
   ::
-  if List.isEmpty model.designList.designs then
+  if Array.isEmpty model.designList.designs then
     [ div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]]
   else
     (makePNbar model.designList)
@@ -680,8 +757,8 @@ viewDesigns model =
     ( let
         vcfg = Design.ViewConfig model.designMode model.user
 
-        htmlList = 
-          (List.map ((Design.view vcfg) >> (Html.map DesignMsg))
+        htmlList = Array.toList
+          (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
             model.designList.designs)
       in
         if model.designMode == Design.Medium then
@@ -761,7 +838,7 @@ view model =
       ]
     , h5 [] [ text "Display Mode:" ]
     , ( let
-          disable = not (model.viewMode == Designs && model.mainDesign == Nothing)
+          disable = not (model.viewMode == Designs && model.mainDesign == noDesign)
         in
         ul [style [("color", if disable then "#d8cb9f" else "inherit")]]
         [ li [] 
@@ -825,7 +902,7 @@ view model =
           div []
           [ h5 [] [ text ("User " ++ user.name) ]
           , ul []
-            [ li [] [ a [href "#edit/0"] [text "Upload!" ]]
+            [ li [] [ a [href "#edit/0"] [text "Upload a Design" ]]
             , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
@@ -840,24 +917,21 @@ view model =
           , p [] [text model.errorMessage]
           ]
         Editing ->
-        ( case model.mainDesign of
+        ( case model.editDesign of
             Nothing -> [text "Design didn't load."]
-            Just design ->
-              let
-                vc = Design.ViewConfig Design.Edit model.user
-              in
-                [Html.map DesignMsg (Design.view vc design)]
+            Just edesign ->
+              [Html.map EDesignMsg (Design.viewEdit edesign)]
         )
         Designs ->
-        ( case model.mainDesign of
+        ( case Array.get model.mainDesign model.designList.designs of
             Nothing ->
               viewDesigns model
             Just design ->
               let
                 vc = Design.ViewConfig Design.Large model.user
               in
-                [ if List.isEmpty model.designList.designs then
-                    text ""
+                [ if Array.isEmpty model.designList.designs then
+                    text ""   -- TODO: fix logic
                   else
                     div [style [("float", "right"), ("position", "relative"), ("top", "-1.75em")]]
                      [a [href "#", onNav DismissDesign] [text "⬅︎ Back"]]
@@ -910,21 +984,21 @@ view model =
                 , text "and post your own designs to the gallery."
                 ]
               , td []
-                [ case model.mainDesign of
-                    Just design ->
+                [ case Array.get model.mainDesign model.designList.designs of
+                    Just ddesign ->
                       table [class "welcometable"]
                         [ tr []
                           [ td [class "thumbcell"] 
-                            [ a [href ("#design/" ++ (toString design.designid))] 
-                              [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
+                            [ a [href ("#design/" ++ (toString ddesign.design.designid))] 
+                              [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
                             ]
                           ]
                         , tr []
                           [ td [] 
                             [ text "The Gallery's newest contributor is: "
-                            , a [href (makeUri "#user" [design.owner, "0"])] [text design.owner]
+                            , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
                             , text ", whose latest piece is called "
-                            , b [] [text design.title]
+                            , b [] [text ddesign.design.title]
                             ]
                           ]
                         ]
@@ -941,9 +1015,9 @@ view model =
           ++
           ( let
               vcfg = Design.ViewConfig Design.Small model.user
-            in
-              List.map ((Design.view vcfg) >> (Html.map DesignMsg))
-                                model.designList.designs
+            in 
+              Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
+                                model.designList.designs)
           )
         )
 
@@ -1004,6 +1078,10 @@ resolveAction ma model =
       RemoveFaves designid -> changeFave "deletefave" designid
       CancelEditAct -> Navigation.back 1
       DeleteDesign designid -> deleteDesign designid
+      UploadDesign -> case model.editDesign of
+        Nothing -> Cmd.none
+        Just edesign -> uploadDesign edesign
+      GetFile id -> fileSelected id
       _ -> Cmd.none
 
 changeFave : String -> Int -> Cmd Msg
@@ -1059,9 +1137,28 @@ getDesign id =
   in
     Http.send NewDesign (get url decodeDesign)
 
-decodeDesign : Json.Decode.Decoder Design.Design
+loadEditDesign : Int -> Cmd Msg
+loadEditDesign id =
+  let
+    url = "http://localhost:5000/design/" ++ (toString id)
+  in
+    Http.send NewEditDesign (get url decodeEDesign)
+
+decodeDesign : Json.Decode.Decoder Design.DisplayDesign
 decodeDesign =
-   Json.Decode.field "design" Design.decodeDesign
+   Json.Decode.field "design" Design.decodeDDesign
+
+decodeEDesign : Json.Decode.Decoder Design.EditDesign
+decodeEDesign =
+   Json.Decode.field "design" Design.decodeEDesign
+
+uploadDesign : Design.EditDesign -> Cmd Msg
+uploadDesign edesign =
+  let
+    url = "http://localhost:5000/postdesign"
+    jbody = Design.encodeDesign edesign      
+  in
+    Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesign)
 
 getDesigns : Model -> String -> Int -> Int -> Cmd Msg
 getDesigns model query start count =
@@ -1075,7 +1172,7 @@ getDesigns model query start count =
 decodeDesigns : Json.Decode.Decoder DesignList
 decodeDesigns = 
   Json.Decode.map5 DesignList
-    (Json.Decode.field "designs" (Json.Decode.list Design.decodeDesign))
+    (Json.Decode.field "designs" (Json.Decode.array Design.decodeDDesign))
     (Json.Decode.field "prevlink" Json.Decode.string)
     (Json.Decode.field "nextlink" Json.Decode.string)
     (Json.Decode.field "thislink" Json.Decode.string)
@@ -1086,7 +1183,7 @@ deleteDesign designid =
   let
     url = "http://localhost:5000/delete/" ++ (toString designid)
   in
-    Http.send DeleteTheDesign (post url Http.emptyBody decodeDesignId)
+    Http.send DeleteADesign (post url Http.emptyBody decodeDesignId)
 
 decodeDesignId : Json.Decode.Decoder Int
 decodeDesignId = 
@@ -1134,9 +1231,9 @@ getCfdg id =
   in
     Http.send (ReceiveCfdg id) (Http.getString url)
 
-getCfdgfromDesign : Design.Design -> Cmd Msg
-getCfdgfromDesign design =
-  getCfdg design.designid
+getCfdgfromDesign : Design.DisplayDesign -> Cmd Msg
+getCfdgfromDesign ddesign =
+  getCfdg ddesign.design.designid
 
 getComments : Int -> Cmd Msg
 getComments id =
@@ -1199,3 +1296,10 @@ decodeUsers =
     (Json.Decode.field "thislink"  Json.Decode.string)
     (Json.Decode.field "count"     Json.Decode.int)
       
+
+-- Subscriptions
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  fileContentRead FileRead

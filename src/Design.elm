@@ -1,26 +1,34 @@
 module Design exposing
-  ( Design
+  ( EditDesign
+  , DisplayDesign
+  , Design
   , initDesign
   , setCfdg
+  , setFile
   , setComments
   , setComment
   , removeComment
-  , decodeDesign
+  , decodeDDesign
+  , decodeEDesign
   , encodeDesign
+  , makeEDesign
 
   , Msg
   , MsgId
+  , EMsg
   , update
+  , editupdate
   , ViewConfig
   , ViewSize (..)
   , view
+  , viewEdit
   )
 
 
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on)
+import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on, targetValue)
 import String exposing (isEmpty, trimLeft)
 import Json.Encode
 import Json.Decode
@@ -31,9 +39,8 @@ import Comment
 import GalleryUtils exposing (..)
 import Markdown
 import Date
-import Array
 import Char
---import Debug
+import Ports exposing (FilePortData, fileSelected, fileContentRead)
 
 -- MODEL
 
@@ -44,7 +51,7 @@ type alias Size =
 
 type TileType = Untiled | Hfrieze | Vfrieze | Tiled
 
-type alias Design =
+type alias Design = 
     { ccImage : String
     , ccName : String
     , ccURI : String
@@ -63,14 +70,33 @@ type alias Design =
     , title : String
     , uploaddate : Time.Time
     , variation : String
+    }
+
+type alias EditDesign = 
+    { design : Design
+    , ccLicense : String
+    , filePortData : Maybe FilePortData
+    , imagePortData : Maybe FilePortData
     , uploadPNG : Bool
+    }
+
+makeEDesign : Design -> EditDesign
+makeEDesign design =
+  EditDesign design "-" Nothing Nothing (String.endsWith ".png" design.imagelocation)
+
+type alias DisplayDesign =
+    { design : Design
     , cfdghtml : Html MsgId
     , noteshtml : Html MsgId
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
     , ready2delete : Bool
-    , formPartValid : Array.Array Bool
     }
+
+makeDDesign : Design -> DisplayDesign
+makeDDesign design =
+  DisplayDesign design (text "") (notesHtml design.notes) [] (Comment.emptyComment design.designid) False
+
 
 options : Markdown.Options
 options =
@@ -99,6 +125,14 @@ int2Tiled i =
     3 -> Tiled
     _ -> Untiled
 
+str2Tiled : String -> TileType
+str2Tiled i =
+  case i of
+    "1" -> Hfrieze
+    "2" -> Vfrieze
+    "3" -> Tiled
+    _   -> Untiled
+
 tiled2Int : TileType -> Int
 tiled2Int tt =
   case tt of
@@ -107,7 +141,7 @@ tiled2Int tt =
     Vfrieze -> 2
     Tiled -> 3
 
-initDesign: String -> String -> Time.Time -> Design
+initDesign: String -> String -> Time.Time -> EditDesign
 initDesign user ccURI now = 
   let
     (image,name,uri) = 
@@ -127,29 +161,31 @@ initDesign user ccURI now =
         ("https://licensebuttons.net/p/zero/1.0/88x31.png","CC0 1.0 Universal (CC0 1.0) Public Domain Dedication","https://creativecommons.org/publicdomain/zero/1.0/")
       else
         ("No license chosen", "", "")
+    design = Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now ""
   in
-    Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now "" False
-      (text "") (text "") [] (Comment.emptyComment 0) False
-      (Array.fromList [False, False, False, True, True, True, True, True, True])
+    makeEDesign design
 
-setCfdg : Int -> String -> Design -> Design
-setCfdg id newCfdg design =
-  if id == design.designid then
-    let
-      markdown = String.concat ["```cfdg\n", newCfdg, "\n```\n"]
-    in
-      { design | cfdghtml = toHtml markdown }
+setCfdg : String -> DisplayDesign -> DisplayDesign
+setCfdg newCfdg ddesign =
+  let
+    markdown = String.concat ["```cfdg\n", newCfdg, "\n```\n"]
+  in
+    { ddesign | cfdghtml = toHtml markdown }
+
+setFile : FilePortData -> EditDesign -> EditDesign
+setFile fpd edesign =
+  if fpd.fileid == "cfdgfile" then
+    {edesign | filePortData = Just fpd}
   else
-    design
-
+    {edesign | imagePortData = Just fpd}
     
-setComments : List Comment.Comment -> Design -> Design
-setComments newComments design =
-  { design | comments = List.map Comment.setupHtml newComments }
+setComments : List Comment.Comment -> DisplayDesign -> DisplayDesign
+setComments newComments ddesign =
+  { ddesign | comments = List.map Comment.setupHtml newComments }
 
-setComment : Comment.Comment -> Design -> Design
-setComment newComment design =
-  { design | comments = replaceComment newComment design.comments}
+setComment : Comment.Comment -> DisplayDesign -> DisplayDesign
+setComment newComment ddesign =
+  { ddesign | comments = replaceComment newComment ddesign.comments}
 
 replaceComment : Comment.Comment -> List Comment.Comment -> List Comment.Comment
 replaceComment cmt_ cmts =
@@ -161,12 +197,12 @@ replaceComment cmt_ cmts =
         c :: (replaceComment cmt_ lc)
     [] -> [Comment.setupHtml cmt_]
 
-removeComment : Int -> Design -> Design
-removeComment deleteid design =
+removeComment : Int -> DisplayDesign -> DisplayDesign
+removeComment deleteid ddesign =
   let
-    comments_ = List.filter (\c -> c.commentid /= deleteid) design.comments
+    comments_ = List.filter (\c -> c.commentid /= deleteid) ddesign.comments
   in
-    {design | comments = comments_}      
+    {ddesign | comments = comments_}      
 
 
 decodeSize : Json.Decode.Decoder Size
@@ -179,10 +215,6 @@ decodeNotesMarkdown : Json.Decode.Decoder (Html MsgId)
 decodeNotesMarkdown =
   Json.Decode.map notesHtml Json.Decode.string
 
-validateDesign : String -> String -> Array.Array Bool
-validateDesign title var =
-  Array.fromList  [ validateTitle title, True, True, True
-                  , validateVariation var, True, True, True, True]
 
 decodeDesign : Json.Decode.Decoder Design
 decodeDesign =
@@ -205,30 +237,59 @@ decodeDesign =
         |> Json.Decode.Pipeline.required "title" (Json.Decode.string)
         |> Json.Decode.Pipeline.required "uploaddate" (Json.Decode.map int2Time Json.Decode.int)
         |> Json.Decode.Pipeline.required "variation" (Json.Decode.string)
-        |> Json.Decode.Pipeline.required "imagelocation" (Json.Decode.map (String.endsWith ".png") Json.Decode.string)
-        |> Json.Decode.Pipeline.hardcoded (text "")
-        |> Json.Decode.Pipeline.required "notes" decodeNotesMarkdown
-        |> Json.Decode.Pipeline.hardcoded []
-        |> Json.Decode.Pipeline.required "designid" (Json.Decode.map Comment.emptyComment Json.Decode.int)
-        |> Json.Decode.Pipeline.hardcoded False
-        |> Json.Decode.Pipeline.custom  (Json.Decode.map2 
-                                          validateDesign 
-                                          (Json.Decode.field "title" Json.Decode.string) 
-                                          (Json.Decode.field "variation" Json.Decode.string)
-                                        )
 
-encodeDesign : Design -> Json.Encode.Value
+decodeDDesign : Json.Decode.Decoder DisplayDesign
+decodeDDesign =
+  Json.Decode.map makeDDesign decodeDesign
+
+decodeEDesign : Json.Decode.Decoder EditDesign
+decodeEDesign =
+  Json.Decode.map makeEDesign decodeDesign
+
+encodeDesign : EditDesign -> Json.Encode.Value
 encodeDesign record =
     Json.Encode.object
-        [ ("ccImage",   Json.Encode.string  <| record.ccImage)
-        , ("ccName",    Json.Encode.string  <| record.ccName)
-        , ("ccURI",     Json.Encode.string  <| record.ccURI)
-        , ("designid",  Json.Encode.int     <| record.designid)
-        , ("notes",     Json.Encode.string  <| record.notes)
-        , ("tiled",     Json.Encode.int     <| (tiled2Int record.tiled))
-        , ("title",     Json.Encode.string  <| record.title)
-        , ("variation", Json.Encode.string  <| record.variation)
+        [ ("ccImage",    Json.Encode.string  <| record.design.ccImage)
+        , ("ccName",     Json.Encode.string  <| record.design.ccName)
+        , ("ccURI",      Json.Encode.string  <| record.design.ccURI)
+        , ("cclicense",  Json.Encode.string  <| record.ccLicense)
+        , ("designid",   Json.Encode.int     <| record.design.designid)
+        , ("tags",       Json.Encode.list    <| List.map Json.Encode.string <| realTags <| record.design.tags)
+        , ("notes",      Json.Encode.string  <| record.design.notes)
+        , ("tiled",      Json.Encode.int     <| (tiled2Int record.design.tiled))
+        , ("title",      Json.Encode.string  <| record.design.title)
+        , ("variation",  Json.Encode.string  <| record.design.variation)
+        , ("compression",Json.Encode.bool    <| record.uploadPNG)
+        , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
+        , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
         ]
+
+encodeFileData : FilePortData -> Json.Encode.Value
+encodeFileData fpd =
+    Json.Encode.object
+        [ ("filename", Json.Encode.string <| fpd.filename)
+        , ("contents", Json.Encode.string <| stripUrl <| fpd.contents)
+        ]
+
+encodeMaybe : (a -> Json.Encode.Value) -> (Maybe a) -> Json.Encode.Value
+encodeMaybe valEncode mVal =
+  case mVal of
+    Nothing -> Json.Encode.null
+    Just val -> valEncode val
+
+stripUrl : String -> String
+stripUrl url =
+  let
+    indices = String.indices ";base64," url
+    first = List.head indices
+  in case first of
+    Nothing -> url
+    Just index -> String.dropLeft (index + 8) url
+
+
+
+realTags : List String -> List String
+realTags = List.filter (\t -> t /= "")
 
 
 -- UPDATE
@@ -239,10 +300,19 @@ type Msg
     | AddFavesClick
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
-    | CancelEdit
+
+
+type EMsg
+    = CancelEdit
     | TitleChange String
-    | FileChange Int
+    | FileChange String
     | VariationChange String
+    | CCchange String
+    | TiledChange String
+    | PNGchoose Bool
+    | TagsChange String
+    | NotesChange String
+    | Upload
 
 type alias MsgId = (Msg, Int)
 
@@ -250,37 +320,70 @@ commentMsgId : Int -> Comment.MsgId -> MsgId
 commentMsgId id cmsgid =
   (CommentMsg cmsgid, id)
 
-update : Msg -> Design -> (Design, Maybe Action)
-update msg design =
+update : Msg -> DisplayDesign -> (DisplayDesign, Maybe Action)
+update msg ddesign =
   case msg of
     DeleteClick -> 
-      if design.ready2delete then
-        ({design | ready2delete = False}, Just (DeleteDesign design.designid))
+      if ddesign.ready2delete then
+        ({ddesign | ready2delete = False}, Just (DeleteDesign ddesign.design.designid))
       else
-        ({design | ready2delete = True}, Nothing)
-    CancelDelete -> ({design | ready2delete = False}, Nothing)
-    AddFavesClick -> (design, Just (AddFaves design.designid))
-    RemoveFavesClick -> (design, Just (RemoveFaves design.designid))
+        ({ddesign | ready2delete = True}, Nothing)
+    CancelDelete -> ({ddesign | ready2delete = False}, Nothing)
+    AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
+    RemoveFavesClick -> (ddesign, Just (RemoveFaves ddesign.design.designid))
     CommentMsg (cmsg, id) ->
       if id == 0 then
         let
-          (comment_, act) = Comment.update cmsg design.emptyComment
+          (comment_, act) = Comment.update cmsg ddesign.emptyComment
         in
-          ({design | emptyComment = comment_}, act)
+          ({ddesign | emptyComment = comment_}, act)
       else
         let
-          (comments_, act) = updateCommentList (cmsg, id) design.comments
+          (comments_, act) = updateCommentList (cmsg, id) ddesign.comments
         in
-          ({design | comments = comments_}, act)
-    CancelEdit -> (design, Just (CancelEditAct))
+          ({ddesign | comments = comments_}, act)
+
+editupdate : EMsg -> EditDesign -> (EditDesign, Maybe Action)
+editupdate msg edesign = case msg of
+    CancelEdit -> (edesign, Just CancelEditAct)
     TitleChange title_ ->
-      ({design | title = title_
-               , formPartValid = Array.set 0 (validateTitle title_) design.formPartValid}, Nothing)
-    FileChange index ->
-      ({design | formPartValid = Array.set index True design.formPartValid}, Nothing)
+      let
+        design = edesign.design
+        design_ = {design | title = title_}
+      in
+        ({edesign | design = design_}, Nothing)
+    FileChange id ->
+      (edesign , Just (GetFile id))
     VariationChange var_ ->
-      ({design | variation = var_
-               , formPartValid = Array.set 4 (validateVariation var_) design.formPartValid}, Nothing)
+      let
+        design = edesign.design
+        design_ = {design | variation = var_}
+      in
+        ({edesign | design = design_}, Nothing)
+    CCchange license_ ->
+      ({edesign | ccLicense = license_}, Nothing)
+    TiledChange tiled_ ->
+      let
+        design = edesign.design
+        design_ = {design | tiled = str2Tiled tiled_}
+      in
+        ({edesign | design = design_}, Nothing)
+    PNGchoose png_ ->
+      ({edesign | uploadPNG = png_}, Nothing)
+    TagsChange tags_ ->
+      let
+        design = edesign.design
+        design_ = {design | tags = String.split " " tags_}
+      in
+        ({edesign | design = design_}, Nothing)
+    NotesChange notes_ ->
+      let
+        design = edesign.design
+        design_ = {design | notes = notes_}
+      in
+        ({edesign | design = design_}, Nothing)
+    Upload ->
+      (edesign, Just UploadDesign)
 
 
 
@@ -320,12 +423,24 @@ validateVariation var =
     vartrim == "" || ((String.length vartrim) <= 6 && (String.all isAlpha vartrim))
 
 
+validateCfdg : EditDesign -> Bool
+validateCfdg edesign = case edesign.filePortData of
+  Nothing -> not (String.isEmpty edesign.design.filelocation)
+  Just fpd -> String.endsWith ".cfdg" (String.toLower fpd.filename)
+
+validateImage : EditDesign -> Bool
+validateImage edesign = case edesign.imagePortData of
+  Nothing -> not (String.isEmpty edesign.design.imagelocation)
+  Just fpd -> String.endsWith ".png" (String.toLower fpd.filename)
+
 
 -- VIEW
 
-validDesign : Design -> Bool
-validDesign design =
-  Array.foldl (&&) True design.formPartValid
+validDesign : EditDesign -> Bool
+validDesign edesign =
+  (validateTitle edesign.design.title) && 
+  (validateVariation edesign.design.variation) &&
+  (validateCfdg edesign) && (validateImage edesign)
 
 showOnSide : Design -> Bool
 showOnSide design =
@@ -360,7 +475,6 @@ type ViewSize
     = Large
     | Medium
     | Small
-    | Edit
 
 type alias ViewConfig =
     { size : ViewSize
@@ -524,7 +638,7 @@ minHeight design =
       Tiled   -> 2 * sz.height + 5
 
 
-viewCC : Design -> Html MsgId
+viewCC : Design -> Html msg
 viewCC design =
   if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
     let
@@ -549,88 +663,85 @@ downloadLink filepath content =
       , class "button download"
       ] [ text content ]
       
-newTextMsg : Int -> (String -> Msg) -> String -> MsgId
-newTextMsg id msg text =
-  (msg text, id)
+makeSelectAttrs : String -> String -> List (Html.Attribute EMsg)
+makeSelectAttrs val state =
+  [value val, selected (val == state)]
 
-isValid : Int -> Design -> Bool
-isValid index design =
-  let
-    mValid = Array.get index design.formPartValid
-  in
-    Maybe.withDefault True mValid
+onSelect : (String -> EMsg) -> Attribute EMsg
+onSelect tagger =
+  on "change" (Json.Decode.map tagger targetValue)
 
-view : ViewConfig -> Design -> Html MsgId
+view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
   case cfg.size of
     Large ->
       div []
-      [ div (fullImageAttributes design)
-        [ if design.tiled == Untiled then
-            img [class "image", src design.imagelocation, alt "cfdg image"] []
+      [ div (fullImageAttributes design.design)
+        [ if design.design.tiled == Untiled then
+            img [class "image", src design.design.imagelocation, alt "cfdg image"] []
           else
             text " "
         ]
       , div 
-        ( if showOnSide design then
+        ( if showOnSide design.design then
             [ style [("padding-left", "150px")]
             ]
           else
             []
         )
         (List.concat
-        [ [ b [] [ text design.title ]
+        [ [ b [] [ text design.design.title ]
           , br [] []
           , text "by " 
-          , a [href (makeUri "#user" [design.owner, "0"])] 
-              [ b [] [text design.owner]]
+          , a [href (makeUri "#user" [design.design.owner, "0"])] 
+              [ b [] [text design.design.owner]]
           ]
-        , if isEmpty design.variation then
+        , if isEmpty design.design.variation then
             [ text "" ]
           else
-            [ text ", Variation: ", b [] [text design.variation] ]
-        , [ b [] [text (tileText design.tiled)]
-          , text (", uploaded on " ++ (makeDate design.uploaddate))
+            [ text ", Variation: ", b [] [text design.design.variation] ]
+        , [ b [] [text (tileText design.design.tiled)]
+          , text (", uploaded on " ++ (makeDate design.design.uploaddate))
           ]
-        , if not (List.isEmpty design.tags) then
+        , if not (List.isEmpty design.design.tags) then
             [ div [class "pte_tags_form"] 
-               ([text "Tags: "] ++ (List.map makeTagLink design.tags))
+               ([text "Tags: "] ++ (List.map makeTagLink design.design.tags))
             ]
           else
             []
         , [ div [id "favelist"] 
-              ( if not (List.isEmpty design.fans) then
-                ( [text (fanCount design.numvotes), text ": "] ++ 
-                  (List.map makeFanLink design.fans)
+              ( if not (List.isEmpty design.design.fans) then
+                ( [text (fanCount design.design.numvotes), text ": "] ++ 
+                  (List.map makeFanLink design.design.fans)
                 )
                 else
                   []
               )
           ]
-        , [ downloadLink design.filelocation " Download "
+        , [ downloadLink design.design.filelocation " Download "
           , text " "
-          , a [ href ("translate.php?id=" ++ toString design.designid)
+          , a [ href ("translate.php?id=" ++ toString design.design.designid)
               , title "Translate to new syntax.", class "button translate" 
               ] [ text " Translate "]
           , text " "
           ]
-        , if canModify design.owner cfg.currentUser then  
+        , if canModify design.design.owner cfg.currentUser then  
             if design.ready2delete then
-              [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+              [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                   , class "keepbutton"
                   ] [ text "Cancel"]
               , text " "
-              , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+              , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
                   , class "confirmbutton"
                   ] [ text "Confirm"]
               , text " "
               ]
             else
-              [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+              [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
                   , class "button deletebutton" 
                   ] [ text " Delete "]
               , text " "
-              , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+              , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
                   , class "button editbutton"
                   ] [ text " Edit "]
               , text " "
@@ -640,22 +751,22 @@ view cfg design =
         , case cfg.currentUser of
             Nothing -> [ ]
             Just user ->
-              if List.member user.name design.fans then
-                [ a [ href "#", onNav (RemoveFavesClick,design.designid)
+              if List.member user.name design.design.fans then
+                [ a [ href "#", onNav (RemoveFavesClick,design.design.designid)
                     , title "Remove this design from your list of favorites."
                     , class "button removefave"
                     ] [ text " Remove "]
                 ]
               else
-                [ a [ href "#", onNav (AddFavesClick,design.designid)
+                [ a [ href "#", onNav (AddFavesClick,design.design.designid)
                     , title "Add this design to your list of favorites."
                     , class "button addfave"
                     ] [ text " Add "]
                 ]
         , [ br [][]
-          , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link] ")
+          , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
           ]
-        , [ viewCC design ]
+        , [ viewCC design.design ]
         , [ br [] [] 
           , table [style [("table-layout","fixed"),("width","100%")]]
             [ tr []
@@ -680,7 +791,7 @@ view cfg design =
                   in
                     [ div [class "commentsdiv"]
                       (List.intersperse (hr [][])
-                        (List.map ((Comment.view user) >> (Html.map (commentMsgId design.designid)))
+                        (List.map ((Comment.view user) >> (Html.map (commentMsgId design.design.designid)))
                           ( design.comments
                             ++
                             if cfg.currentUser == Nothing || editing then
@@ -702,62 +813,62 @@ view cfg design =
       [ style 
         [("overflow", "auto")
         , ("position", "relative")
-        , ("min-height", toString (minHeight design) ++ "px")
+        , ("min-height", toString (minHeight design.design) ++ "px")
         ]
       ]
-      [ div (thumbImageAttributes design)
-        [ thumbImage design ]
+      [ div (thumbImageAttributes design.design)
+        [ thumbImage design.design ]
       , div [style [("padding-left", "310px")]]
           (List.concat
-          [ [ b [] [text design.title ]
+          [ [ b [] [text design.design.title ]
             , text " by "
-            , a [ href (makeUri "#user" [design.owner, "0"]) ] 
-                [ b [] [text design.owner] ]
+            , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                [ b [] [text design.design.owner] ]
             ]
-            , if isEmpty design.variation then
+            , if isEmpty design.design.variation then
                 [ text "" ]
               else
-                [ text ", Variation: ", b [] [text design.variation] ]
-            , [ b [] [text (tileText design.tiled)]
-              , text (", uploaded on " ++ (makeDate design.uploaddate))
+                [ text ", Variation: ", b [] [text design.design.variation] ]
+            , [ b [] [text (tileText design.design.tiled)]
+              , text (", uploaded on " ++ (makeDate design.design.uploaddate))
               ]
-            , if design.numvotes > 0 then
-                [ div [class "small"] [text (fanCount design.numvotes) ]
+            , if design.design.numvotes > 0 then
+                [ div [class "small"] [text (fanCount design.design.numvotes) ]
                 ]
               else
                 [div [] []]
-          , [ downloadLink design.filelocation " Download "
+          , [ downloadLink design.design.filelocation " Download "
             , text " "
-            , a [ href ("#design/" ++ (toString design.designid)), title "View design."
+            , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
                 , class "button viewbutton" 
                 ] [ text " View "]
             , text " "
             ]
-          , if canModify design.owner cfg.currentUser then
+          , if canModify design.design.owner cfg.currentUser then
               if design.ready2delete then
-                [ a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+                [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                     , class "keepbutton"
                     ] [ text "Cancel"]
                 , text " "
-                , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+                , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
                     , class "confirmbutton"
                     ] [ text "Confirm"]
                 ]
               else
-                [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+                [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
                     , class "button deletebutton" 
                     ] [ text " Delete "]
                 , text " "
-                , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+                , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
                     , class "button editbutton"
                     ] [ text " Edit "]
                 ]
             else
               [ ]
           , [ br [][]
-            , text ("link tag: [link design:" ++ (toString design.designid) ++ "] ... [/link] ")
+            , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
             ]
-          , [ viewCC design ]
+          , [ viewCC design.design ]
           , [ br [] []
             , div [class "filediv", style [("width","95%")]]
                 [ design.noteshtml
@@ -770,51 +881,51 @@ view cfg design =
       table [class "sm_thumbtable"]
         [ tr []
           [ td [class "sm_thumbcell"]
-            [ a [ href ("#design/" ++ (toString design.designid)) ]
-              [ img [ class "image", src design.smthumblocation, alt "design thumbnail"] []]
+            [ a [ href ("#design/" ++ (toString design.design.designid)) ]
+              [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
           , td []
             (List.concat
-            [ [ b [] [text design.title ]
+            [ [ b [] [text design.design.title ]
               , br [] []
               , text " by "
-              , a [ href (makeUri "#user" [design.owner, "0"]) ] 
-                  [ b [] [text design.owner] ]
+              , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                  [ b [] [text design.design.owner] ]
               ]
-              , if design.numvotes > 0 then
+              , if design.design.numvotes > 0 then
                   [ br [] []
-                  , span [class "small"] [text (fanCount design.numvotes) ]
+                  , span [class "small"] [text (fanCount design.design.numvotes) ]
                   ]
                 else
                   []
             , [ div [style [("margin-bottom", "5px")]]
-                [ downloadLink design.filelocation ""
+                [ downloadLink design.design.filelocation ""
                 , text " "
-                , a [ href ("#design/" ++ (toString design.designid)), title "View design."
+                , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
                     , class "button viewbutton" 
                     ] [ ]
                 , text " "
                 ]
               ]
-            , if canModify design.owner cfg.currentUser then
+            , if canModify design.design.owner cfg.currentUser then
                 if design.ready2delete then
                   [ div [] 
-                    [a [ href "#", onNav (CancelDelete,design.designid), title "Cancel deletion."
+                    [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                         , class "keepbutton"
                         ] [ ]
                     , text " "
-                    , a [ href "#", onNav (DeleteClick,design.designid), title "Confirm deletion."
+                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
                         , class "confirmbutton"
                         ] [ ]
                     ]
                   ]
                 else
                   [ div [] 
-                    [ a [ href "#", onNav (DeleteClick,design.designid), title "Delete this design."
+                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
                         , class "button deletebutton"
                         ] [ ]
                     , text " "
-                    , a [ href ("#edit/" ++ (toString design.designid)), title "Edit this design."
+                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
                         , class "button editbutton"
                         ] [ ]
                     ]
@@ -824,9 +935,11 @@ view cfg design =
             ])
           ]
         ]
-    Edit ->
+
+viewEdit : EditDesign -> Html EMsg
+viewEdit edesign =
       div []
-      [ if design.designid == 0 then
+      [ if edesign.design.designid == 0 then
           h1 [] [text "Upload your artwork!"]
         else
           h1 [] [text "Update your artwork!"]
@@ -839,41 +952,53 @@ view cfg design =
         , br [][]
         ]
       , Html.form [method "POST", action "http://localhost:5000/postdesign", 
-              enctype "multipart/form-data"]
+              enctype "multipart/form-data", onSubmit Upload]
         [ table [class "upload"]
           [ tr []
             [ td [] [b [] [text "Title"], text ":"]
             , td [] [input [type_ "text", size 30, maxlength 100, name "title"
-                    , value design.title, onInput (newTextMsg design.designid TitleChange)][]]
+                    , value edesign.design.title, onInput TitleChange][]]
             , td 
               [ class "alert"
-             , style [("visibility", if (isValid 0 design) then "hidden" else "visible")]
+             , style [("visibility", if (validateTitle edesign.design.title) then "hidden" else "visible")]
               ] [text "Title must be between 3 and 100 characters."]
             ]
           , tr []
             [ td [] [b [] [text "CFDG"], text " file:"]
-            , td [] [ input [type_ "file", name "cfdgfile"
-                    , on "change" (Json.Decode.succeed (FileChange 1, design.designid))][]]
+            , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
+                    , on "change" (Json.Decode.succeed (FileChange "cfdgfile"))][]]
             , td 
               [ class "alert"
-             , style [("visibility", if (isValid 1 design) then "hidden" else "visible")]
+             , style [("visibility", if (validateCfdg edesign) then "hidden" else "visible")]
               ] [text "CFDG file must be chosen."]
             ]
           , tr []
             [ td [] [b [] [text "PNG"], text " file:"]
-            , td [] [ input [type_ "file", name "imagefile"
-                    , on "change" (Json.Decode.succeed (FileChange 2, design.designid))] []]
+            , td [] [ input [type_ "file", name "imagefile", id "imagefile"
+                    , on "change" (Json.Decode.succeed (FileChange "imagefile"))] []]
             , td 
               [ class "alert"
-             , style [("visibility", if (isValid 2 design) then "hidden" else "visible")]
+             , style [("visibility", if (validateImage edesign) then "hidden" else "visible")]
               ] [text "PNG file must be chosen."]
             ]
           , tr [] 
             [ td [] [text "Image upload compression type:"]
             , td [] 
-              [ input [type_ "radio", name "compression", value "JPEG", checked (not design.uploadPNG)][]
+              [ input 
+                [ type_ "radio"
+                , name "compression"
+                , value "JPEG"
+                , checked (not edesign.uploadPNG)
+                , onClick (PNGchoose False)
+                ][]
               , text " JPEG "
-              , input [type_ "radio", name "compression", value "PNG-8", checked (design.uploadPNG)][]
+              , input 
+                [ type_ "radio"
+                , name "compression"
+                , value "PNG-8"
+                , checked (edesign.uploadPNG)
+                , onClick (PNGchoose True)
+                ][]
               , text " PNG-8 "
               ]
             , td [][]
@@ -881,25 +1006,33 @@ view cfg design =
           , tr []
             [ td [] [b [] [text "Variation"], text ":"]
             , td [] [ input [type_ "text", size 9, maxlength 6, name "variation"
-                    , value design.variation, onInput (newTextMsg design.designid VariationChange)][]]
+                    , value edesign.design.variation
+                    , onInput VariationChange
+                    ][]]
             , td 
              [ class "alert"
-             , style [("visibility", if (isValid 4 design) then "hidden" else "visible")]
+             , style [("visibility", if (validateVariation edesign.design.variation) then "hidden" else "visible")]
              ] [text "Variation must be 0 to 6 letters."]
             ]
           , tr []
             [ td [] [b [] [text "Tags"], text ":"]
-            , td [] [input [type_ "text", size 30, name "tags", value (String.join " " design.tags)] []]
+            , td [] 
+              [ input 
+                [ type_ "text", size 30, name "tags"
+                , value (String.join " " edesign.design.tags)
+                , onInput TagsChange
+                ] []
+              ]
             , td [][]
             ]
           , tr []
             [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
             , td [] 
-              [ select [name "tiledtype", size 1]
-                [ option [value "0", selected (design.tiled == Untiled)] [text "Not tiled"]
-                , option [value "1", selected (design.tiled == Hfrieze)] [text "Horizontal frieze"]
-                , option [value "2", selected (design.tiled == Vfrieze)] [text "Vertical frieze"]
-                , option [value "3", selected (design.tiled == Tiled)]   [text "Tiled"]
+              [ select [name "tiledtype", size 1, onSelect TiledChange]
+                [ option [value "0", selected (edesign.design.tiled == Untiled)] [text "Not tiled"]
+                , option [value "1", selected (edesign.design.tiled == Hfrieze)] [text "Horizontal frieze"]
+                , option [value "2", selected (edesign.design.tiled == Vfrieze)] [text "Vertical frieze"]
+                , option [value "3", selected (edesign.design.tiled == Tiled)]   [text "Tiled"]
                 ]
               ]
             , td [][]
@@ -910,24 +1043,28 @@ view cfg design =
               , p [] [text "Please, please, please make sure that any included cfdg files are in the gallery as well and put links to them here."]
               ]
             , td [colspan 2]
-              [ textarea [rows 5, cols 20, maxlength 1000, name "notes", value design.notes] []
+              [ textarea
+                [ rows 5, cols 20, maxlength 1000
+                , name "notes", value edesign.design.notes
+                , onInput NotesChange
+                ] []
               , tagHelp
               ]
             ]
           , tr []
             [ td [class "vupload"] [b [] [text "Set License"], text ":"]
             , td [colspan 2]
-              [ select [name "cclicense", size 1]
-                [ option [value "-", selected True] [text "No change"]
+              [ select [name "cclicense", size 1, onSelect CCchange]
+                [ option (makeSelectAttrs "-" edesign.ccLicense) [text "No change"]
                 , optgroup [attribute "label" "Public Domain"]
-                  [ option [value "zero"] [text "Creative Commons Zero"]]
+                  [ option (makeSelectAttrs "zero" edesign.ccLicense) [text "Creative Commons Zero"]]
                 , optgroup [attribute "label" "Creative Commons Licenses"]
-                  [ option [value "by"] [text "Creative Commons Attibution"]
-                  , option [value "by-sa"] [text "Creative Commons Attibution-ShareAlike"]
-                  , option [value "by-nd"] [text "Creative Commons Attibution-NoDerivatives"]
-                  , option [value "by-nc"] [text "Creative Commons Attibution-NonCommercial"]
-                  , option [value "by-nc-sa"] [text "Creative Commons Attibution-NonCommercial-ShareAlike"]
-                  , option [value "by-nc-nd"] [text "Creative Commons Attibution-NonCommercial-NoDerivatives"]
+                  [ option (makeSelectAttrs "by" edesign.ccLicense) [text "Creative Commons Attibution"]
+                  , option (makeSelectAttrs "by-sa" edesign.ccLicense) [text "Creative Commons Attibution-ShareAlike"]
+                  , option (makeSelectAttrs "by-nd" edesign.ccLicense) [text "Creative Commons Attibution-NoDerivatives"]
+                  , option (makeSelectAttrs "by-nc" edesign.ccLicense) [text "Creative Commons Attibution-NonCommercial"]
+                  , option (makeSelectAttrs "by-nc-sa" edesign.ccLicense) [text "Creative Commons Attibution-NonCommercial-ShareAlike"]
+                  , option (makeSelectAttrs "by-nc-nd" edesign.ccLicense) [text "Creative Commons Attibution-NonCommercial-NoDerivatives"]
                   ]
                 , optgroup [attribute "label" "Default Copyright"]
                   [ option [value ""][text "All Rights Reserved"]]
@@ -936,29 +1073,27 @@ view cfg design =
             ]
           , tr []
             [ td [][text "Current License:"]
-            , td [colspan 2] [viewCC design]
+            , td [colspan 2] [viewCC edesign.design]
             ]
           , tr []
             [ td [] 
               [ input 
                 [ type_ "submit"
                 , value
-                    (if design.designid == 0 then
+                    (if edesign.design.designid == 0 then
                       "Upload Design"
                     else
                       "Update Design")
-                , disabled (not (validDesign design))
+                , disabled (not (validDesign edesign))
                 ] []
               , text " "
-              , input [type_ "submit", value "Cancel", onNav (CancelEdit,design.designid)] []
+              , input [type_ "submit", value "Cancel", onNav CancelEdit] []
               ]
             , td [colspan 2] 
-              [ if design.designid == 0 then
-                  text ""
-                else
-                  input [type_ "hidden", name "designid", value (toString design.designid)] []
+              [ input [type_ "hidden", name "designid", value (toString edesign.design.designid)] []
               ]
             ]
           ]
         ]
       ]
+

@@ -19,6 +19,7 @@ import Json.Decode
 
 type Action 
     = DeleteDesign Int
+    | UploadDesign
     | EditDesign Int
     | AddFaves Int
     | RemoveFaves Int
@@ -26,6 +27,7 @@ type Action
     | UpdateComment Int String
     | CreateComment Int String
     | CancelEditAct
+    | GetFile String
 
 
 int2Time : Int -> Time.Time
