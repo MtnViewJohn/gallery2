@@ -7,6 +7,7 @@ import Design
 import Comment
 import User exposing (..)
 import Json.Decode as JD
+import Json.Encode as JE
 import Http
 import Navigation
 import UrlParser as Url exposing ((</>), (<?>), s, int, stringParam, top)
@@ -81,6 +82,7 @@ type alias Model =
   , userList : UserList
   , errorMessage : String
   , initUrl : String
+  , errorInfo : Result Http.Error String
   }
 
 zeroList : DesignList
@@ -91,7 +93,8 @@ zeroUList = UserList [] "" "" "" 0
 
 initModel : Navigation.Location -> (Model, Cmd Msg)
 initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing Design.Small [] zeroUList "" loc.href, 
+  (Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing 
+    Design.Small [] zeroUList "" loc.href (Ok ""), 
     loginSession)
 
 designMap : (Design.DisplayDesign -> Design.DisplayDesign) -> DesignList -> DesignList
@@ -272,20 +275,20 @@ update msg model =
                   Nothing -> (model_, Cmd.none)
                   Just user ->
                     if id == 0 then
-                      ({model_ | editDesign = Nothing, viewMode = Editing}
+                      ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""}
                       , Task.perform LoadDesign Time.now)
                     else
                       let
                         (index, mddesign) = designFind id model_.designList.designs
                       in case mddesign of
                           Nothing ->
-                            ({model_ | editDesign = Nothing, viewMode = Editing},
+                            ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""},
                               loadEditDesign id)
                           Just ddesign ->
                             let
                               edesign_ = Design.makeEDesign ddesign.design
                             in
-                              ({model_ | editDesign = Just edesign_, viewMode = Editing}
+                              ({model_ | editDesign = Just edesign_, viewMode = Editing, errorMessage = ""}
                               , Cmd.none)
               Author name_enc start count ->
                 let
@@ -443,50 +446,50 @@ update msg model =
           let
             designList_ = DesignList (Array.fromList [design]) "" "" "" 1
           in
-            ({model | designList = designList_, mainDesign = 0},
+            ({model | designList = designList_, mainDesign = 0, errorInfo = Ok "New design"},
               Cmd.batch [getComments design.design.designid, getCfdg design.design.designid])
         Err error ->
-          ({ model | mainDesign = noDesign}, Cmd.none)
+          ({ model | mainDesign = noDesign, errorInfo = Err error}, Cmd.none)
     NewEditDesign designResult ->
       case designResult of
         Ok design ->
-          ({model | editDesign = Just design}, Cmd.none)
+          ({model | editDesign = Just design, errorInfo = Ok "New edit design"}, Cmd.none)
         Err error ->
-          ({ model | editDesign = Nothing}, Cmd.none)
+          ({ model | editDesign = Nothing, errorInfo = Err error}, Cmd.none)
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | designList = designs, mainDesign = noDesign},         
+          ({model | designList = designs, mainDesign = noDesign, errorInfo = Ok "New designs"},         
             if model.designMode == Design.Small then
               Cmd.none
             else
               Cmd.batch (List.map getCfdgfromDesign (Array.toList designs.designs)))
         Err error ->
-          ({model | designList = zeroList}, Cmd.none)
+          ({model | designList = zeroList, errorInfo = Err error}, Cmd.none)
     NewUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user}, Cmd.none)
+          ({model | user = Just user, errorInfo = Ok "Login success"}, Cmd.none)
         Err error ->
           let
             newLoginModel = Login.fail "Login failed" model.loginform          
           in
-            ({ model | loginform = newLoginModel }, Cmd.none) 
+            ({ model | loginform = newLoginModel, errorInfo = Err error }, Cmd.none) 
     SessionUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user}, getTags)
+          ({model | user = Just user, errorInfo = Ok "Session loaded"}, getTags)
         Err error ->
-          (model, getTags)
+          ({model | errorInfo = Err error}, getTags)
     LogoutUser logoutResult ->
       case logoutResult of
         Ok yes ->
-          ({model | user = Nothing}, Cmd.none)
+          ({model | user = Nothing, errorInfo = Ok "Logout success"}, Cmd.none)
         Err error ->
           let
             newLoginModel = Login.fail "Logout failed" model.loginform          
           in
-            ({ model | loginform = newLoginModel}, Cmd.none) 
+            ({ model | loginform = newLoginModel, errorInfo = Err error}, Cmd.none) 
     ReceiveCfdg id cfdgResult ->
       case cfdgResult of
         Ok cfdgText ->
@@ -500,9 +503,9 @@ update msg model =
                 designList = model.designList
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                ({model | designList = designList_}, Cmd.none)
-        Err _ ->
-          (model, Cmd.none)
+                ({model | designList = designList_, errorInfo = Ok "Cfdg received"}, Cmd.none)
+        Err error ->
+          ({model | errorInfo = Err error}, Cmd.none)
     NewComments commentResult ->
       case commentResult of
         Ok comments ->
@@ -516,9 +519,9 @@ update msg model =
                 designList = model.designList
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                ({model | designList = designList_}, Cmd.none)
-        Err _ ->
-          (model, Cmd.none)
+                ({model | designList = designList_, errorInfo = Ok "Comments freceived"}, Cmd.none)
+        Err error ->
+          ({model | errorInfo = Err error}, Cmd.none)
     NewComment commentResult ->
       case commentResult of
         Ok comment -> case Array.get model.mainDesign model.designList.designs of
@@ -529,8 +532,8 @@ update msg model =
               designList = model.designList
               designList_ = {designList | designs = Array.set model.mainDesign ddesign_ designList.designs}
             in
-              ({model | designList = designList_}, Cmd.none)
-        Err _ -> (model, Cmd.none)
+              ({model | designList = designList_, errorInfo = Ok "Comment received"}, Cmd.none)
+        Err error -> ({model | errorInfo = Err error}, Cmd.none)
     RemoveComment commentidResult ->
       case commentidResult of
         Ok commentid -> case Array.get model.mainDesign model.designList.designs of
@@ -541,34 +544,26 @@ update msg model =
               designList = model.designList
               designList_ = {designList | designs = Array.set model.mainDesign ddesign_ designList.designs}
             in
-              ({model | designList = designList_}, Cmd.none)
-        Err _ -> (model, Cmd.none)
+              ({model | designList = designList_, errorInfo = Ok "Comment deleted"}, Cmd.none)
+        Err error -> ({model | errorInfo = Err error}, Cmd.none)
     GotTitleIndex indexResult ->
       case indexResult of
         Ok index ->
-          (model, Navigation.newUrl ("#title/" ++ (toString index)))
-        Err _ ->
-          (model, Cmd.none)
+          ({ model | errorInfo = Ok "Title index"}, Navigation.newUrl ("#title/" ++ (toString index)))
+        Err error ->
+          ({model | errorInfo = Err error}, Cmd.none)
     GotTags tagsResult ->
       case tagsResult of
         Ok tags ->
-          ({ model | tagList = tags}, Navigation.modifyUrl model.initUrl)
+          ({ model | tagList = tags, errorInfo = Ok "Tags"}, Navigation.modifyUrl model.initUrl)
         Err error ->
-          {- let
-            _ = case error of
-              Http.BadUrl url -> Debug.log "BadUrl" url
-              Http.Timeout -> Debug.log "Timeout" ""
-              Http.NetworkError -> Debug.log "NetworkError" ""
-              Http.BadStatus resp -> Debug.log "BadStatus" resp.status.message
-              Http.BadPayload msg resp -> Debug.log "BadPayload" msg
-          in -}
-            (model, Navigation.modifyUrl model.initUrl)
+            ({model | errorInfo = Err error}, Navigation.modifyUrl model.initUrl)
     NewUsers usersResult ->
       case usersResult of
         Ok users ->
-          ({model | userList = users}, Cmd.none)
+          ({model | userList = users, errorInfo = Ok "User list"}, Cmd.none)
         Err error ->
-          (model,Cmd.none)
+          ({model | errorInfo = Err error}, Cmd.none)
     NewFaves favesResults -> case favesResults of
       Ok faveinfo -> case Array.get model.mainDesign model.designList.designs of
         Just ddesign ->
@@ -582,11 +577,11 @@ update msg model =
               designList = model.designList
               designList_ = {designList | designs = Array.set model.mainDesign ddesign_ model.designList.designs}
             in
-              ({model | designList = designList_}, Cmd.none)
+              ({model | designList = designList_, errorInfo = Ok "New fave list"}, Cmd.none)
           else
             (model, Cmd.none)         -- Shouldn't happen
         Nothing -> (model, Cmd.none)  -- ditto
-      Err _ -> (model, Cmd.none)
+      Err error -> ({model | errorInfo = Err error}, Cmd.none)
     DeleteADesign designidResult ->
       case designidResult of
         Ok designid ->
@@ -600,9 +595,10 @@ update msg model =
               else
                 Navigation.newUrl ("#" ++ designList_.thislink)
           in
-            ({model | designList = designList_, mainDesign = noDesign}, cmd_)
+            ({model | designList = designList_, mainDesign = noDesign
+                    , errorInfo = Ok "Design deleted"}, cmd_)
         Err error ->
-          (model, Navigation.newUrl "#error/Delete%20failed%2e")
+          ({model | errorInfo = Err error}, Navigation.newUrl "#error/Delete%20failed%2e")
     UploadResponse uploadResponse ->
       case uploadResponse of
         Ok ddesign_ -> 
@@ -627,18 +623,21 @@ update msg model =
                 Navigation.back 1
           in
             ({model 
-              | designList = designList_, editDesign = Nothing
+              | designList = designList_, editDesign = Nothing, errorInfo = Ok "Upload success"
               , viewMode = Designs, mainDesign = mainDesign_}, cmd_)
         Err error ->
           let
-            _ = case error of
-              Http.BadUrl url -> Debug.log "BadUrl" url
-              Http.Timeout -> Debug.log "Timeout" ""
-              Http.NetworkError -> Debug.log "NetworkError" ""
-              Http.BadStatus resp -> Debug.log "BadStatus" resp.status.message
-              Http.BadPayload msg resp -> Debug.log "BadPayload" msg
+            msg = case error of
+              Http.BadStatus resp -> 
+                let
+                  i = String.indices "</h1>" resp.body
+                in case List.head i of
+                  Nothing -> resp.body
+                  Just found -> "<h3>Upload issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
+              Http.BadPayload msg resp -> "Unexpected response."
+              _ -> "Communication error."
           in
-            (model, Navigation.newUrl "#error/Upload%20failed%2e")
+            ({model | errorInfo = Err error, errorMessage = msg}, Cmd.none)
     FileRead fpd ->
       case model.editDesign of
         Nothing -> (model, Cmd.none)
@@ -913,14 +912,19 @@ view model =
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
         Error ->
-          [ h1 [] [text "An error occured!"]
-          , p [] [text model.errorMessage]
+          [ div [ property "innerHTML" (JE.string model.errorMessage) ] []
           ]
         Editing ->
         ( case model.editDesign of
             Nothing -> [text "Design didn't load."]
             Just edesign ->
-              [Html.map EDesignMsg (Design.viewEdit edesign)]
+              [ Html.map EDesignMsg (Design.viewEdit edesign)
+              , if model.errorMessage == "" then
+                  text ""
+                else
+                  div [ property "innerHTML" (JE.string model.errorMessage)
+                      , class "alertbox"] []
+              ]
         )
         Designs ->
         ( case Array.get model.mainDesign model.designList.designs of
