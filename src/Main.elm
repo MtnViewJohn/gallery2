@@ -988,24 +988,27 @@ view model =
                 , text "and post your own designs to the gallery."
                 ]
               , td []
-                [ case Array.get model.mainDesign model.designList.designs of
-                    Just ddesign ->
-                      table [class "welcometable"]
-                        [ tr []
-                          [ td [class "thumbcell"] 
-                            [ a [href ("#design/" ++ (toString ddesign.design.designid))] 
-                              [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
+                [ case model.editDesign of
+                    Just edesign ->
+                      let
+                        ddesign = Design.makeDDesign edesign.design
+                      in
+                        table [class "welcometable"]
+                          [ tr []
+                            [ td [class "thumbcell"] 
+                              [ a [href ("#design/" ++ (toString ddesign.design.designid))] 
+                                [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
+                              ]
+                            ]
+                          , tr []
+                            [ td [] 
+                              [ text "The Gallery's newest contributor is: "
+                              , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
+                              , text ", whose latest piece is called "
+                              , b [] [text ddesign.design.title]
+                              ]
                             ]
                           ]
-                        , tr []
-                          [ td [] 
-                            [ text "The Gallery's newest contributor is: "
-                            , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
-                            , text ", whose latest piece is called "
-                            , b [] [text ddesign.design.title]
-                            ]
-                          ]
-                        ]
                     Nothing ->
                       text ""
                 ]
@@ -1131,7 +1134,7 @@ getNewbie =
   let
     url = "http://localhost:5000/newbie"
   in
-    Http.send NewDesign (get url decodeDesign)
+    Http.send NewEditDesign (get url decodeEDesign)
       
 
 getDesign : Int -> Cmd Msg

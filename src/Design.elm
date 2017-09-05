@@ -12,6 +12,7 @@ module Design exposing
   , decodeEDesign
   , encodeDesign
   , makeEDesign
+  , makeDDesign
 
   , Msg
   , MsgId
