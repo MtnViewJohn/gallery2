@@ -18,9 +18,9 @@ import Task
 import Array exposing (Array)
 import Ports exposing (FilePortData, fileSelected, fileContentRead)
 
-main : Program Never Model Msg
+main : Program Flags Model Msg
 main =
-  Navigation.program
+  Navigation.programWithFlags
     NewURL
     { init = initModel
     , view = view
@@ -67,6 +67,11 @@ type alias FaveInfo =
   , fans : List String
   }
 
+type alias Flags =
+  { backend : String
+  }
+
+
 type alias Model =
   { user : Maybe User
   , loginform : Login.Model
@@ -83,6 +88,7 @@ type alias Model =
   , errorMessage : String
   , initUrl : String
   , errorInfo : Result Http.Error String
+  , backend : String
   }
 
 zeroList : DesignList
@@ -91,11 +97,13 @@ zeroList = DesignList Array.empty "" "" "" 0
 zeroUList : UserList
 zeroUList = UserList [] "" "" "" 0
 
-initModel : Navigation.Location -> (Model, Cmd Msg)
-initModel loc = 
-  (Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing 
-    Design.Small [] zeroUList "" loc.href (Ok ""), 
-    loginSession)
+initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
+initModel flags loc = 
+  let
+    model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing 
+            Design.Small [] zeroUList "" loc.href (Ok "") flags.backend
+  in
+    (model, loginSession model)
 
 designMap : (Design.DisplayDesign -> Design.DisplayDesign) -> DesignList -> DesignList
 designMap mapping oldList =
@@ -229,9 +237,9 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
     LoginClick ->
-      (model, loginUser model.loginform)
+      (model, loginUser model.loginform model)
     LogoutClick ->
-      (model, logoutUser)
+      (model, logoutUser model)
     CCcheck cc ->
       let
         model_ = {model | limitCC = cc}
@@ -261,7 +269,7 @@ update msg model =
                 ({model_ | viewMode = Default
                          , mainDesign = noDesign
                          , designList = zeroList}, 
-                  Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie])
+                  Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie model_])
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
@@ -269,7 +277,7 @@ update msg model =
                   ({model_ | errorMessage = msg, viewMode = Error}, Cmd.none)
               DesignID id ->
                 ({model_ | mainDesign = noDesign, viewMode = Designs },
-                  getDesign id)
+                  getDesign id model_)
               EditDesign id ->
                 case model_.user of
                   Nothing -> (model_, Cmd.none)
@@ -283,7 +291,7 @@ update msg model =
                       in case mddesign of
                           Nothing ->
                             ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""},
-                              loadEditDesign id)
+                              loadEditDesign id model_)
                           Just ddesign ->
                             let
                               edesign_ = Design.makeEDesign ddesign.design
@@ -380,7 +388,7 @@ update msg model =
                   ({model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}, Cmd.none)
               Users utype start count ->
                 if List.member utype ["name", "posts", "joined"] then
-                  ({model_ | viewMode = People}, getUsers ("users/" ++ utype) start count)
+                  ({model_ | viewMode = People}, getUsers ("users/" ++ utype) start count model_)
                 else
                   (model_, Cmd.none)
     NewSeed seed ->
@@ -447,7 +455,10 @@ update msg model =
             designList_ = DesignList (Array.fromList [design]) "" "" "" 1
           in
             ({model | designList = designList_, mainDesign = 0, errorInfo = Ok "New design"},
-              Cmd.batch [getComments design.design.designid, getCfdg design.design.designid])
+              Cmd.batch 
+                [ getComments design.design.designid model
+                , getCfdg design.design.designid model
+                ])
         Err error ->
           ({ model | mainDesign = noDesign, errorInfo = Err error}, Cmd.none)
     NewEditDesign designResult ->
@@ -463,7 +474,7 @@ update msg model =
             if model.designMode == Design.Small then
               Cmd.none
             else
-              Cmd.batch (List.map getCfdgfromDesign (Array.toList designs.designs)))
+              Cmd.batch (List.map (getCfdgfromDesign model) (Array.toList designs.designs)))
         Err error ->
           ({model | designList = zeroList, errorInfo = Err error}, Cmd.none)
     NewUser loginResult ->
@@ -478,9 +489,9 @@ update msg model =
     SessionUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user, errorInfo = Ok "Session loaded"}, getTags)
+          ({model | user = Just user, errorInfo = Ok "Session loaded"}, getTags model)
         Err error ->
-          ({model | errorInfo = Err error}, getTags)
+          ({model | errorInfo = Err error}, getTags model)
     LogoutUser logoutResult ->
       case logoutResult of
         Ok yes ->
@@ -1078,23 +1089,23 @@ resolveAction ma model =
   case ma of 
     Nothing -> Cmd.none
     Just act -> case act of
-      UpdateComment commentid comment_ -> sendComment commentid comment_
-      CreateComment designid comment_ -> newComment designid comment_
-      DeleteComment commentid -> deleteComment commentid
-      AddFaves designid -> changeFave "addfave" designid
-      RemoveFaves designid -> changeFave "deletefave" designid
+      UpdateComment commentid comment_ -> sendComment commentid comment_ model
+      CreateComment designid comment_ -> newComment designid comment_ model
+      DeleteComment commentid -> deleteComment commentid model
+      AddFaves designid -> changeFave "addfave" designid model
+      RemoveFaves designid -> changeFave "deletefave" designid model
       CancelEditAct -> Navigation.back 1
-      DeleteDesign designid -> deleteDesign designid
+      DeleteDesign designid -> deleteDesign designid model
       UploadDesign -> case model.editDesign of
         Nothing -> Cmd.none
-        Just edesign -> uploadDesign edesign
+        Just edesign -> uploadDesign edesign model
       GetFile id -> fileSelected id
       _ -> Cmd.none
 
-changeFave : String -> Int -> Cmd Msg
-changeFave change designid =
+changeFave : String -> Int -> Model -> Cmd Msg
+changeFave change designid model =
   let
-    url = String.join "/" ["http://localhost:5000", change, toString designid]
+    url = String.join "/" [model.backend, change, toString designid]
   in
     Http.send NewFaves (post url Http.emptyBody decodeFaves)
 
@@ -1104,24 +1115,24 @@ decodeFaves =
     (JD.field "designid"  JD.int)
     (JD.field "faves" (JD.list JD.string))
 
-sendComment : Int -> String -> Cmd Msg
-sendComment commentid comment_ =
+sendComment : Int -> String -> Model -> Cmd Msg
+sendComment commentid comment_ model =
   let
-    url = "http://localhost:5000/updatecomment/" ++ (toString commentid)
+    url = model.backend ++ "/updatecomment/" ++ (toString commentid)
   in
     Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
 
-newComment : Int -> String -> Cmd Msg
-newComment designid comment_ =
+newComment : Int -> String -> Model -> Cmd Msg
+newComment designid comment_ model =
   let
-    url = "http://localhost:5000/createcomment/" ++ (toString designid)
+    url = model.backend ++ "/createcomment/" ++ (toString designid)
   in
     Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
 
-deleteComment : Int -> Cmd Msg
-deleteComment commentid =
+deleteComment : Int -> Model -> Cmd Msg
+deleteComment commentid model =
   let
-    url = "http://localhost:5000/deletecomment/" ++ (toString commentid)
+    url = model.backend ++ "/deletecomment/" ++ (toString commentid)
   in
     Http.send RemoveComment (post url Http.emptyBody decodeCommentId)
 
@@ -1129,25 +1140,25 @@ decodeCommentId : JD.Decoder Int
 decodeCommentId =
   JD.field "commentid" JD.int
       
-getNewbie : Cmd Msg
-getNewbie =
+getNewbie : Model -> Cmd Msg
+getNewbie model =
   let
-    url = "http://localhost:5000/newbie"
+    url = model.backend ++ "/newbie"
   in
     Http.send NewEditDesign (get url decodeEDesign)
       
 
-getDesign : Int -> Cmd Msg
-getDesign id =
+getDesign : Int -> Model -> Cmd Msg
+getDesign id model =
   let
-    url = "http://localhost:5000/design/" ++ (toString id)
+    url = model.backend ++ "/design/" ++ (toString id)
   in
     Http.send NewDesign (get url decodeDesign)
 
-loadEditDesign : Int -> Cmd Msg
-loadEditDesign id =
+loadEditDesign : Int -> Model -> Cmd Msg
+loadEditDesign id model =
   let
-    url = "http://localhost:5000/design/" ++ (toString id)
+    url = model.backend ++ "/design/" ++ (toString id)
   in
     Http.send NewEditDesign (get url decodeEDesign)
 
@@ -1159,10 +1170,10 @@ decodeEDesign : JD.Decoder Design.EditDesign
 decodeEDesign =
    JD.field "design" Design.decodeEDesign
 
-uploadDesign : Design.EditDesign -> Cmd Msg
-uploadDesign edesign =
+uploadDesign : Design.EditDesign -> Model -> Cmd Msg
+uploadDesign edesign model =
   let
-    url = "http://localhost:5000/postdesign"
+    url = model.backend ++ "/postdesign"
     jbody = Design.encodeDesign edesign      
   in
     Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesign)
@@ -1171,7 +1182,7 @@ getDesigns : Model -> String -> Int -> Int -> Cmd Msg
 getDesigns model query start count =
   let
     ccquery = if model.limitCC then "cc" ++ query else query
-    url = String.join "/" ["http://localhost:5000", ccquery, 
+    url = String.join "/" [model.backend, ccquery, 
                            toString(start), toString(count)]
   in
     Http.send NewDesigns (get url decodeDesigns)
@@ -1185,10 +1196,10 @@ decodeDesigns =
     (JD.field "thislink" JD.string)
     (JD.field "count"    JD.int)
 
-deleteDesign : Int -> Cmd Msg
-deleteDesign designid =
+deleteDesign : Int -> Model -> Cmd Msg
+deleteDesign designid model =
   let
-    url = "http://localhost:5000/delete/" ++ (toString designid)
+    url = model.backend ++ "/delete/" ++ (toString designid)
   in
     Http.send DeleteADesign (post url Http.emptyBody decodeDesignId)
 
@@ -1197,22 +1208,23 @@ decodeDesignId =
   JD.field "designid" JD.int
 
 
-loginUser : Login.Model -> Cmd Msg
-loginUser lmodel =
+loginUser : Login.Model -> Model -> Cmd Msg
+loginUser lmodel model =
   let
     url = makeUri 
-      "http://localhost:5000/login"
-      [ lmodel.user
+      model.backend
+      [ "login"
+      , lmodel.user
       , lmodel.password
       , if lmodel.remember then "1" else "0"
       ]
   in
     Http.send NewUser (post url Http.emptyBody decodeUser)
 
-loginSession : Cmd Msg
-loginSession =
+loginSession : Model -> Cmd Msg
+loginSession model =
   let
-    url = "http://localhost:5000/userinfo"
+    url = model.backend ++ "/userinfo"
   in
     Http.send SessionUser (get url decodeUser)
 
@@ -1220,10 +1232,10 @@ decodeUser : JD.Decoder User.User
 decodeUser =
   JD.field "userinfo" User.decodeUser
 
-logoutUser : Cmd Msg
-logoutUser = 
+logoutUser : Model -> Cmd Msg
+logoutUser model = 
   let
-    url = "http://localhost:5000/logout"
+    url = model.backend ++ "/logout"
   in
     Http.send LogoutUser (post url Http.emptyBody decodeUserLogout)
 
@@ -1231,21 +1243,21 @@ decodeUserLogout : JD.Decoder Bool
 decodeUserLogout =
   JD.field "logout_success" JD.bool
 
-getCfdg : Int -> Cmd Msg
-getCfdg id =
+getCfdg : Int -> Model -> Cmd Msg
+getCfdg id model =
   let
-    url = "http://localhost:5000/data/cfdg/" ++ (toString id)
+    url = model.backend ++ "/data/cfdg/" ++ (toString id)
   in
     Http.send (ReceiveCfdg id) (Http.getString url)
 
-getCfdgfromDesign : Design.DisplayDesign -> Cmd Msg
-getCfdgfromDesign ddesign =
-  getCfdg ddesign.design.designid
+getCfdgfromDesign : Model -> Design.DisplayDesign -> Cmd Msg
+getCfdgfromDesign model ddesign =
+  getCfdg ddesign.design.designid model
 
-getComments : Int -> Cmd Msg
-getComments id =
+getComments : Int -> Model -> Cmd Msg
+getComments id model =
   let
-    url = "http://localhost:5000/comments/" ++ (toString id)
+    url = model.backend ++ "/comments/" ++ (toString id)
   in
     Http.send NewComments (get url decodeComments)
 
@@ -1258,9 +1270,9 @@ getTitle model title =
   let
     url = 
       if model.limitCC then
-        "http://localhost:5000/cctitleindex/" ++ (Http.encodeUri title)
+        model.backend ++ "/cctitleindex/" ++ (Http.encodeUri title)
       else
-        "http://localhost:5000/titleindex/" ++ (Http.encodeUri title)
+        model.backend ++ "/titleindex/" ++ (Http.encodeUri title)
   in
     Http.send GotTitleIndex (get url decodeTitleIndex)
 
@@ -1268,10 +1280,10 @@ decodeTitleIndex : JD.Decoder Int
 decodeTitleIndex = 
   JD.field "index" JD.int
 
-getTags : Cmd Msg
-getTags = 
+getTags : Model -> Cmd Msg
+getTags model = 
   let
-    url = "http://localhost:5000/tags"
+    url = model.backend ++ "/tags"
   in
     Http.send GotTags (get url decodeTags)
 
@@ -1286,10 +1298,10 @@ decodeTagInfo =
     (JD.field "count" JD.int)
 
       
-getUsers: String -> Int -> Int -> Cmd Msg
-getUsers query start count =
+getUsers: String -> Int -> Int -> Model -> Cmd Msg
+getUsers query start count model =
   let
-    url = String.join "/" ["http://localhost:5000", query, 
+    url = String.join "/" [model.backend, query, 
                            toString(start), toString(count)]
   in
     Http.send NewUsers (get url decodeUsers)

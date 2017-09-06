@@ -57,7 +57,7 @@
     while (node.firstChild) {
         node.removeChild(node.firstChild);
     }
-    app = Elm.Main.embed(node);
+    app = Elm.Main.embed(node, {backend: 'http://localhost:5000'});
     app.ports.fileSelected.subscribe(function (id) {
       var node = document.getElementById(id);
       if (node === null) {

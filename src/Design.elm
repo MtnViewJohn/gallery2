@@ -952,7 +952,7 @@ viewEdit edesign =
         , br [][]
         , br [][]
         ]
-      , Html.form [method "POST", action "http://localhost:5000/postdesign", 
+      , Html.form [method "POST", action "#", 
               enctype "multipart/form-data", onSubmit Upload]
         [ table [class "upload"]
           [ tr []
