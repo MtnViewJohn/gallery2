@@ -719,51 +719,56 @@ view cfg design =
                   []
               )
           ]
-        , [ downloadLink design.design.filelocation " Download "
-          , text " "
-          , a [ href ("translate.php?id=" ++ toString design.design.designid)
-              , title "Translate to new syntax.", class "button translate" 
-              ] [ text " Translate "]
-          , text " "
-          ]
-        , if canModify design.design.owner cfg.currentUser then  
-            if design.ready2delete then
-              [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                  , class "keepbutton"
-                  ] [ text "Cancel"]
-              , text " "
-              , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                  , class "confirmbutton"
-                  ] [ text "Confirm"]
-              , text " "
-              ]
-            else
-              [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                  , class "button deletebutton" 
-                  ] [ text " Delete "]
-              , text " "
-              , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
-                  , class "button editbutton"
-                  ] [ text " Edit "]
-              , text " "
-              ]
-          else
-            [ ]
-        , case cfg.currentUser of
-            Nothing -> [ ]
-            Just user ->
-              if List.member user.name design.design.fans then
-                [ a [ href "#", onNav (RemoveFavesClick,design.design.designid)
-                    , title "Remove this design from your list of favorites."
-                    , class "button removefave"
-                    ] [ text " Remove "]
-                ]
+        , [ div [class "buttondiv"] 
+          ( [ downloadLink design.design.filelocation " Download "
+            , text " "
+            , a [ href ("translate.php?id=" ++ toString design.design.designid)
+                , title "Translate to new syntax.", class "button translate" 
+                ] [ text " Translate "]
+            , text " "
+            ] ++
+            ( if canModify design.design.owner cfg.currentUser then  
+                if design.ready2delete then
+                  [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                      , class "keepbutton"
+                      ] [ text "Cancel"]
+                  , text " "
+                  , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                      , class "confirmbutton"
+                      ] [ text "Confirm"]
+                  , text " "
+                  ]
+                else
+                  [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                      , class "button deletebutton" 
+                      ] [ text " Delete "]
+                  , text " "
+                  , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                      , class "button editbutton"
+                      ] [ text " Edit "]
+                  , text " "
+                  ]
               else
-                [ a [ href "#", onNav (AddFavesClick,design.design.designid)
-                    , title "Add this design to your list of favorites."
-                    , class "button addfave"
-                    ] [ text " Add "]
-                ]
+                [ ]
+            ) ++
+            ( case cfg.currentUser of
+                Nothing -> [ ]
+                Just user ->
+                  if List.member user.name design.design.fans then
+                    [ a [ href "#", onNav (RemoveFavesClick,design.design.designid)
+                        , title "Remove this design from your list of favorites."
+                        , class "button removefave"
+                        ] [ text " Remove "]
+                    ]
+                  else
+                    [ a [ href "#", onNav (AddFavesClick,design.design.designid)
+                        , title "Add this design to your list of favorites."
+                        , class "button addfave"
+                        ] [ text " Add "]
+                    ]
+            )
+          )
+          ]
         , [ br [][]
           , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
           ]
@@ -838,34 +843,37 @@ view cfg design =
                 ]
               else
                 [div [] []]
-          , [ downloadLink design.design.filelocation " Download "
-            , text " "
-            , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                , class "button viewbutton" 
-                ] [ text " View "]
-            , text " "
+          , [ div [class "buttondiv"]
+              ( [ downloadLink design.design.filelocation " Download "
+                , text " "
+                , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
+                    , class "button viewbutton" 
+                    ] [ text " View "]
+                , text " "
+                ] ++
+                if canModify design.design.owner cfg.currentUser then
+                  if design.ready2delete then
+                    [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                        , class "keepbutton"
+                        ] [ text "Cancel"]
+                    , text " "
+                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                        , class "confirmbutton"
+                        ] [ text "Confirm"]
+                    ]
+                  else
+                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                        , class "button deletebutton" 
+                        ] [ text " Delete "]
+                    , text " "
+                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                        , class "button editbutton"
+                        ] [ text " Edit "]
+                    ]
+                else
+                  [ ]
+              )
             ]
-          , if canModify design.design.owner cfg.currentUser then
-              if design.ready2delete then
-                [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                    , class "keepbutton"
-                    ] [ text "Cancel"]
-                , text " "
-                , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                    , class "confirmbutton"
-                    ] [ text "Confirm"]
-                ]
-              else
-                [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                    , class "button deletebutton" 
-                    ] [ text " Delete "]
-                , text " "
-                , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
-                    , class "button editbutton"
-                    ] [ text " Edit "]
-                ]
-            else
-              [ ]
           , [ br [][]
             , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
             ]
