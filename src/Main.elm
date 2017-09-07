@@ -67,6 +67,11 @@ type alias FaveInfo =
   , fans : List String
   }
 
+type alias DesignTags =
+  { design : Design.DisplayDesign
+  , tags : List TagInfo
+  }
+
 type alias Flags =
   { backend : String
   }
@@ -215,7 +220,7 @@ type Msg
   | NewSeed Int
   | DismissDesign
   | LoadDesign Time
-  | NewDesign (Result Http.Error Design.DisplayDesign)
+  | NewDesign (Result Http.Error DesignTags)
   | NewEditDesign (Result Http.Error Design.EditDesign)
   | NewDesigns (Result Http.Error DesignList)
   | NewUser (Result Http.Error User.User)
@@ -450,11 +455,13 @@ update msg model =
             ({model | editDesign = Just edesign_}, Cmd.none)
     NewDesign designResult ->
       case designResult of
-        Ok design ->
+        Ok dt ->
           let
+            design = dt.design
+            tags_ = dt.tags
             designList_ = DesignList (Array.fromList [design]) "" "" "" 1
           in
-            ({model | designList = designList_, mainDesign = 0, errorInfo = Ok "New design"},
+            ({model | designList = designList_, tagList = tags_, mainDesign = 0, errorInfo = Ok "New design"},
               Cmd.batch 
                 [ getComments design.design.designid model
                 , getCfdg design.design.designid model
@@ -1153,7 +1160,13 @@ getDesign id model =
   let
     url = model.backend ++ "/design/" ++ (toString id)
   in
-    Http.send NewDesign (get url decodeDesign)
+    Http.send NewDesign (get url decodeDesignTag)
+
+decodeDesignTag : JD.Decoder DesignTags
+decodeDesignTag =
+  JD.map2 DesignTags
+    (JD.field "design" Design.decodeDDesign)
+    (JD.field "tags" (JD.list decodeTagInfo))
 
 loadEditDesign : Int -> Model -> Cmd Msg
 loadEditDesign id model =
