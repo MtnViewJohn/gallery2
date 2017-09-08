@@ -19,6 +19,7 @@ import Json.Decode as JD
 
 type Action 
     = DeleteDesign Int
+    | ClearDelete Int
     | UploadDesign
     | EditDesign Int
     | AddFaves Int

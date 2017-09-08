@@ -221,6 +221,7 @@ type Msg
   | NewURL Navigation.Location
   | LoginMsg Login.Msg
   | DesignMsg Design.MsgId
+  | ClearDeleteBut Int
   | EDesignMsg Design.EMsg
   | LookupName
   | LookupDesign
@@ -439,8 +440,16 @@ update msg model =
               (ddesign_, act_) = Design.update dmsg ddesign
               designList_ = {designList | designs = Array.set index ddesign_ model.designList.designs}
               model_ = {model | designList = designList_}
-            in
-              (model_, resolveAction act_ model_)
+            in case act_ of
+              Just (ClearDelete id) -> update (ClearDeleteBut id) model_
+              _ -> (model_, resolveAction act_ model_)
+    ClearDeleteBut id ->
+      let
+        designList = model.designList
+        designs_ = Array.map (Design.clearDeleteBut id) designList.designs
+        designList_ = { designList | designs = designs_ }
+      in
+        ({model | designList = designList_}, Cmd.none)
     EDesignMsg emsg -> case model.editDesign of
       Nothing -> (model, Cmd.none)
       Just edesign ->

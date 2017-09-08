@@ -8,6 +8,7 @@ module Design exposing
   , setComments
   , setComment
   , removeComment
+  , clearDeleteBut
   , decodeDDesign
   , decodeEDesign
   , encodeDesign
@@ -205,6 +206,9 @@ removeComment deleteid ddesign =
   in
     {ddesign | comments = comments_}      
 
+clearDeleteBut : Int -> DisplayDesign -> DisplayDesign
+clearDeleteBut id ddesign =
+  { ddesign | ready2delete = ddesign.design.designid == id }
 
 decodeSize : JD.Decoder Size
 decodeSize = 
@@ -328,7 +332,7 @@ update msg ddesign =
       if ddesign.ready2delete then
         ({ddesign | ready2delete = False}, Just (DeleteDesign ddesign.design.designid))
       else
-        ({ddesign | ready2delete = True}, Nothing)
+        ({ddesign | ready2delete = True}, Just (ClearDelete ddesign.design.designid))
     CancelDelete -> ({ddesign | ready2delete = False}, Nothing)
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
     RemoveFavesClick -> (ddesign, Just (RemoveFaves ddesign.design.designid))
