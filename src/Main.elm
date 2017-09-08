@@ -76,6 +76,14 @@ type alias Flags =
   { backend : String
   }
 
+type OrderT = ASC | DESC | None
+
+type alias UserOrder =
+  { name : OrderT
+  , posts : OrderT
+  , join : OrderT
+  }
+
 
 type alias Model =
   { user : Maybe User
@@ -90,6 +98,7 @@ type alias Model =
   , designMode : Design.ViewSize
   , tagList : List TagInfo
   , userList : UserList
+  , userOrder : UserOrder
   , errorMessage : String
   , initUrl : String
   , errorInfo : Result Http.Error String
@@ -106,7 +115,7 @@ initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
     model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing 
-            Design.Small [] zeroUList "" loc.href (Ok "") flags.backend
+            Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href (Ok "") flags.backend
   in
     (model, loginSession model)
 
@@ -392,10 +401,21 @@ update msg model =
                 in
                   ({model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}, Cmd.none)
               Users utype start count ->
-                if List.member utype ["name", "posts", "joined"] then
-                  ({model_ | viewMode = People}, getUsers ("users/" ++ utype) start count model_)
-                else
-                  (model_, Cmd.none)
+                let
+                  (userOrder_, valid) = case utype of
+                    "name"     -> (UserOrder ASC  None None, True)
+                    "posts"    -> (UserOrder None ASC  None, True)
+                    "joined"   -> (UserOrder None None ASC , True)
+                    "name_d"   -> (UserOrder DESC None None, True)
+                    "posts_d"  -> (UserOrder None DESC None, True)
+                    "joined_d" -> (UserOrder None None DESC, True)
+                    _          -> (UserOrder None None None, False)
+                in
+                  if valid then
+                    ({model_ | viewMode = People, userOrder = userOrder_}, 
+                      getUsers ("users/" ++ utype) start count model_)
+                  else
+                    (model_, Cmd.none)
     NewSeed seed ->
       (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
@@ -800,9 +820,18 @@ viewUsers model =
   , table [class "tagstable"]
     ( [ thead [] 
         [ tr [] 
-          [ th [align "left", class "usernames"] [a [href "#users/name/0/25"] [text "User name"]]
-          , th [align "right"] [a [href "#users/posts/0/25"] [text "Post count"]]
-          , th [align "right", class "dates"] [a [href "#users/joined/0/25"] [text "Join date"]]
+          [ case model.userOrder.name of
+              ASC  -> th [align "left", class "usernames"] [a [href "#users/name_d/0/25"] [text "User name ↑"]]
+              DESC -> th [align "left", class "usernames"] [a [href "#users/name/0/25"] [text "User name ↓"]]
+              None -> th [align "left", class "usernames"] [a [href "#users/name/0/25"] [text "User name"]]
+          , case model.userOrder.posts of
+              ASC  -> th [align "right"] [a [href "#users/posts_d/0/25"] [text "Post count ↑"]]
+              DESC -> th [align "right"] [a [href "#users/posts/0/25"] [text "Post count ↓"]]
+              None -> th [align "right"] [a [href "#users/posts/0/25"] [text "Post count"]]
+          , case model.userOrder.join of
+              ASC  -> th [align "right", class "dates"] [a [href "#users/joined_d/0/25"] [text "Join date ↑"]]
+              DESC -> th [align "right", class "dates"] [a [href "#users/joined/0/25"] [text "Join date ↓"]]
+              None -> th [align "right", class "dates"] [a [href "#users/joined/0/25"] [text "Join date"]]
           ]
         ]
       ]
