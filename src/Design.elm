@@ -77,6 +77,7 @@ type alias Design =
 type alias EditDesign = 
     { design : Design
     , ccLicense : String
+    , tagString : String
     , filePortData : Maybe FilePortData
     , imagePortData : Maybe FilePortData
     , uploadPNG : Bool
@@ -84,7 +85,8 @@ type alias EditDesign =
 
 makeEDesign : Design -> EditDesign
 makeEDesign design =
-  EditDesign design "-" Nothing Nothing (String.endsWith ".png" design.imagelocation)
+  EditDesign design "-" (String.join " " design.tags) Nothing Nothing 
+      (String.endsWith ".png" design.imagelocation)
 
 type alias DisplayDesign =
     { design : Design
@@ -259,7 +261,7 @@ encodeDesign record =
         , ("ccURI",      JE.string  <| record.design.ccURI)
         , ("cclicense",  JE.string  <| record.ccLicense)
         , ("designid",   JE.int     <| record.design.designid)
-        , ("tags",       JE.list    <| List.map JE.string <| realTags <| record.design.tags)
+        , ("tags",       JE.list    <| List.map JE.string record.design.tags)
         , ("notes",      JE.string  <| record.design.notes)
         , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
         , ("title",      JE.string  <| record.design.title)
@@ -378,9 +380,9 @@ editupdate msg edesign = case msg of
     TagsChange tags_ ->
       let
         design = edesign.design
-        design_ = {design | tags = String.split " " tags_}
+        design_ = {design | tags = realTags <| String.split " " tags_}
       in
-        ({edesign | design = design_}, Nothing)
+        ({edesign | design = design_, tagString = tags_}, Nothing)
     NotesChange notes_ ->
       let
         design = edesign.design
@@ -709,7 +711,7 @@ view cfg design =
           , text (", uploaded on " ++ (makeDate design.design.uploaddate))
           ]
         , if not (List.isEmpty design.design.tags) then
-            [ div [class "pte_tags_form"] 
+            [ div [] 
                ([text "Tags: "] ++ (List.map makeTagLink design.design.tags))
             ]
           else
@@ -1032,7 +1034,7 @@ viewEdit edesign =
             , td [] 
               [ input 
                 [ type_ "text", size 30, name "tags"
-                , value (String.join " " edesign.design.tags)
+                , value edesign.tagString
                 , onInput TagsChange
                 ] []
               ]
