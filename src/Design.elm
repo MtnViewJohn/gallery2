@@ -716,15 +716,6 @@ view cfg design =
             ]
           else
             []
-        , [ div [id "favelist"] 
-              ( if not (List.isEmpty design.design.fans) then
-                ( [text (fanCount design.design.numvotes), text ": "] ++ 
-                  (List.map makeFanLink design.design.fans)
-                )
-                else
-                  []
-              )
-          ]
         , [ div [class "buttondiv"] 
           ( [ downloadLink design.design.filelocation " Download "
             , text " "
@@ -772,6 +763,17 @@ view cfg design =
                         , class "button addfave"
                         ] [ text " Add "]
                     ]
+            ) ++
+            (
+              [ div [id "favelist"] 
+                  ( if not (List.isEmpty design.design.fans) then
+                    ( [text (fanCount design.design.numvotes), text ": "] ++ 
+                      (List.map makeFanLink design.design.fans)
+                    )
+                    else
+                      []
+                  )
+              ]
             )
           )
           ]
