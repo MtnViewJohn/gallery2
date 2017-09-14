@@ -461,7 +461,7 @@ makeTagLink tag =
 
 makeFanLink : String -> Html MsgId
 makeFanLink fan = 
-  a [href (makeUri "#faves" [fan, "0"])] [b [] [text (fan ++ " ")]]
+  a [href (makeUri "#faves" [fan, "0"])] [b [] [text fan]]
 
 fanCount : Int -> String
 fanCount cnt =
@@ -765,10 +765,10 @@ view cfg design =
                     ]
             ) ++
             (
-              [ div [id "favelist"] 
+              [ div [id (if (List.length design.design.fans) <= 1 then "favelist" else "foolist")] 
                   ( if not (List.isEmpty design.design.fans) then
                     ( [text (fanCount design.design.numvotes), text ": "] ++ 
-                      (List.map makeFanLink design.design.fans)
+                      (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
                     )
                     else
                       []
