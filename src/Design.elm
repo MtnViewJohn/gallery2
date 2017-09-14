@@ -77,7 +77,7 @@ type alias Design =
 type alias EditDesign = 
     { design : Design
     , ccLicense : String
-    , tagString : String
+    , newTag : String
     , filePortData : Maybe FilePortData
     , imagePortData : Maybe FilePortData
     , uploadPNG : Bool
@@ -85,8 +85,7 @@ type alias EditDesign =
 
 makeEDesign : Design -> EditDesign
 makeEDesign design =
-  EditDesign design "-" (String.join " " design.tags) Nothing Nothing 
-      (String.endsWith ".png" design.imagelocation)
+  EditDesign design "-" "" Nothing Nothing (String.endsWith ".png" design.imagelocation)
 
 type alias DisplayDesign =
     { design : Design
@@ -318,6 +317,8 @@ type EMsg
     | TiledChange String
     | PNGchoose Bool
     | TagsChange String
+    | TagDelete String
+    | TagAdd
     | NotesChange String
     | Upload
 
@@ -378,11 +379,24 @@ editupdate msg edesign = case msg of
     PNGchoose png_ ->
       ({edesign | uploadPNG = png_}, Nothing)
     TagsChange tags_ ->
+      ({edesign | newTag = String.filter isGraph tags_}, Nothing)
+    TagDelete tag ->
       let
         design = edesign.design
-        design_ = {design | tags = realTags <| String.split " " tags_}
+        tags_ = List.filter (\x -> x /= tag) design.tags
+        design_ = {design | tags = tags_}
       in
-        ({edesign | design = design_, tagString = tags_}, Nothing)
+        ({edesign | design = design_}, Nothing)
+    TagAdd ->
+      let
+        design = edesign.design
+        tags_ =  design.tags ++ [edesign.newTag]
+        design_ = {design | tags = tags_}
+      in
+        if List.member edesign.newTag design.tags then
+          ({edesign | newTag = ""}, Nothing)
+        else
+          ({edesign | design = design_, newTag = ""}, Nothing)
     NotesChange notes_ ->
       let
         design = edesign.design
@@ -414,6 +428,10 @@ updateCommentList (msg, id) comments =
 isAlpha : Char -> Bool
 isAlpha char =
   Char.isLower char || Char.isUpper char
+
+isGraph : Char -> Bool
+isGraph char =
+  char > ' ' && char <= '~'
 
 validateTitle : String -> Bool
 validateTitle title =
@@ -953,6 +971,14 @@ view cfg design =
           ]
         ]
 
+tagDeleteLink : String -> List (Html EMsg)
+tagDeleteLink tag =
+  [ text " "
+  , a [href (makeUri "#tag" [tag, "0"]), target "_blank"] [text tag]
+  , text " "
+  , a [href "#", onNav (TagDelete tag), title "Delete this tag", class "tagbutton"] [text "x"]
+  ]
+
 viewEdit : EditDesign -> Html EMsg
 viewEdit edesign =
       div []
@@ -1033,14 +1059,14 @@ viewEdit edesign =
             ]
           , tr []
             [ td [] [b [] [text "Tags"], text ":"]
-            , td [] 
-              [ input 
-                [ type_ "text", size 30, name "tags"
-                , value edesign.tagString
+            , td [colspan 2] 
+              (( input 
+                [ type_ "text", size 12, name "tags"
+                , value edesign.newTag
                 , onInput TagsChange
                 ] []
-              ]
-            , td [][]
+              ) :: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
+                ++ (List.concat (List.map tagDeleteLink edesign.design.tags)))
             ]
           , tr []
             [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
