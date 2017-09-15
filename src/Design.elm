@@ -431,7 +431,14 @@ isAlpha char =
 
 isGraph : Char -> Bool
 isGraph char =
-  char > ' ' && char <= '~'
+  case char of
+    ' ' -> False
+    '\t' -> False
+    '\n' -> False
+    '\r' -> False
+    '\f' -> False
+    '\v' -> False
+    _ -> True
 
 validateTitle : String -> Bool
 validateTitle title =
