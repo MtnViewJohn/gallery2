@@ -301,18 +301,8 @@ update msg model =
                       ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""}
                       , Task.perform LoadDesign Time.now)
                     else
-                      let
-                        (index, mddesign) = designFind id model_.designList.designs
-                      in case mddesign of
-                          Nothing ->
-                            ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""},
-                              loadEditDesign id model_)
-                          Just ddesign ->
-                            let
-                              edesign_ = Design.makeEDesign ddesign.design
-                            in
-                              ({model_ | editDesign = Just edesign_, viewMode = Editing, errorMessage = ""}
-                              , Cmd.none)
+                      ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""},
+                        loadEditDesign id model_)
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
