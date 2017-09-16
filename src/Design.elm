@@ -507,9 +507,9 @@ makeFanLink fan =
 fanCount : Int -> String
 fanCount cnt =
   if cnt == 1 then
-    "One vote"
+    "One like"
   else
-    toString cnt ++ " votes"
+    toString cnt ++ " likes"
 
 tileText : TileType -> String
 tileText tile =
@@ -802,15 +802,15 @@ view cfg design =
                 Just user ->
                   if List.member user.name design.design.fans then
                     [ a [ href "#", onNav (RemoveFavesClick,design.design.designid)
-                        , title "Remove this design from your list of favorites."
-                        , class "button removefave"
-                        ] [ text " Remove "]
+                        , title "Click to 'Unlike' this design."
+                        , class "button favebutton removefave"
+                        ] [ text ""]
                     ]
                   else
                     [ a [ href "#", onNav (AddFavesClick,design.design.designid)
-                        , title "Add this design to your list of favorites."
-                        , class "button addfave"
-                        ] [ text " Add "]
+                        , title "Click to 'Like' this design."
+                        , class "button favebutton addfave"
+                        ] [ text ""]
                     ]
             ) ++
             (

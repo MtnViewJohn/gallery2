@@ -912,7 +912,7 @@ view model =
       [ li [] [ a [href "#newest/0"] [text "Newest" ]]
       , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
       , li [] [ a [href "#title/0"]  [text "Title" ]]
-      , li [] [ a [href "#popular/0"] [text "Popular" ]]
+      , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ a [href "#users/name/0/25"] [text "People" ]]
       , li [] [ a [href "#tags/tag"] [text "Tags"] ]
