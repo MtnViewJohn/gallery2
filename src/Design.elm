@@ -926,7 +926,7 @@ view cfg design =
           , [ br [] []
             , div [class "filediv", style [("width","95%")]]
                 [ design.noteshtml
-                , design.cfdghtml
+                , div [class "minicfdg"] [design.cfdghtml]
                 ]
             ]
           ])

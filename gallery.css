@@ -273,3 +273,7 @@ div#taglist > select {
 option.tagoption:hover {
     background: #dddddd;
 }
+div.minicfdg {
+    max-height: 1000px;
+    overflow: auto;
+}
