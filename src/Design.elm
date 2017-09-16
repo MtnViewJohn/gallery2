@@ -30,7 +30,7 @@ module Design exposing
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on, targetValue)
+import Html.Events exposing (onCheck, onInput, onClick, onSubmit, on, targetValue, onFocus, onBlur)
 import String exposing (isEmpty, trimLeft)
 import Json.Encode as JE
 import Json.Decode as JD
@@ -81,11 +81,15 @@ type alias EditDesign =
     , filePortData : Maybe FilePortData
     , imagePortData : Maybe FilePortData
     , uploadPNG : Bool
+    , focusTag : Bool
+    , focusTaglist : Bool
+    , tagSelected : Bool
     }
 
 makeEDesign : Design -> EditDesign
 makeEDesign design =
-  EditDesign design "-" "" Nothing Nothing (String.endsWith ".png" design.imagelocation)
+  EditDesign design "-" "" Nothing Nothing (String.endsWith ".png" design.imagelocation) 
+    False False False
 
 type alias DisplayDesign =
     { design : Design
@@ -316,9 +320,12 @@ type EMsg
     | CCchange String
     | TiledChange String
     | PNGchoose Bool
-    | TagsChange String
+    | TagType String
     | TagDelete String
     | TagAdd
+    | TagFocus Bool
+    | TagsFocus Bool
+    | TagSelect String
     | NotesChange String
     | Upload
 
@@ -378,8 +385,8 @@ editupdate msg edesign = case msg of
         ({edesign | design = design_}, Nothing)
     PNGchoose png_ ->
       ({edesign | uploadPNG = png_}, Nothing)
-    TagsChange tags_ ->
-      ({edesign | newTag = String.filter isGraph tags_}, Nothing)
+    TagType tags_ ->
+      ({edesign | newTag = String.filter isGraph tags_, tagSelected = False}, Nothing)
     TagDelete tag ->
       let
         design = edesign.design
@@ -393,10 +400,19 @@ editupdate msg edesign = case msg of
         tags_ =  design.tags ++ [edesign.newTag]
         design_ = {design | tags = tags_}
       in
-        if List.member edesign.newTag design.tags then
+        if (List.member edesign.newTag design.tags) || (String.isEmpty edesign.newTag) then
           ({edesign | newTag = ""}, Nothing)
         else
           ({edesign | design = design_, newTag = ""}, Nothing)
+    TagFocus focus ->
+      ({edesign | focusTag = focus}, Nothing)
+    TagsFocus focus ->
+      ({edesign | focusTaglist = focus}, Nothing)
+    TagSelect tag ->
+      if tag /= " " then
+        ({edesign | newTag = tag, tagSelected = True}, Nothing)
+      else
+        (edesign, Nothing)
     NotesChange notes_ ->
       let
         design = edesign.design
@@ -986,8 +1002,16 @@ tagDeleteLink tag =
   , a [href "#", onNav (TagDelete tag), title "Delete this tag", class "tagbutton"] [text "x"]
   ]
 
-viewEdit : EditDesign -> Html EMsg
-viewEdit edesign =
+tagOptions : List TagInfo -> List (Html EMsg)
+tagOptions tags =
+  let
+    opt tagi = option [value tagi.name, class "tagoption", onClick (TagSelect tagi.name)] [text tagi.name]
+    tags_ = if List.length tags == 1 then tags ++ [TagInfo " " 0] else tags
+  in
+    List.map opt tags_
+
+viewEdit : List TagInfo -> EditDesign -> Html EMsg
+viewEdit tags edesign =
       div []
       [ if edesign.design.designid == 0 then
           h1 [] [text "Upload your artwork!"]
@@ -1070,10 +1094,30 @@ viewEdit edesign =
               (( input 
                 [ type_ "text", size 12, name "tags"
                 , value edesign.newTag
-                , onInput TagsChange
+                , autocomplete False
+                , onFocus (TagFocus True), onBlur (TagFocus False)
+                , onInput TagType
                 ] []
-              ) :: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
-                ++ (List.concat (List.map tagDeleteLink edesign.design.tags)))
+               ):: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
+                ++ (List.concat (List.map tagDeleteLink edesign.design.tags))
+                ++ [ let
+                        match tag tagi = String.contains tag tagi.name
+                        matching = List.filter (match edesign.newTag) tags
+                        show =  (edesign.focusTag || edesign.focusTaglist) && 
+                                (not edesign.tagSelected) &&
+                                (not (List.isEmpty matching))
+                      in
+                        div 
+                          [ id "taglist", hidden (not show)]
+                          [ select 
+                            [ size (clamp 2 10 (List.length matching))
+                            , required False
+                            , onFocus (TagsFocus True), onBlur (TagsFocus False)
+                            ]
+                            (tagOptions matching)
+                          ]
+                   ]
+              )
             ]
           , tr []
             [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]

@@ -263,3 +263,14 @@ div#favelist {
     display: inline-block;
     margin-left: 10px;
 }
+div#taglist {
+    position: absolute;
+}
+div#taglist > select {
+    width: 12em;
+    border: 3px solid #b1d2f5;
+    margin: 3px;
+}
+option.tagoption:hover {
+    background: #dddddd;
+}

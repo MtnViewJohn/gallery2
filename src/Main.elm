@@ -57,11 +57,6 @@ type alias UserList =
   , count : Int
   }
 
-type alias TagInfo =
-  { name : String
-  , count : Int
-  }
-
 type alias FaveInfo =
   { designid : Int
   , fans : List String
@@ -964,7 +959,7 @@ view model =
         ( case model.editDesign of
             Nothing -> [text "Design didn't load."]
             Just edesign ->
-              [ Html.map EDesignMsg (Design.viewEdit edesign)
+              [ Html.map EDesignMsg (Design.viewEdit model.tagList edesign)
               , if model.errorMessage == "" then
                   text ""
                 else

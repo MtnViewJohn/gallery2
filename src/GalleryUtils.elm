@@ -7,6 +7,7 @@ module GalleryUtils exposing
   , justAccum
   , tagHelp
   , Action (..)
+  , TagInfo
   )
 
 import Time
@@ -29,6 +30,12 @@ type Action
     | CreateComment Int String
     | CancelEditAct
     | GetFile String
+
+type alias TagInfo =
+  { name : String
+  , count : Int
+  }
+
 
 
 int2Time : Int -> Time.Time
