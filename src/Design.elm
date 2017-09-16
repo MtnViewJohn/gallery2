@@ -711,6 +711,16 @@ downloadLink filepath content =
       , class "button download"
       ] [ text content ]
       
+imageLink : String -> String -> Html MsgId
+imageLink filepath content =
+  let
+    mfilename = List.head <| List.reverse <| (String.split "/" filepath)
+    filename = Maybe.withDefault filepath mfilename
+  in
+    a [href filepath, downloadAs filename, title "Download the image to your computer."
+      , class "button download"
+      ] [ text content ]
+      
 makeSelectAttrs : String -> String -> List (Html.Attribute EMsg)
 makeSelectAttrs val state =
   [value val, selected (val == state)]
@@ -758,7 +768,9 @@ view cfg design =
           else
             []
         , [ div [class "buttondiv"] 
-          ( [ downloadLink design.design.filelocation " Download "
+          ( [ downloadLink design.design.filelocation " Download CFDG "
+            , text " "
+            , imageLink design.design.imagelocation " Download Image "
             , text " "
             ] ++
             ( if canModify design.design.owner cfg.currentUser then  
@@ -889,7 +901,7 @@ view cfg design =
               else
                 [div [] []]
           , [ div [class "buttondiv"]
-              ( [ downloadLink design.design.filelocation " Download "
+              ( [ downloadLink design.design.filelocation " Download CFDG "
                 , text " "
                 , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
                     , class "button viewbutton" 
