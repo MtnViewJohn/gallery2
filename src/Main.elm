@@ -792,11 +792,11 @@ makeHeader thislink =
       , div [class "tabinter", style [("background-image", "url(graphics/empty2inactive.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
-           [a [href (makeUri "#user" [urlname, "0"])] [text "Own Designs"]]
+           [a [href (makeUri "#user" [urlname, "0"])] [text "Designs"]]
       , div [class "tabinter", style [("background-image", "url(graphics/inactive2active.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
-           [text "Favorite Designs"]
+           [text "Likes"]
       , div [class "tabinter", style [("background-image", "url(graphics/active2empty.png)")]]
            [text " "]
       , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
@@ -809,11 +809,11 @@ makeHeader thislink =
       , div [class "tabinter", style [("background-image", "url(graphics/empty2active.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
-           [text "Own Designs"]
+           [text "Designs"]
       , div [class "tabinter", style [("background-image", "url(graphics/active2inactive.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
-           [a [href (makeUri "#faves" [urlname, "0"])] [text "Favorite Designs"]]
+           [a [href (makeUri "#faves" [urlname, "0"])] [text "Likes"]]
       , div [class "tabinter", style [("background-image", "url(graphics/inactive2empty.png)")]]
            [text " "]
       , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
@@ -833,7 +833,7 @@ viewDesigns model =
       htmlList = Array.toList
         (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
           model.designList.designs)
-    in
+    in br [][] ::
       if model.designMode == Design.Medium then
         (List.intersperse (hr [] []) htmlList)
       else
