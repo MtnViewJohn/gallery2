@@ -760,10 +760,6 @@ view cfg design =
         , [ div [class "buttondiv"] 
           ( [ downloadLink design.design.filelocation " Download "
             , text " "
-            , a [ href ("translate.php?id=" ++ toString design.design.designid)
-                , title "Translate to new syntax.", class "button translate" 
-                ] [ text " Translate "]
-            , text " "
             ] ++
             ( if canModify design.design.owner cfg.currentUser then  
                 if design.ready2delete then
