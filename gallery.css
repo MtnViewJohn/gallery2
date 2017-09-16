@@ -39,6 +39,7 @@ form input {
 	font-weight: normal;
 	font-style: normal;
 	font-variant: normal;
+    padding: 5px;
 }
 fieldset {border:0; margin:0; padding:0;}
 
@@ -210,7 +211,7 @@ div.ccInfo {margin: 4px 0;}
 div.ccInfo a.ccIcon {float:left; margin-right: 4px;}
 .alert { color:#990000; font-weight:bold; }
 .clearleft { clear: left; padding: 5px;}
-textarea { width: 400px; height: 150px; }
+textarea { width: 400px; height: 150px; padding: 5px;}
 
 textarea.cfdg {
 	width: 100%;
