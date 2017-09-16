@@ -935,13 +935,11 @@ view model =
               , text "Only"
               ]
             ]
+          , li [] [text " "]
           , li [] [ text "Display size:" ]
-          , li []
-            [ fieldset []
-              [ radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable
-              , text " "
-              , radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable
-              ]
+          , fieldset []
+            [ li [] [radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable]
+            , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable]
             ]
           ])
     , h5 [] [ text "Lookup" ]
