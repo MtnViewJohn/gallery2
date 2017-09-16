@@ -118,12 +118,12 @@ table.upload td + td {
  padding:10px;
 vertical-align: top;
 }
-.sm_thumbtable {
- display:inline;
+table.sm_thumbtable {
+ display:inline-block;
  width:225px;
+ height: 120px;
  text-align:left;
  margin:10px;
- float: left;
 }
 table.tagstable {
     border: 1px solid #ccc;
@@ -156,7 +156,6 @@ table.tagstable th.dates {
     text-align: center;
     vertical-align: middle;
 }
-table.sm_thumbtable { height: 120px; }
 .status_message {
  border:1px solid black;
  padding:10px;

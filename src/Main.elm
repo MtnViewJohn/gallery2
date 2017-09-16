@@ -46,6 +46,7 @@ type alias DesignList =
   , prevlink : String
   , nextlink : String
   , thislink : String
+  , start : Int
   , count : Int
   }
 
@@ -101,7 +102,7 @@ type alias Model =
   }
 
 zeroList : DesignList
-zeroList = DesignList Array.empty "" "" "" 0
+zeroList = DesignList Array.empty "" "" "" 0 0
 
 zeroUList : UserList
 zeroUList = UserList [] "" "" "" 0
@@ -137,6 +138,28 @@ designFind id darray =
   in
     find2 ((Array.length darray) - 1)
       
+      
+dmerge : DesignList -> DesignList -> DesignList
+dmerge new old =
+  let
+    newparts = String.split "/" new.thislink
+    oldparts = String.split "/" old.thislink
+  in case (List.head newparts, List.head oldparts) of
+    (Just newhead, Just oldhead) -> 
+      if (newhead /= oldhead) then
+        new
+      else if old.start + old.count == new.start then
+        {old | designs = Array.append old.designs new.designs
+             , nextlink = new.nextlink
+             , count = old.count + new.count}
+      else if new.start + new.count == old.start then
+        {old | designs = Array.append new.designs old.designs
+             , prevlink = new.prevlink
+             , count = old.count + new.count
+             , thislink = new.thislink}
+      else
+        new
+    _ -> new
       
 
 -- URL PARSING
@@ -214,6 +237,7 @@ type Msg
   | CCcheck Bool
   | SwitchTo Design.ViewSize
   | NewURL Navigation.Location
+  | LoadDesigns String
   | LoginMsg Login.Msg
   | DesignMsg Design.MsgId
   | ClearDeleteBut Int
@@ -262,6 +286,8 @@ update msg model =
         url_ = (makeQuery model_) ++ "#" ++ model_.designList.thislink
       in
         (model_, Navigation.newUrl url_)
+    LoadDesigns newHash ->
+      (model, Navigation.modifyUrl ("#" ++ newHash))
     NewURL loc ->
       let
         qbits = String.split "&" (String.dropLeft 1 loc.search)
@@ -473,7 +499,7 @@ update msg model =
           let
             design = dt.design
             tags_ = dt.tags
-            designList_ = DesignList (Array.fromList [design]) "" "" "" 1
+            designList_ = DesignList (Array.fromList [design]) "" "" "" 0 1
           in
             ({model | designList = designList_, tagList = tags_, mainDesign = 0, errorInfo = Ok "New design"},
               Cmd.batch 
@@ -491,7 +517,9 @@ update msg model =
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | designList = designs, mainDesign = noDesign, errorInfo = Ok "New designs"},         
+          ({model | designList = dmerge designs model.designList
+                  , mainDesign = noDesign
+                  , errorInfo = Ok "New designs"},         
             if model.designMode == Design.Small then
               Cmd.none
             else
@@ -645,7 +673,7 @@ update msg model =
             mainDesign_ = if index == noDesign then 0 else index
             designList_ =
               if index == noDesign then
-                DesignList designs_ "" "" "" 1
+                DesignList designs_ "" "" "" 0 1
               else
                 {designList | designs = designs_}
             cmd_ =
@@ -722,6 +750,24 @@ makePNbar dlist =
   , makePNlink "Next" dlist.count dlist.nextlink
   ]
 
+makeUpBar : DesignList -> Html Msg
+makeUpBar dlist =
+  if String.isEmpty dlist.prevlink then
+    text ""
+  else
+    div [class "khomut"]
+    [ a [href "#", onNav <| LoadDesigns dlist.prevlink] 
+        [img [src "graphics/more_up.png", alt "More designs", width 64] []]]
+
+makeDownBar : DesignList -> Html Msg
+makeDownBar dlist =
+  if String.isEmpty dlist.nextlink then
+    div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]
+  else
+    div [class "khomut"]
+    [ a [href "#", onNav <| LoadDesigns dlist.nextlink] 
+        [img [src "graphics/more_down.png", alt "More designs", width 64] []]]
+
 
 makeHeader : String -> Html Msg
 makeHeader thislink =
@@ -780,25 +826,20 @@ viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
   (makeHeader model.designList.thislink)
   ::
-  if Array.isEmpty model.designList.designs then
-    [ div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]]
-  else
-    (makePNbar model.designList)
-    ::
-    ( let
-        vcfg = Design.ViewConfig model.designMode model.user
-
-        htmlList = Array.toList
-          (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
-            model.designList.designs)
-      in
-        if model.designMode == Design.Medium then
-          (List.intersperse (hr [] []) htmlList)
-        else
-          htmlList
-    )
-    ++
-    [makePNbar model.designList]
+  [ (makeUpBar model.designList)
+  , div [] 
+    (let
+      vcfg = Design.ViewConfig model.designMode model.user
+      htmlList = Array.toList
+        (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
+          model.designList.designs)
+    in
+      if model.designMode == Design.Medium then
+        (List.intersperse (hr [] []) htmlList)
+      else
+        htmlList)
+  , (makeDownBar model.designList)
+  ]
 
 
 viewUsers : Model -> List (Html Msg)
@@ -1225,11 +1266,12 @@ getDesigns model query start count =
 
 decodeDesigns : JD.Decoder DesignList
 decodeDesigns = 
-  JD.map5 DesignList
+  JD.map6 DesignList
     (JD.field "designs" (JD.array Design.decodeDDesign))
     (JD.field "prevlink" JD.string)
     (JD.field "nextlink" JD.string)
     (JD.field "thislink" JD.string)
+    (JD.field "start"    JD.int)
     (JD.field "count"    JD.int)
 
 deleteDesign : Int -> Model -> Cmd Msg
