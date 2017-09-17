@@ -80,6 +80,8 @@ type alias EditDesign =
     , newTag : String
     , filePortData : Maybe FilePortData
     , imagePortData : Maybe FilePortData
+    , fileSelected : Bool
+    , imageSelected : Bool
     , uploadPNG : Bool
     , focusTag : Bool
     , focusTaglist : Bool
@@ -88,7 +90,7 @@ type alias EditDesign =
 
 makeEDesign : Design -> EditDesign
 makeEDesign design =
-  EditDesign design "-" "" Nothing Nothing (String.endsWith ".png" design.imagelocation) 
+  EditDesign design "-" "" Nothing Nothing False False (String.endsWith ".png" design.imagelocation) 
     False False False
 
 type alias DisplayDesign =
@@ -182,9 +184,9 @@ setCfdg newCfdg ddesign =
 setFile : FilePortData -> EditDesign -> EditDesign
 setFile fpd edesign =
   if fpd.fileid == "cfdgfile" then
-    {edesign | filePortData = Just fpd}
+    {edesign | filePortData = Just fpd, fileSelected = True}
   else
-    {edesign | imagePortData = Just fpd}
+    {edesign | imagePortData = Just fpd, imageSelected = True}
     
 setComments : List Comment.Comment -> DisplayDesign -> DisplayDesign
 setComments newComments ddesign =
@@ -1050,18 +1052,30 @@ viewEdit tags edesign =
             , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
                     , on "change" (JD.succeed (FileChange "cfdgfile"))][]]
             , td 
-              [ class "alert"
-             , style [("visibility", if (validateCfdg edesign) then "hidden" else "visible")]
-              ] [text "CFDG file must be chosen."]
+              [ class (if (validateCfdg edesign) then "foo" else "alert")]
+              [ if validateCfdg edesign then
+                  if (edesign.fileSelected) then
+                    text " "
+                  else
+                    text "Existing CFDG file will be kept."
+                else
+                  text "CFDG file must be chosen."
+              ]
             ]
           , tr []
             [ td [] [b [] [text "PNG"], text " file:"]
             , td [] [ input [type_ "file", name "imagefile", id "imagefile"
                     , on "change" (JD.succeed (FileChange "imagefile"))] []]
             , td 
-              [ class "alert"
-             , style [("visibility", if (validateImage edesign) then "hidden" else "visible")]
-              ] [text "PNG file must be chosen."]
+              [ class (if (validateImage edesign) then "foo" else "alert")]
+              [ if validateImage edesign then
+                  if (edesign.imageSelected) then
+                    text " "
+                  else
+                    text "Existing image file will be kept."
+                else
+                  text "PNG file must be chosen."
+              ]
             ]
           , tr [] 
             [ td [] [text "Image upload compression type:"]
