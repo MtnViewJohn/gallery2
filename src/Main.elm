@@ -775,10 +775,14 @@ makeHeader thislink =
     urlparts = String.split "/" thislink
     urlname = Maybe.withDefault "" (List.head <| (List.drop 1) <| urlparts)
     name = Maybe.withDefault "What's his name" (Http.decodeUri urlname)
+    namepos = if String.endsWith "s" name then
+      name ++ "'"
+    else
+      name ++ "'s"
     -- Map spaces to non-breaking spaces
     toNB str = String.map (\c -> if c == ' ' then ' ' else c) str
-    designs = toNB (name ++ "'s Designs")
-    likes = toNB (name ++ "'s Likes")
+    designs = toNB (namepos ++ " Designs")
+    likes = toNB (namepos ++ " Likes")
   in
     if String.startsWith "title/" thislink then
       div []
@@ -800,7 +804,8 @@ makeHeader thislink =
            [text likes]
       , div [class "tabinter", style [("background-image", "url(graphics/active2empty.png)")]]
            [text " "]
-      , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
+      , div [class "tabrest rightcell", style [("background-image", "url(graphics/empty.png)")]]
+            [text ("To link to this author: [link user:" ++ name ++ "] ... [/link] ")]
       , div [class "tabclear"] []
       ]
     else if String.startsWith "user/" thislink then
@@ -817,7 +822,8 @@ makeHeader thislink =
            [a [href (makeUri "#faves" [urlname, "0"])] [text likes]]
       , div [class "tabinter", style [("background-image", "url(graphics/inactive2empty.png)")]]
            [text " "]
-      , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
+      , div [class "tabrest rightcell", style [("background-image", "url(graphics/empty.png)")]]
+            [text ("To link to this author: [link user:" ++ name ++ "] ... [/link] ")]
       , div [class "tabclear"] []
       ]
     else 

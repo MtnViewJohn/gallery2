@@ -251,7 +251,7 @@ div.tabdata {
 }
 div.tabrest {
     height: 37px;
-    width: 100%;
+    xwidth: 100%;
     background-repeat: repeat-x;
 }
 div.tabclear {
