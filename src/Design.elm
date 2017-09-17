@@ -952,7 +952,7 @@ view cfg design =
             [ a [ href ("#design/" ++ (toString design.design.designid)) ]
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
-          , td []
+          , td [class "sm_thumbinfo"]
             (List.concat
             [ [ b [] [text design.design.title ]
               , br [] []
@@ -962,44 +962,44 @@ view cfg design =
               ]
               , if design.design.numvotes > 0 then
                   [ br [] []
-                  , span [class "small"] [text (fanCount design.design.numvotes) ]
+                  , span [class "small"] [text (fanCount design.design.numvotes)]
                   ]
                 else
                   []
-            , [ div [style [("margin-bottom", "5px")]]
-                [ downloadLink design.design.filelocation ""
-                , text " "
-                , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                    , class "button viewbutton" 
-                    ] [ ]
-                , text " "
-                ]
+            , [ div []
+                (
+                  [ downloadLink design.design.filelocation ""
+                  , text " "
+                  , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
+                      , class "button viewbutton" 
+                      ] [ ]
+                  , text " "
+                  ] ++ 
+                  (
+                    if canModify design.design.owner cfg.currentUser then
+                      if design.ready2delete then
+                        [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                            , class "keepbutton"
+                            ] [ ]
+                        , text " "
+                        , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                            , class "confirmbutton"
+                            ] [ ]
+                        ]
+                      else
+                        [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                            , class "button deletebutton"
+                            ] [ ]
+                        , text " "
+                        , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                            , class "button editbutton"
+                            ] [ ]
+                        ]
+                    else
+                      [ ]
+                  )
+                )
               ]
-            , if canModify design.design.owner cfg.currentUser then
-                if design.ready2delete then
-                  [ div [] 
-                    [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                        , class "keepbutton"
-                        ] [ ]
-                    , text " "
-                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                        , class "confirmbutton"
-                        ] [ ]
-                    ]
-                  ]
-                else
-                  [ div [] 
-                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                        , class "button deletebutton"
-                        ] [ ]
-                    , text " "
-                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
-                        , class "button editbutton"
-                        ] [ ]
-                    ]
-                  ]
-              else
-                [ ]
             ])
           ]
         ]

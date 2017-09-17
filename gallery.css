@@ -35,11 +35,14 @@ a:hover.letterref  {color: #000; text-decoration: none; background: transparent;
 
 
 form input {
-    font-size: 8pt;
+    font-size: 14px;
 	font-weight: normal;
 	font-style: normal;
 	font-variant: normal;
     padding: 5px;
+}
+textarea, select, button {
+    font-size: 14px;
 }
 fieldset {border:0; margin:0; padding:0;}
 
@@ -84,7 +87,7 @@ table.upload td + td {
     font-size: 9pt;
 }
 .small {
-    font-size:8pt;
+    font-size:10pt;
 }
 .thumb {
  border:1px solid #333333;
@@ -121,8 +124,8 @@ vertical-align: top;
 }
 table.sm_thumbtable {
  display:inline-block;
- width:225px;
- height: 120px;
+ width:275px;
+ height: 140px;
  text-align:left;
  margin:10px;
 }
@@ -136,10 +139,10 @@ table.tagstable td,th {
     padding: 5px;
 }
 table.tagstable th.usernames {
-    width: 120px;
+    width: 160px;
 }
 table.tagstable th.dates {
-    width: 150px;
+    width: 200px;
 }
 .halfcell { width: 50%; vertical-align: top;
 }
@@ -156,6 +159,9 @@ table.tagstable th.dates {
     height: 100px;
     text-align: center;
     vertical-align: middle;
+}
+.sm_thumbinfo {
+    padding-left: 5px;
 }
 .status_message {
  border:1px solid black;
@@ -182,15 +188,15 @@ table.tagstable th.dates {
 .addcommenttext {
  width:100%;
  height:120px;
- font-size:8pt;
+ font-size:12pt;
 }
 .addcommentdiv {
  padding: 5px;
     background-color:#dddddd;
-    font-size:8pt;
+    font-size:12pt;
 }
 .commentsdiv {
-    font-size:8pt;
+    font-size:12pt;
     background-color:#dddddd;
  padding:8pt;
  margin:5px;
@@ -200,7 +206,7 @@ table.tagstable th.dates {
  margin: 3px;
  padding:4px;
 }
-.taghelp { font-size: 8pt; }
+.taghelp { font-size: 12pt; }
 .notesdiv {
  padding: 5px;
     background-color:#c4d7ff;
