@@ -774,10 +774,11 @@ makeHeader thislink =
   let
     urlparts = String.split "/" thislink
     urlname = Maybe.withDefault "" (List.head <| (List.drop 1) <| urlparts)
-    name = Maybe.withDefault "" (Http.decodeUri urlname)
+    name = Maybe.withDefault "What's his name" (Http.decodeUri urlname)
     -- Map spaces to non-breaking spaces
-    namenb = String.map (\c -> if c == ' ' then ' ' else c) name
-
+    toNB str = String.map (\c -> if c == ' ' then ' ' else c) str
+    designs = toNB (name ++ "'s Designs")
+    likes = toNB (name ++ "'s Likes")
   in
     if String.startsWith "title/" thislink then
       div []
@@ -788,15 +789,15 @@ makeHeader thislink =
     else if String.startsWith "faves/" thislink then
       div [class "tabtable"]
       [ div [class "tabdata", style [("background-image", "url(graphics/empty.png)")]]
-           [text ("Gallery user: " ++ namenb)]
+           [text " "]
       , div [class "tabinter", style [("background-image", "url(graphics/empty2inactive.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
-           [a [href (makeUri "#user" [urlname, "0"])] [text "Designs"]]
+           [a [href (makeUri "#user" [urlname, "0"])] [text designs]]
       , div [class "tabinter", style [("background-image", "url(graphics/inactive2active.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
-           [text "Likes"]
+           [text likes]
       , div [class "tabinter", style [("background-image", "url(graphics/active2empty.png)")]]
            [text " "]
       , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
@@ -805,15 +806,15 @@ makeHeader thislink =
     else if String.startsWith "user/" thislink then
       div [class "tabtable"]
       [ div [class "tabdata", style [("background-image", "url(graphics/empty.png)")]]
-           [text ("Gallery user: " ++ namenb)]
+           [text " "]
       , div [class "tabinter", style [("background-image", "url(graphics/empty2active.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/active.png)")]] 
-           [text "Designs"]
+           [text designs]
       , div [class "tabinter", style [("background-image", "url(graphics/active2inactive.png)")]]
            [text " "]
       , div [class "tabdata", style [("background-image", "url(graphics/inactive.png)")]] 
-           [a [href (makeUri "#faves" [urlname, "0"])] [text "Likes"]]
+           [a [href (makeUri "#faves" [urlname, "0"])] [text likes]]
       , div [class "tabinter", style [("background-image", "url(graphics/inactive2empty.png)")]]
            [text " "]
       , div [class "tabrest", style [("background-image", "url(graphics/empty.png)")]] [text " "]
