@@ -718,8 +718,10 @@ imageLink filepath content =
   let
     mfilename = List.head <| List.reverse <| (String.split "/" filepath)
     filename = Maybe.withDefault filepath mfilename
+    mfilename2 = List.head <| String.split "?" filename
+    filename2 = Maybe.withDefault filename mfilename2
   in
-    a [href filepath, downloadAs filename, title "Download the image to your computer."
+    a [href filepath, downloadAs filename2, title "Download the image to your computer."
       , class "button download"
       ] [ text content ]
       
