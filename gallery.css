@@ -26,7 +26,7 @@ li.rss {
 }
 
 a.letterref { 
-    padding: 3px; 
+    padding: 5px; 
     font: 12pt Courier, 'Courier New', monospace; 
 }
 a:link.letterref  {color: #fff; text-decoration: none; background-color: #888}

@@ -732,7 +732,7 @@ designString des =
 makeIndexLink : Char -> List (Html Msg)
 makeIndexLink c =
   [ a [class "letterref", href ("#titleindex/" ++ (String.fromChar c))] 
-      [text (String.fromChar c)]
+      [b [] [text (String.fromChar c)]]
   , text " "
   ]
 
@@ -782,7 +782,7 @@ makeHeader thislink =
   in
     if String.startsWith "title/" thislink then
       div []
-      ([ a [class "letterref", href "#title/0"] [text "all"], text " "]
+      ([ a [class "letterref", href "#title/0"] [b [] [text "all"]], text " "]
       ++
       List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
       ++ [hr [][]])
