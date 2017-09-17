@@ -950,9 +950,10 @@ view model =
           [ fieldset []
             [ label []
               [ text "Author "
-              , input [ type_ "text", name "by", size 8, placeholder "name", 
-                        value model.authorLookup, onInput AuthorText] []
-              , input [ type_ "submit", value "Go" ] [ ]
+              , input [ type_ "text", name "by", size 8, placeholder "name"
+                      , value model.authorLookup, onInput AuthorText
+                      , style [("padding", "1px")]] []
+              , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
               ]
             ]
           ]
@@ -962,9 +963,10 @@ view model =
           [ fieldset []
             [ label []
               [ text "Design "
-              , input [ type_ "text", name "id", size 8, placeholder "id #",
-                        value (designString model.designLookup), onInput DesignText ] []
-              , input [ type_ "submit", value "Go"] [ ]
+              , input [ type_ "text", name "id", size 8, placeholder "id #"
+                      , value (designString model.designLookup), onInput DesignText
+                      , style [("padding", "1px")]] []
+              , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
               ]
             ]
           ]
