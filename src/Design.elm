@@ -828,13 +828,14 @@ view cfg design =
             )
           )
           ]
-        , [ br [][]
-          , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
-          ]
-        , [ viewCC design.design ]
-        , [ br [] [] 
-          , table [style [("table-layout","fixed"),("width","100%")]]
+        , [ table [style [("table-layout","fixed"),("width","100%")]]
             [ tr []
+              [ td [] [viewCC design.design]
+              , td [class "rightcell"]
+                [ text ("To link to this design: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
+                ]
+              ]
+            , tr []
               [ td [class "halfcell"]
                 [ div [class "filediv"]
                   [ design.noteshtml
