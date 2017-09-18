@@ -90,6 +90,7 @@ type alias Model =
   , viewMode : ViewMode
   , mainDesign : Int
   , designList : DesignList
+  , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
   , designMode : Design.ViewSize
   , tagList : List TagInfo
@@ -110,7 +111,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList Nothing 
+    model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
             Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href (Ok "") flags.backend
   in
     (model, loginSession model)
@@ -304,7 +305,8 @@ update msg model =
               Home ->
                 ({model_ | viewMode = Default
                          , mainDesign = noDesign
-                         , designList = zeroList}, 
+                         , designList = zeroList
+                         , pendingLoad = True}, 
                   Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie model_])
               ErrorMsg msg_enc ->
                 let
@@ -328,13 +330,15 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign
+                           , viewMode = Designs
+                           , pendingLoad = True },
                     getDesigns model_ (makeUri "by" [name]) start count)
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                     getDesigns model_ (makeUri "by" [name]) start dcount)
               AuthorInit2 name_enc ->
                 let
@@ -351,39 +355,39 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                     getDesigns model_ (makeUri "faves" [name]) start dcount)
               Newest start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "newest" start count)
               NewestInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "newest" start dcount)
               Oldest start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "oldest" start count)
               OldestInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "oldest" start dcount)
               Title start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "title" start count)
               TitleInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "title" start dcount)
               TitleIndex title ->
                 (model_, getTitle model_ title)
               Popular start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "popular" start count)
               PopularInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "popular" start dcount)
               RandomDes seed start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ ("random/" ++ (toString seed)) start count)
               RandomInit seed start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs },
+                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ ("random/" ++ (toString seed)) start dcount)
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
@@ -391,13 +395,13 @@ update msg model =
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                     getDesigns model_ (makeUri "tag" [tag]) start count)
               TagInit tag_enc start ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs },
+                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                     getDesigns model_ (makeUri "tag" [tag]) start dcount)
               ShowTags tagType ->
                 let
@@ -519,13 +523,14 @@ update msg model =
         Ok designs ->
           ({model | designList = dmerge designs model.designList
                   , mainDesign = noDesign
+                  , pendingLoad = False
                   , errorInfo = Ok "New designs"},         
             if model.designMode == Design.Small then
               Cmd.none
             else
               Cmd.batch (List.map (getCfdgfromDesign model) (Array.toList designs.designs)))
         Err error ->
-          ({model | designList = zeroList, errorInfo = Err error}, Cmd.none)
+          ({model | designList = zeroList, errorInfo = Err error, pendingLoad = False}, Cmd.none)
     NewUser loginResult ->
       case loginResult of
         Ok user ->
@@ -759,14 +764,17 @@ makeUpBar dlist =
     [ a [href "#", onNav <| LoadDesigns dlist.prevlink] 
         [img [src "graphics/more_up.png", alt "More designs", width 64] []]]
 
-makeDownBar : DesignList -> Html Msg
-makeDownBar dlist =
-  if String.isEmpty dlist.nextlink then
-    div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]
+makeDownBar : Bool -> DesignList -> Html Msg
+makeDownBar pending dlist =
+  if pending then
+    div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]
   else
-    div [class "khomut"]
-    [ a [href "#", onNav <| LoadDesigns dlist.nextlink] 
-        [img [src "graphics/more_down.png", alt "More designs", width 64] []]]
+    if String.isEmpty dlist.nextlink then
+      div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100] []]
+    else
+      div [class "khomut"]
+      [ a [href "#", onNav <| LoadDesigns dlist.nextlink] 
+          [img [src "graphics/more_down.png", alt "More designs", width 64] []]]
 
 
 makeHeader : String -> Html Msg
@@ -845,7 +853,7 @@ viewDesigns model =
         (List.intersperse (hr [] []) htmlList)
       else
         htmlList)
-  , (makeDownBar model.designList)
+  , (makeDownBar model.pendingLoad model.designList)
   ]
 
 
