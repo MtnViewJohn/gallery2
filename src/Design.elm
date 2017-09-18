@@ -63,6 +63,7 @@ type alias Design =
     , imagelocation : String
     , imagesize : Maybe Size
     , notes : String
+    , notesmd : String
     , numvotes : Int
     , owner : String
     , smthumblocation : String
@@ -104,7 +105,7 @@ type alias DisplayDesign =
 
 makeDDesign : Design -> DisplayDesign
 makeDDesign design =
-  DisplayDesign design (text "") (notesHtml design.notes) [] (Comment.emptyComment design.designid) False
+  DisplayDesign design (text "") (notesHtml design.notesmd) [] (Comment.emptyComment design.designid) False
 
 
 options : Markdown.Options
@@ -170,7 +171,7 @@ initDesign user ccURI now =
         ("https://licensebuttons.net/p/zero/1.0/88x31.png","CC0 1.0 Universal (CC0 1.0) Public Domain Dedication","https://creativecommons.org/publicdomain/zero/1.0/")
       else
         ("No license chosen", "", "")
-    design = Design image name uri 0 [] "" "" Nothing "" 0 user "" [] "" Untiled "" now ""
+    design = Design image name uri 0 [] "" "" Nothing "" "" 0 user "" [] "" Untiled "" now ""
   in
     makeEDesign design
 
@@ -240,6 +241,7 @@ decodeDesign =
         |> JPipe.required "imagelocation" (JD.string)
         |> JPipe.optional "imagesize" (JD.maybe decodeSize) Nothing
         |> JPipe.required "notes" (JD.string)
+        |> JPipe.required "notesmd" (JD.string)
         |> JPipe.required "numvotes" (JD.int)
         |> JPipe.required "owner" (JD.string)
         |> JPipe.required "smthumblocation" (JD.string)
