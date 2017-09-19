@@ -101,11 +101,13 @@ type alias DisplayDesign =
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
     , ready2delete : Bool
+    , name : String
     }
 
 makeDDesign : Design -> DisplayDesign
 makeDDesign design =
-  DisplayDesign design (text "") (notesHtml design.notesmd) [] (Comment.emptyComment design.designid) False
+  DisplayDesign design (text "") (notesHtml design.notesmd) [] 
+    (Comment.emptyComment design.designid) False ""
 
 
 options : Markdown.Options
@@ -879,135 +881,149 @@ view cfg design =
         ])
       ]
     Medium ->
-      div 
-      [ style 
-        [("overflow", "auto")
-        , ("position", "relative")
-        , ("min-height", toString (minHeight design.design) ++ "px")
-        ]
-      ]
-      [ div (thumbImageAttributes design.design)
-        [ thumbImage design.design ]
-      , div [style [("padding-left", "310px")]]
-          (List.concat
-          [ [ b [] [text design.design.title ]
-            , text " by "
-            , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                [ b [] [text design.design.owner] ]
+      let
+        dhtml =
+          div 
+          [ style 
+            [("overflow", "auto")
+            , ("position", "relative")
+            , ("min-height", toString (minHeight design.design) ++ "px")
             ]
-            , if isEmpty design.design.variation then
-                [ text "" ]
-              else
-                [ text ", Variation: ", b [] [text design.design.variation] ]
-            , [ b [] [text (tileText design.design.tiled)]
-              , text (", uploaded on " ++ (makeDate design.design.uploaddate))
-              ]
-            , if design.design.numvotes > 0 then
-                [ div [class "small"] [text (fanCount design.design.numvotes) ]
+          ]
+          [ div (thumbImageAttributes design.design)
+            [ thumbImage design.design ]
+          , div [style [("padding-left", "310px")]]
+              (List.concat
+              [ [ b [] [text design.design.title ]
+                , text " by "
+                , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                    [ b [] [text design.design.owner] ]
                 ]
-              else
-                [div [] []]
-          , [ div [class "buttondiv"]
-              ( [ downloadLink design.design.filelocation " Download CFDG "
-                , text " "
-                , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                    , class "button viewbutton" 
-                    ] [ text " View "]
-                , text " "
-                ] ++
-                if canModify design.design.owner cfg.currentUser then
-                  if design.ready2delete then
-                    [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                        , class "keepbutton"
-                        ] [ text "Cancel"]
-                    , text " "
-                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                        , class "confirmbutton"
-                        ] [ text "Confirm"]
+                , if isEmpty design.design.variation then
+                    [ text "" ]
+                  else
+                    [ text ", Variation: ", b [] [text design.design.variation] ]
+                , [ b [] [text (tileText design.design.tiled)]
+                  , text (", uploaded on " ++ (makeDate design.design.uploaddate))
+                  ]
+                , if design.design.numvotes > 0 then
+                    [ div [class "small"] [text (fanCount design.design.numvotes) ]
                     ]
                   else
-                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                        , class "button deletebutton" 
-                        ] [ text " Delete "]
+                    [div [] []]
+              , [ div [class "buttondiv"]
+                  ( [ downloadLink design.design.filelocation " Download CFDG "
                     , text " "
-                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
-                        , class "button editbutton"
-                        ] [ text " Edit "]
-                    ]
-                else
-                  [ ]
-              )
-            ]
-          , [ br [][]
-            , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
-            ]
-          , [ viewCC design.design ]
-          , [ br [] []
-            , div [class "filediv", style [("width","95%")]]
-                [ design.noteshtml
-                , div [class "minicfdg"] [design.cfdghtml]
-                ]
-            ]
-          ])
-      ]
-    Small ->
-      table [class "sm_thumbtable"]
-        [ tr []
-          [ td [class "sm_thumbcell"]
-            [ a [ href ("#design/" ++ (toString design.design.designid)) ]
-              [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
-            ]
-          , td [class "sm_thumbinfo"]
-            (List.concat
-            [ [ b [] [text design.design.title ]
-              , br [] []
-              , text " by "
-              , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                  [ b [] [text design.design.owner] ]
-              ]
-              , if design.design.numvotes > 0 then
-                  [ br [] []
-                  , span [class "small"] [text (fanCount design.design.numvotes)]
-                  ]
-                else
-                  []
-            , [ div []
-                (
-                  [ downloadLink design.design.filelocation ""
-                  , text " "
-                  , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                      , class "button viewbutton" 
-                      ] [ ]
-                  , text " "
-                  ] ++ 
-                  (
+                    , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
+                        , class "button viewbutton" 
+                        ] [ text " View "]
+                    , text " "
+                    ] ++
                     if canModify design.design.owner cfg.currentUser then
                       if design.ready2delete then
-                        [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                        [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                             , class "keepbutton"
-                            ] [ ]
+                            ] [ text "Cancel"]
                         , text " "
                         , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
                             , class "confirmbutton"
-                            ] [ ]
+                            ] [ text "Confirm"]
                         ]
                       else
                         [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                            , class "button deletebutton"
-                            ] [ ]
+                            , class "button deletebutton" 
+                            ] [ text " Delete "]
                         , text " "
                         , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
                             , class "button editbutton"
-                            ] [ ]
+                            ] [ text " Edit "]
                         ]
                     else
                       [ ]
                   )
-                )
-              ]
-            ])
+                ]
+              , [ br [][]
+                , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
+                ]
+              , [ viewCC design.design ]
+              , [ br [] []
+                , div [class "filediv", style [("width","95%")]]
+                    [ design.noteshtml
+                    , div [class "minicfdg"] [design.cfdghtml]
+                    ]
+                ]
+              ])
           ]
-        ]
+      in
+        if design.name == "" then
+          dhtml
+        else
+          a [name design.name] [dhtml]
+    Small ->
+      let
+        dhtml =
+          table [class "sm_thumbtable"]
+            [ tr []
+              [ td [class "sm_thumbcell"]
+                [ a [ href ("#design/" ++ (toString design.design.designid)) ]
+                  [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
+                ]
+              , td [class "sm_thumbinfo"]
+                (List.concat
+                [ [ b [] [text design.design.title ]
+                  , br [] []
+                  , text " by "
+                  , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                      [ b [] [text design.design.owner] ]
+                  ]
+                  , if design.design.numvotes > 0 then
+                      [ br [] []
+                      , span [class "small"] [text (fanCount design.design.numvotes)]
+                      ]
+                    else
+                      []
+                , [ div []
+                    (
+                      [ downloadLink design.design.filelocation ""
+                      , text " "
+                      , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
+                          , class "button viewbutton" 
+                          ] [ ]
+                      , text " "
+                      ] ++ 
+                      (
+                        if canModify design.design.owner cfg.currentUser then
+                          if design.ready2delete then
+                            [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                                , class "keepbutton"
+                                ] [ ]
+                            , text " "
+                            , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                                , class "confirmbutton"
+                                ] [ ]
+                            ]
+                          else
+                            [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                                , class "button deletebutton"
+                                ] [ ]
+                            , text " "
+                            , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                                , class "button editbutton"
+                                ] [ ]
+                            ]
+                        else
+                          [ ]
+                      )
+                    )
+                  ]
+                ])
+              ]
+            ]
+      in
+        if design.name == "" then
+          dhtml
+        else
+          a [name design.name] [dhtml]
 
 tagDeleteLink : String -> List (Html EMsg)
 tagDeleteLink tag =

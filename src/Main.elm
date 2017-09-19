@@ -98,6 +98,7 @@ type alias Model =
   , userOrder : UserOrder
   , errorMessage : String
   , initUrl : String
+  , currentHash : String
   , errorInfo : Result Http.Error String
   , backend : String
   }
@@ -112,7 +113,7 @@ initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
     model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
-            Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href (Ok "") flags.backend
+            Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
 
@@ -140,24 +141,39 @@ designFind id darray =
     find2 ((Array.length darray) - 1)
       
       
-dmerge : DesignList -> DesignList -> DesignList
-dmerge new old =
+dmerge : String -> DesignList -> DesignList -> DesignList
+dmerge hash new old =
   let
     newparts = String.split "/" new.thislink
     oldparts = String.split "/" old.thislink
+    name_ = String.dropLeft 1 hash
   in case (List.head newparts, List.head oldparts) of
     (Just newhead, Just oldhead) -> 
       if (newhead /= oldhead) then
         new
       else if old.start + old.count == new.start then
-        {old | designs = Array.append old.designs new.designs
-             , nextlink = new.nextlink
-             , count = old.count + new.count}
+        let
+          mfirst = Array.get 0 new.designs
+          ndesigns_ = case mfirst of
+            Nothing -> new.designs
+            Just ddesign ->
+              Array.set 0 {ddesign | name = name_} new.designs
+        in
+          {old | designs = Array.append old.designs ndesigns_
+               , nextlink = new.nextlink
+               , count = old.count + new.count}
       else if new.start + new.count == old.start then
-        {old | designs = Array.append new.designs old.designs
-             , prevlink = new.prevlink
-             , count = old.count + new.count
-             , thislink = new.thislink}
+        let
+          mfirst = Array.get 0 old.designs
+          odesigns_ = case mfirst of
+            Nothing -> old.designs
+            Just ddesign ->
+              Array.set 0 {ddesign | name = name_} old.designs
+        in
+          {old | designs = Array.append new.designs odesigns_
+               , prevlink = new.prevlink
+               , count = old.count + new.count
+               , thislink = new.thislink}
       else
         new
     _ -> new
@@ -294,7 +310,9 @@ update msg model =
         qbits = String.split "&" (String.dropLeft 1 loc.search)
         cc_ = List.member "cc" qbits
         mode_ = if (List.member "large" qbits) then Design.Medium else Design.Small
-        model_ = {model | limitCC = cc_, designMode = mode_}
+        model_ = {model | limitCC = cc_
+                        , designMode = mode_
+                        , currentHash = loc.hash}
         dcount = if model_.designMode == Design.Small then 50 else 5
       in
         case Url.parseHash route loc of
@@ -521,7 +539,7 @@ update msg model =
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | designList = dmerge designs model.designList
+          ({model | designList = dmerge model.currentHash designs model.designList
                   , mainDesign = noDesign
                   , pendingLoad = False
                   , errorInfo = Ok "New designs"},         
