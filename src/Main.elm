@@ -636,11 +636,20 @@ update msg model =
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
     GotTags tagsResult ->
-      case tagsResult of
-        Ok tags ->
-          ({ model | tagList = tags, errorInfo = Ok "Tags"}, Navigation.modifyUrl model.initUrl)
-        Err error ->
-            ({model | errorInfo = Err error}, Navigation.modifyUrl model.initUrl)
+      let
+        cmd = if model.initUrl == "" then
+          Cmd.none
+        else
+          Navigation.modifyUrl model.initUrl
+      in
+        case tagsResult of
+          Ok tags ->
+            ({ model | tagList = tags
+                     , errorInfo = Ok "Tags"
+                     , initUrl = ""}, cmd)
+          Err error ->
+              ({model | errorInfo = Err error
+                      , initUrl = ""}, cmd)
     NewUsers usersResult ->
       case usersResult of
         Ok users ->
