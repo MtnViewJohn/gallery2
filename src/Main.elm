@@ -65,7 +65,7 @@ type alias FaveInfo =
 
 type alias DesignTags =
   { design : Design.DisplayDesign
-  , tags : List TagInfo
+  , tags : Maybe (List TagInfo)
   }
 
 type alias Flags =
@@ -281,7 +281,7 @@ type Msg
   | NewUsers (Result Http.Error UserList)
   | NewFaves (Result Http.Error FaveInfo)
   | DeleteADesign (Result Http.Error Int)
-  | UploadResponse (Result Http.Error Design.DisplayDesign)
+  | UploadResponse (Result Http.Error DesignTags)
   | FileRead FilePortData
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -520,7 +520,7 @@ update msg model =
         Ok dt ->
           let
             design = dt.design
-            tags_ = dt.tags
+            tags_ = Maybe.withDefault model.tagList dt.tags
             designList_ = DesignList (Array.fromList [design]) "" "" "" 0 1
           in
             ({model | designList = designList_, tagList = tags_, mainDesign = 0, errorInfo = Ok "New design"},
@@ -693,8 +693,10 @@ update msg model =
           ({model | errorInfo = Err error}, Navigation.newUrl "#error/Delete%20failed%2e")
     UploadResponse uploadResponse ->
       case uploadResponse of
-        Ok ddesign_ -> 
+        Ok dt -> 
           let
+            ddesign_ = dt.design
+            tags_ = Maybe.withDefault model.tagList dt.tags
             designList = model.designList
             (index, _) = designFind ddesign_.design.designid designList.designs
             designs_ = 
@@ -716,7 +718,7 @@ update msg model =
           in
             ({model 
               | designList = designList_, editDesign = Nothing, errorInfo = Ok "Upload success"
-              , viewMode = Designs, mainDesign = mainDesign_}, cmd_)
+              , viewMode = Designs, mainDesign = mainDesign_, tagList = tags_}, cmd_)
         Err error ->
           let
             msg = case error of
@@ -1272,7 +1274,7 @@ decodeDesignTag : JD.Decoder DesignTags
 decodeDesignTag =
   JD.map2 DesignTags
     (JD.field "design" Design.decodeDDesign)
-    (JD.field "tags" (JD.list decodeTagInfo))
+    (JD.maybe <| JD.field "tags" (JD.list decodeTagInfo))
 
 loadEditDesign : Int -> Model -> Cmd Msg
 loadEditDesign id model =
@@ -1280,10 +1282,6 @@ loadEditDesign id model =
     url = model.backend ++ "/design/" ++ (toString id)
   in
     Http.send NewEditDesign (get url decodeEDesign)
-
-decodeDesign : JD.Decoder Design.DisplayDesign
-decodeDesign =
-   JD.field "design" Design.decodeDDesign
 
 decodeEDesign : JD.Decoder Design.EditDesign
 decodeEDesign =
@@ -1295,7 +1293,7 @@ uploadDesign edesign model =
     url = model.backend ++ "/postdesign"
     jbody = Design.encodeDesign edesign      
   in
-    Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesign)
+    Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesignTag)
 
 getDesigns : Model -> String -> Int -> Int -> Cmd Msg
 getDesigns model query start count =
