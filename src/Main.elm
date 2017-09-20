@@ -356,7 +356,10 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                  ({model_  | mainDesign = noDesign
+                            , viewMode = Designs
+                            , pendingLoad = True
+                            , designList = zeroList },
                     getDesigns model_ (makeUri "by" [name]) start dcount)
               AuthorInit2 name_enc ->
                 let
@@ -373,25 +376,37 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                  ({model_  | mainDesign = noDesign
+                            , viewMode = Designs
+                            , pendingLoad = True
+                            , designList = zeroList },
                     getDesigns model_ (makeUri "faves" [name]) start dcount)
               Newest start count ->
                 ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "newest" start count)
               NewestInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                ({model_  | mainDesign = noDesign
+                          , viewMode = Designs
+                          , pendingLoad = True
+                          , designList = zeroList },
                   getDesigns model_ "newest" start dcount)
               Oldest start count ->
                 ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "oldest" start count)
               OldestInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                ({model_  | mainDesign = noDesign
+                          , viewMode = Designs
+                          , pendingLoad = True
+                          , designList = zeroList },
                   getDesigns model_ "oldest" start dcount)
               Title start count ->
                 ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "title" start count)
               TitleInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                ({model_  | mainDesign = noDesign
+                          , viewMode = Designs
+                          , pendingLoad = True
+                          , designList = zeroList },
                   getDesigns model_ "title" start dcount)
               TitleIndex title ->
                 (model_, getTitle model_ title)
@@ -399,13 +414,19 @@ update msg model =
                 ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ "popular" start count)
               PopularInit start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                ({model_  | mainDesign = noDesign
+                          , viewMode = Designs
+                          , pendingLoad = True
+                          , designList = zeroList },
                   getDesigns model_ "popular" start dcount)
               RandomDes seed start count ->
                 ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
                   getDesigns model_ ("random/" ++ (toString seed)) start count)
               RandomInit seed start ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                ({model_  | mainDesign = noDesign
+                          , viewMode = Designs
+                          , pendingLoad = True
+                          , designList = zeroList },
                   getDesigns model_ ("random/" ++ (toString seed)) start dcount)
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
@@ -419,7 +440,10 @@ update msg model =
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
+                  ({model_  | mainDesign = noDesign
+                            , viewMode = Designs
+                            , pendingLoad = True
+                            , designList = zeroList },
                     getDesigns model_ (makeUri "tag" [tag]) start dcount)
               ShowTags tagType ->
                 let
