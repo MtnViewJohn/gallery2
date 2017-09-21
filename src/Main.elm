@@ -325,11 +325,13 @@ update msg model =
           Just route ->
             case route of
               Home ->
-                ({model_ | viewMode = Default
-                         , mainDesign = noDesign
-                         , designList = zeroList
-                         , pendingLoad = True}, 
-                  Cmd.batch [getDesigns model_ "newest" 0 10, getNewbie model_])
+                let
+                  model__ = {model_ | viewMode = Default
+                                    , mainDesign = noDesign
+                                    , designList = zeroList
+                                    , pendingLoad = True}
+                in
+                  (model__, Cmd.batch [getDesigns model__ "newest" 0 10, getNewbie model__])
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
@@ -1344,7 +1346,7 @@ getDesigns model query start count =
     url = String.join "/" [model.backend, ccquery, 
                            toString(start), toString(count)]
   in
-    if model.currentHash == model.designList.currentHash then
+    if model.currentHash == model.designList.currentHash && model.currentHash /= "" then
       Task.perform identity (Task.succeed ShortCircuit)
     else
       Http.send NewDesigns (get url decodeDesigns)
