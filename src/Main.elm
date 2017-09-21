@@ -452,7 +452,7 @@ update msg model =
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
                   ({model_ | designList = zeroList },
-                    Navigation.modifyUrl (makeUri "#user" [tag, "0", toString dcount]))
+                    Navigation.modifyUrl (makeUri "#tag" [tag, "0", toString dcount]))
               ShowTags tagType ->
                 let
                   comp = 
