@@ -808,14 +808,17 @@ makePNbar dlist =
   , makePNlink "Next" dlist.count dlist.nextlink
   ]
 
-makeUpBar : DesignList -> Html Msg
-makeUpBar dlist =
-  if String.isEmpty dlist.prevlink then
-    text ""
+makeUpBar : Bool -> DesignList -> Html Msg
+makeUpBar pending dlist =
+  if pending && Array.length dlist.designs > 0 then
+    div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]
   else
-    div [class "khomut"]
-    [ a [href "#", onNav <| LoadDesigns dlist.prevlink] 
-        [img [src "graphics/more_up.png", alt "More designs", width 64] []]]
+    if String.isEmpty dlist.prevlink then
+      text ""
+    else
+      div [class "khomut"]
+      [ a [href "#", onNav <| LoadDesigns dlist.prevlink] 
+          [img [src "graphics/more_up.png", alt "More designs", width 64] []]]
 
 makeDownBar : Bool -> DesignList -> Html Msg
 makeDownBar pending dlist =
@@ -894,7 +897,7 @@ viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
   (makeHeader model.designList.thislink)
   ::
-  [ (makeUpBar model.designList)
+  [ (makeUpBar model.pendingLoad model.designList)
   , div [] 
     (let
       vcfg = Design.ViewConfig model.designMode model.user
@@ -1066,7 +1069,7 @@ view model =
           ]
         Editing ->
         ( case model.editDesign of
-            Nothing -> [text "Design didn't load."]
+            Nothing -> [makeDownBar True zeroList]
             Just edesign ->
               [ Html.map EDesignMsg (Design.viewEdit model.tagList edesign)
               , if model.errorMessage == "" then
