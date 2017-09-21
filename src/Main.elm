@@ -258,8 +258,7 @@ route =
 -- UPDATE
 
 type Msg
-  = LoginClick 
-  | LogoutClick
+  = LogoutClick
   | CCcheck Bool
   | SwitchTo Design.ViewSize
   | NewURL Navigation.Location
@@ -298,8 +297,6 @@ type Msg
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
-    LoginClick ->
-      (model, loginUser model.loginform model)
     LogoutClick ->
       (model, logoutUser model)
     CCcheck cc ->
@@ -496,13 +493,9 @@ update msg model =
       (model, Navigation.newUrl ("#random/" ++ (toString seed ++ "/0")))
     LoginMsg lMsg ->
       let
-        (newLoginModel, maybeAction) = Login.update lMsg model.loginform          
+        newLoginModel = Login.update lMsg model.loginform          
       in
-        case maybeAction of
-          Just action ->
-            update LoginClick { model | loginform = newLoginModel }
-          Nothing ->
-            ({ model | loginform = newLoginModel }, Cmd.none) 
+        ({ model | loginform = newLoginModel }, Cmd.none) 
     DesignMsg (dmsg, id) ->
       let
         (index, mddesign) = designFind id model.designList.designs
@@ -1103,9 +1096,11 @@ view model =
             , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
+          , div [hidden True]
+            [ Html.map LoginMsg (Login.view model.backend model.loginform) ]
           ]
         Nothing ->
-          Html.map LoginMsg (Login.view model.loginform)
+          Html.map LoginMsg (Login.view model.backend model.loginform)
     ]
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
@@ -1401,19 +1396,6 @@ decodeDesignId : JD.Decoder Int
 decodeDesignId = 
   JD.field "designid" JD.int
 
-
-loginUser : Login.Model -> Model -> Cmd Msg
-loginUser lmodel model =
-  let
-    url = makeUri 
-      model.backend
-      [ "login"
-      , lmodel.user
-      , lmodel.password
-      , if lmodel.remember then "1" else "0"
-      ]
-  in
-    Http.send NewUser (post url Http.emptyBody decodeUser)
 
 loginSession : Model -> Cmd Msg
 loginSession model =

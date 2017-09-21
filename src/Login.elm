@@ -1,7 +1,6 @@
 module Login exposing
   ( Model
   , initModel
-  , Action
 
   , Msg
   , update
@@ -25,7 +24,6 @@ initModel = Model "" "" False ""
 
 
 
-type Action = LoginAttempt
 
 -- UPDATE
 
@@ -47,23 +45,16 @@ type Msg
     = UserText String
     | PassText String
     | RememberCheck Bool
-    | LoginClick
 
-update : Msg -> Model -> (Model, Maybe Action)
+update : Msg -> Model -> Model
 update msg model =
   case msg of
     UserText name ->
-      ({ model | user = trimLeft(name) }, Nothing)
+      { model | user = trimLeft(name) }
     PassText pass ->
-      ({ model | password = trimLeft(pass) }, Nothing)
+      { model | password = trimLeft(pass) }
     RememberCheck remember ->
-      ({ model | remember = remember }, Nothing)
-    LoginClick ->
-      case validate model of
-        Ok ->
-          ({ model | message = "" }, Just LoginAttempt)
-        NotOk err ->
-          ({ model | message = err }, Nothing)
+      { model | remember = remember }
 
 fail : String -> Model -> Model
 fail errMsg model =
@@ -72,9 +63,9 @@ fail errMsg model =
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
-  Html.form [ id "loginform", onSubmit LoginClick ] 
+view : String -> Model -> Html Msg
+view server model =
+  Html.form [ id "loginform", action (server ++ "/login"), method "post"] 
   [ h5 [] [ text "Login:" ]
   , ul [ class "loginform" ] 
     [ li [] 
@@ -89,7 +80,7 @@ view model =
       ]
     , li [] 
       [ label []
-        [ input [ type_ "checkbox", onCheck RememberCheck, checked model.remember ] []
+        [ input [ type_ "checkbox", name "rememberme", onCheck RememberCheck, checked model.remember ] []
         , text " Remember me"
         ]
       ]
