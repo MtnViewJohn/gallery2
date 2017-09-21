@@ -64,6 +64,12 @@ type alias FaveInfo =
   , fans : List String
   }
 
+type alias DesignInfo =
+  { fans : List String
+  , tags : List String
+  , imagesize : Maybe Design.Size
+  }
+
 type alias DesignTags =
   { design : Design.DisplayDesign
   , tags : Maybe (List TagInfo)
@@ -276,7 +282,7 @@ type Msg
   | SessionUser (Result Http.Error User.User)
   | LogoutUser (Result Http.Error Bool)
   | ReceiveCfdg Int (Result Http.Error String)
-  | ReceiveFans Int (Result Http.Error (List String))
+  | ReceiveInfo Int (Result Http.Error DesignInfo)
   | NewComments (Result Http.Error (List Comment.Comment))
   | NewComment (Result Http.Error Comment.Comment)
   | RemoveComment (Result Http.Error Int)
@@ -354,7 +360,7 @@ update msg model =
                       Cmd.batch 
                         [ getComments ddesign.design.designid model_
                         , getCfdg ddesign.design.designid model_
-                        , getFans ddesign.design.designid model_
+                        , getInfo ddesign.design.designid model_
                         ])
               EditDesign id ->
                 case model_.user of
@@ -632,9 +638,9 @@ update msg model =
                 ({model | designList = designList_, errorInfo = Ok "Cfdg received"}, Cmd.none)
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
-    ReceiveFans id fansResult ->
-      case fansResult of
-        Ok fans_ ->
+    ReceiveInfo id infoResult ->
+      case infoResult of
+        Ok info ->
           let
             (index, mddesign) = designFind id model.designList.designs
           in case mddesign of
@@ -642,13 +648,14 @@ update msg model =
             Just ddesign ->
               let
                 design = ddesign.design
-
-                design_ = {design | fans = fans_}
+                design_ = {design | fans = info.fans
+                                  , tags = info.tags
+                                  , imagesize = info.imagesize}
                 ddesign_ = {ddesign | design = design_}
                 designList = model.designList
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                ({model | designList = designList_, errorInfo = Ok "Fans received"}, Cmd.none)
+                ({model | designList = designList_, errorInfo = Ok "Info received"}, Cmd.none)
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
     NewComments commentResult ->
@@ -1441,16 +1448,19 @@ getCfdgfromDesign : Model -> Design.DisplayDesign -> Cmd Msg
 getCfdgfromDesign model ddesign =
   getCfdg ddesign.design.designid model
 
-getFans : Int -> Model -> Cmd Msg
-getFans id model =
+getInfo : Int -> Model -> Cmd Msg
+getInfo id model =
   let
-    url = model.backend ++ "/fans/" ++ (toString id)
+    url = model.backend ++ "/auxinfo/" ++ (toString id)
   in
-    Http.send (ReceiveFans id) (get url decodeFans)
+    Http.send (ReceiveInfo id) (get url decodeInfo)
 
-decodeFans : JD.Decoder (List String)
-decodeFans =
-  JD.field "fans" (JD.list JD.string)
+decodeInfo : JD.Decoder DesignInfo
+decodeInfo =
+  JD.map3 DesignInfo
+    (JD.field "fans" (JD.list JD.string))
+    (JD.field "tags" (JD.list JD.string))
+    (JD.maybe <| JD.field "imagesize" Design.decodeSize)
 
 getComments : Int -> Model -> Cmd Msg
 getComments id model =

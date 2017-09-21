@@ -11,6 +11,7 @@ module Design exposing
   , clearDeleteBut
   , decodeDDesign
   , decodeEDesign
+  , decodeSize
   , encodeDesign
   , makeEDesign
   , makeDDesign
@@ -22,6 +23,7 @@ module Design exposing
   , editupdate
   , ViewConfig
   , ViewSize (..)
+  , Size
   , view
   , viewEdit
   )
