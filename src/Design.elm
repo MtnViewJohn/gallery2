@@ -805,31 +805,29 @@ view cfg design =
               else
                 [ ]
             ) ++
-            ( case cfg.currentUser of
-                Nothing -> [ ]
-                Just user ->
-                  if List.member user.name design.design.fans then
-                    [ a [ href "#", onNav (RemoveFavesClick,design.design.designid)
-                        , title "Click to 'Unlike' this design."
-                        , class "button favebutton removefave"
-                        ] [ text ""]
-                    ]
-                  else
-                    [ a [ href "#", onNav (AddFavesClick,design.design.designid)
-                        , title "Click to 'Like' this design."
-                        , class "button favebutton addfave"
-                        ] [ text ""]
-                    ]
-            ) ++
             (
-              [ div [id (if (List.length design.design.fans) <= 1 then "favelist" else "foolist")] 
+              [ div [id (if (List.length design.design.fans) <= 5 then "favelist" else "foolist")] 
+                  (( case cfg.currentUser of
+                      Nothing -> text ""
+                      Just user ->
+                        if List.member user.name design.design.fans then
+                          a [ href "#", onNav (RemoveFavesClick,design.design.designid)
+                            , title "Click to 'Unlike' this design."
+                            , class "button favebutton removefave"
+                            ] [ text ""]
+                        else
+                          a [ href "#", onNav (AddFavesClick,design.design.designid)
+                            , title "Click to 'Like' this design."
+                            , class "button favebutton addfave"
+                            ] [ text ""]
+                  ) ::
                   ( if not (List.isEmpty design.design.fans) then
                     ( [text (fanCount design.design.numvotes), text ": "] ++ 
                       (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
                     )
                     else
                       []
-                  )
+                  ))
               ]
             )
           )
