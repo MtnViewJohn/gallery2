@@ -276,6 +276,7 @@ type Msg
   | SessionUser (Result Http.Error User.User)
   | LogoutUser (Result Http.Error Bool)
   | ReceiveCfdg Int (Result Http.Error String)
+  | ReceiveFans Int (Result Http.Error (List String))
   | NewComments (Result Http.Error (List Comment.Comment))
   | NewComment (Result Http.Error Comment.Comment)
   | RemoveComment (Result Http.Error Int)
@@ -353,6 +354,7 @@ update msg model =
                       Cmd.batch 
                         [ getComments ddesign.design.designid model_
                         , getCfdg ddesign.design.designid model_
+                        , getFans ddesign.design.designid model_
                         ])
               EditDesign id ->
                 case model_.user of
@@ -628,6 +630,25 @@ update msg model =
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
                 ({model | designList = designList_, errorInfo = Ok "Cfdg received"}, Cmd.none)
+        Err error ->
+          ({model | errorInfo = Err error}, Cmd.none)
+    ReceiveFans id fansResult ->
+      case fansResult of
+        Ok fans_ ->
+          let
+            (index, mddesign) = designFind id model.designList.designs
+          in case mddesign of
+            Nothing -> (model, Cmd.none)  -- Shouldn't happen
+            Just ddesign ->
+              let
+                design = ddesign.design
+
+                design_ = {design | fans = fans_}
+                ddesign_ = {ddesign | design = design_}
+                designList = model.designList
+                designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
+              in
+                ({model | designList = designList_, errorInfo = Ok "Fans received"}, Cmd.none)
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
     NewComments commentResult ->
@@ -1419,6 +1440,17 @@ getCfdg id model =
 getCfdgfromDesign : Model -> Design.DisplayDesign -> Cmd Msg
 getCfdgfromDesign model ddesign =
   getCfdg ddesign.design.designid model
+
+getFans : Int -> Model -> Cmd Msg
+getFans id model =
+  let
+    url = model.backend ++ "/fans/" ++ (toString id)
+  in
+    Http.send (ReceiveFans id) (get url decodeFans)
+
+decodeFans : JD.Decoder (List String)
+decodeFans =
+  JD.field "fans" (JD.list JD.string)
 
 getComments : Int -> Model -> Cmd Msg
 getComments id model =
