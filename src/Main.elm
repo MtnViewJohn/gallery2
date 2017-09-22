@@ -291,8 +291,19 @@ type Msg
   | NewFaves (Result Http.Error FaveInfo)
   | DeleteADesign (Result Http.Error Int)
   | UploadResponse (Result Http.Error DesignTags)
-  | ShortCircuit
   | FileRead FilePortData
+
+updateDesigns : Model -> String -> Int -> Int -> (Model, Cmd Msg)
+updateDesigns model query start count =
+  let
+    go2server = model.currentHash /= model.designList.currentHash ||
+                model.currentHash == ""
+  in
+    ({model | mainDesign = noDesign, viewMode = Designs, pendingLoad = go2server},
+      if go2server then
+        getDesigns model query start count
+      else
+        Cmd.none)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -385,10 +396,7 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign
-                           , viewMode = Designs
-                           , pendingLoad = True },
-                    getDesigns model_ (makeUri "by" [name]) start count)
+                  updateDesigns model_ (makeUri "by" [name]) start count
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -404,10 +412,7 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  ({model_ | mainDesign = noDesign
-                           , viewMode = Designs
-                           , pendingLoad = True },
-                    getDesigns model_ (makeUri "faves" [name]) start count)
+                  updateDesigns model_ (makeUri "faves" [name]) start count
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -415,34 +420,29 @@ update msg model =
                   ({model_  | designList = zeroList },
                     Navigation.modifyUrl (makeUri "#faves" [name, toString start, toString dcount]))
               Newest start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                  getDesigns model_ "newest" start count)
+                updateDesigns model_ "newest" start count
               NewestInit start ->
                 ({model_  | designList = zeroList },
                   Navigation.modifyUrl (makeUri "#newest" [toString start, toString dcount]))
               Oldest start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                  getDesigns model_ "oldest" start count)
+                updateDesigns model_ "oldest" start count
               OldestInit start ->
                 ({model_  | designList = zeroList },
                   Navigation.modifyUrl (makeUri "#oldest" [toString start, toString dcount]))
               Title start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                  getDesigns model_ "title" start count)
+                updateDesigns model_ "title" start count
               TitleInit start ->
                 ({model_  | designList = zeroList },
                   Navigation.modifyUrl (makeUri "#title" [toString start, toString dcount]))
               TitleIndex title ->
                 (model_, getTitle model_ title)
               Popular start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                  getDesigns model_ "popular" start count)
+                updateDesigns model_ "popular" start count
               PopularInit start ->
                 ({model_  | designList = zeroList },
                   Navigation.modifyUrl (makeUri "#popular" ["0", toString dcount]))
               RandomDes seed start count ->
-                ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                  getDesigns model_ ("random/" ++ (toString seed)) start count)
+                updateDesigns model_ ("random/" ++ (toString seed)) start count
               RandomInit seed start ->
                 ({model_  | designList = zeroList },
                   Navigation.modifyUrl (makeUri "#random" [toString seed, "0", toString dcount]))
@@ -452,8 +452,7 @@ update msg model =
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  ({model_ | mainDesign = noDesign, viewMode = Designs, pendingLoad = True },
-                    getDesigns model_ (makeUri "tag" [tag]) start count)
+                  updateDesigns model_ (makeUri "tag" [tag]) start count
               TagInit tag_enc start ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
@@ -590,7 +589,6 @@ update msg model =
               Cmd.batch (List.map (getCfdgfromDesign model) (Array.toList designs.designs)))
         Err error ->
           ({model | designList = zeroList, errorInfo = Err error, pendingLoad = False}, Cmd.none)
-    ShortCircuit -> ({model | pendingLoad = False}, Cmd.none)
     NewUser loginResult ->
       case loginResult of
         Ok user ->
@@ -1369,10 +1367,7 @@ getDesigns model query start count =
     url = String.join "/" [model.backend, ccquery, 
                            toString(start), toString(count)]
   in
-    if model.currentHash == model.designList.currentHash && model.currentHash /= "" then
-      Task.perform identity (Task.succeed ShortCircuit)
-    else
-      Http.send NewDesigns (get url decodeDesigns)
+    Http.send NewDesigns (get url decodeDesigns)
 
 decodeDesigns : JD.Decoder DesignList
 decodeDesigns = 
