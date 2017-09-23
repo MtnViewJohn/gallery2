@@ -360,9 +360,9 @@ update msg model =
                 in
                   (model__, 
                     if err == "" then
-                      loginUser model__
+                      Cmd.batch [loginUser model__, Navigation.modifyUrl "#"]
                     else
-                      Cmd.none)
+                      Navigation.modifyUrl "#")
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
