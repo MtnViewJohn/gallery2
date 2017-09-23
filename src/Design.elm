@@ -1062,6 +1062,7 @@ viewEdit tags edesign =
           [ tr []
             [ td [] [b [] [text "Title"], text ":"]
             , td [] [input [type_ "text", size 30, maxlength 100, name "title"
+                    , attribute "data-lpignore" "true"
                     , value edesign.design.title, onInput TitleChange][]]
             , td 
               [ class "alert"

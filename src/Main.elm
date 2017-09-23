@@ -1073,8 +1073,9 @@ view model =
           [ fieldset []
             [ label []
               [ text "Author "
-              , input [ type_ "text", name "by", size 8, placeholder "name"
+              , input [ type_ "text", name "by", size 8, placeholder "name", id "lookname"
                       , value model.authorLookup, onInput AuthorText
+                      , attribute "data-lpignore" "true"
                       , style [("padding", "1px")]] []
               , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
               ]
@@ -1086,8 +1087,9 @@ view model =
           [ fieldset []
             [ label []
               [ text "Design "
-              , input [ type_ "text", name "id", size 8, placeholder "id #"
+              , input [ type_ "text", name "id", size 8, placeholder "id #", id "lookid"
                       , value (designString model.designLookup), onInput DesignText
+                      , attribute "data-lpignore" "true"
                       , style [("padding", "1px")]] []
               , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
               ]
