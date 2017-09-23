@@ -193,6 +193,7 @@ dmerge hash new old =
 
 type Route
   = Home
+  | Login String String String
   | ErrorMsg String
   | DesignID Int
   | EditDesign Int
@@ -226,6 +227,7 @@ route : Url.Parser (Route -> a) a
 route =
   Url.oneOf
     [ Url.map Home top
+    , Url.map Login (Url.s "login" </> Url.string </> Url.string </> Url.string)
     , Url.map ErrorMsg (Url.s "error" </> Url.string)
     , Url.map DesignID (Url.s "design" </> int)
     , Url.map EditDesign (Url.s "edit" </> int)
@@ -347,6 +349,20 @@ update msg model =
                                     , pendingLoad = True}
                 in
                   (model__, Cmd.batch [getDesigns model__ "newest" 0 10, getNewbie model__])
+              Login user password remember ->
+                let
+                  err = case (user, password) of
+                    ("", _) -> "Username required"
+                    (_, "") -> "Password required"
+                    _ -> ""
+                  login_ = Login.Model user password (remember /= "0") err
+                  model__ = {model_ | loginform = login_}
+                in
+                  (model__, 
+                    if err == "" then
+                      loginUser model__
+                    else
+                      Cmd.none)
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
@@ -592,12 +608,13 @@ update msg model =
     NewUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user, errorInfo = Ok "Login success"}, Cmd.none)
+          ({model | user = Just user, errorInfo = Ok "Login success"}, 
+            Navigation.modifyUrl "#newest/0")
         Err error ->
           let
-            newLoginModel = Login.fail "Login failed" model.loginform          
+            loginform_ = Login.fail "Login failed" model.loginform          
           in
-            ({ model | loginform = newLoginModel, errorInfo = Err error }, Cmd.none) 
+            ({ model | loginform = loginform_, errorInfo = Err error }, Cmd.none) 
     SessionUser loginResult ->
       case loginResult of
         Ok user ->
@@ -1095,10 +1112,10 @@ view model =
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
           , div [hidden True]
-            [ Html.map LoginMsg (Login.view model.backend model.loginform) ]
+            [ Html.map LoginMsg (Login.view model.loginform) ]
           ]
         Nothing ->
-          Html.map LoginMsg (Login.view model.backend model.loginform)
+          Html.map LoginMsg (Login.view model.loginform)
     ]
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
@@ -1391,6 +1408,19 @@ decodeDesignId : JD.Decoder Int
 decodeDesignId = 
   JD.field "designid" JD.int
 
+
+loginUser : Model -> Cmd Msg
+loginUser model =
+  let
+    url = makeUri 
+      model.backend
+      [ "login"
+      , model.loginform.user
+      , model.loginform.password
+      , if model.loginform.remember then "1" else "0"
+      ]
+  in
+    Http.send NewUser (post url Http.emptyBody decodeUser)
 
 loginSession : Model -> Cmd Msg
 loginSession model =

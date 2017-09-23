@@ -13,6 +13,7 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onCheck, onInput, onSubmit)
 import String exposing (isEmpty, trimLeft)
+import GalleryUtils exposing (..)
 
 -- MODEL
 
@@ -63,9 +64,12 @@ fail errMsg model =
 -- VIEW
 
 
-view : String -> Model -> Html Msg
-view server model =
-  Html.form [ id "loginform", action (server ++ "/login"), method "post"] 
+view : Model -> Html Msg
+view model =
+  let
+    url = makeUri "#login" [model.user, model.password, if model.remember then "1" else "0"]
+  in
+  Html.form [ id "loginform", action url, method "post"] 
   [ h5 [] [ text "Login:" ]
   , ul [ class "loginform" ] 
     [ li [] 
