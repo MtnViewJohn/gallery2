@@ -583,7 +583,7 @@ update msg model =
                 , getCfdg design.design.designid model
                 ])
         Err error ->
-          ({ model | mainDesign = noDesign, errorInfo = Err error}, Cmd.none)
+          ({ model | mainDesign = noDesign, errorInfo = Err error, pendingLoad = False}, Cmd.none)
     NewEditDesign designResult ->
       case designResult of
         Ok design ->
