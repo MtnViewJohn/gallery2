@@ -585,13 +585,16 @@ update msg model =
         Err error ->
           ({ model | mainDesign = noDesign, errorInfo = Err error, pendingLoad = False}, Cmd.none)
     NewEditDesign designResult ->
-      case designResult of
-        Ok design ->
-          ({model | editDesign = Just design
-                  , pendingLoad = False
-                  , errorInfo = Ok "New edit design"}, Cmd.none)
-        Err error ->
-          ({ model | editDesign = Nothing, errorInfo = Err error}, Cmd.none)
+      let
+        stillPending = if model.viewMode == Default then model.pendingLoad else False
+      in
+        case designResult of
+          Ok design ->
+            ({model | editDesign = Just design
+                    , pendingLoad = stillPending
+                    , errorInfo = Ok "New edit design"}, Cmd.none)
+          Err error ->
+            ({ model | editDesign = Nothing, errorInfo = Err error, pendingLoad = stillPending}, Cmd.none)
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
@@ -1230,11 +1233,14 @@ view model =
           , br [] []
           ]
           ++
-          ( let
-              vcfg = Design.ViewConfig Design.Small model.user
-            in 
-              Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
-                                model.designList.designs)
+          ( if model.pendingLoad then
+              [div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]]
+            else
+              let
+                vcfg = Design.ViewConfig Design.Small model.user
+              in 
+                Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
+                                  model.designList.designs)
           )
         )
 
