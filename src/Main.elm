@@ -17,6 +17,8 @@ import Time exposing (Time)
 import Task
 import Array exposing (Array)
 import Ports exposing (FilePortData, fileSelected, fileContentRead)
+import Dom
+import Dom.Scroll
 
 main : Program Flags Model Msg
 main =
@@ -148,16 +150,24 @@ designFind id darray =
     find2 ((Array.length darray) - 1)
       
       
-dmerge : String -> DesignList -> DesignList -> DesignList
+dmerge : String -> DesignList -> DesignList -> (DesignList, Int)
 dmerge hash new old =
   let
     newparts = String.split "/" new.thislink
     oldparts = String.split "/" old.thislink
     name_ = String.dropLeft 1 hash
+    mfront = Array.get 0 new.designs
+    mback = Array.get (Array.length new.designs - 1) new.designs
+    frontid = case mfront of 
+      Just dd -> dd.design.designid 
+      Nothing -> 0
+    backid = case mback of 
+      Just dd -> dd.design.designid 
+      Nothing -> 0
   in case (List.head newparts, List.head oldparts) of
     (Just newhead, Just oldhead) -> 
       if (newhead /= oldhead) then
-        {new | currentHash = hash}
+        ({new | currentHash = hash}, frontid)
       else if old.start + old.count == new.start then
         let
           mfirst = Array.get 0 new.designs
@@ -166,10 +176,10 @@ dmerge hash new old =
             Just ddesign ->
               Array.set 0 {ddesign | name = name_} new.designs
         in
-          {old | designs = Array.append old.designs ndesigns_
-               , nextlink = new.nextlink
-               , count = old.count + new.count
-               , currentHash = hash}
+          ({old | designs = Array.append old.designs ndesigns_
+                , nextlink = new.nextlink
+                , count = old.count + new.count
+                , currentHash = hash}, frontid)
       else if new.start + new.count == old.start then
         let
           mfirst = Array.get 0 old.designs
@@ -178,14 +188,16 @@ dmerge hash new old =
             Just ddesign ->
               Array.set 0 {ddesign | name = name_} old.designs
         in
-          {old | designs = Array.append new.designs odesigns_
-               , prevlink = new.prevlink
-               , count = old.count + new.count
-               , thislink = new.thislink
-               , currentHash = hash}
+          ({old | designs = Array.append new.designs odesigns_
+                , prevlink = new.prevlink
+                , count = old.count + new.count
+                , start = new.start
+                , thislink = new.thislink
+                , currentHash = hash}, backid)
       else
-        {new | currentHash = hash}
-    _ -> {new | currentHash = hash}
+        ({new | currentHash = hash}, frontid)
+    _ ->
+      ({new | currentHash = hash}, frontid)
       
 
 -- URL PARSING
@@ -293,6 +305,7 @@ type Msg
   | NewFaves (Result Http.Error FaveInfo)
   | DeleteADesign (Result Http.Error Int)
   | UploadResponse (Result Http.Error DesignTags)
+  | TryScroll (Result Dom.Error ())
   | FileRead FilePortData
 
 updateDesigns : Model -> String -> Int -> Int -> (Model, Cmd Msg)
@@ -598,16 +611,22 @@ update msg model =
     NewDesigns designResult ->
       case designResult of
         Ok designs ->
-          ({model | designList = dmerge model.currentHash designs model.designList
-                  , mainDesign = noDesign
-                  , pendingLoad = False
-                  , errorInfo = Ok "New designs"},         
-            if model.designMode == Design.Small then
-              Cmd.none
-            else
-              Cmd.batch (List.map (getCfdgfromDesign model) (Array.toList designs.designs)))
+          let
+            (merger, designid) =dmerge model.currentHash designs model.designList
+            scroll = Task.attempt TryScroll <| Dom.Scroll.toTop <| "design" ++ (toString designid)
+          in
+            ({model | designList = merger
+                    , mainDesign = noDesign
+                    , pendingLoad = False
+                    , errorInfo = Ok "New designs"},         
+              if model.designMode == Design.Small then
+                scroll
+              else
+                Cmd.batch <| scroll :: (List.map (getCfdgfromDesign model) (Array.toList designs.designs)))
         Err error ->
           ({model | designList = zeroList, errorInfo = Err error, pendingLoad = False}, Cmd.none)
+    TryScroll _ ->
+      (model, Cmd.none)
     NewUser loginResult ->
       case loginResult of
         Ok user ->

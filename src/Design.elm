@@ -743,7 +743,7 @@ view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
   case cfg.size of
     Large ->
-      div []
+      div [id ("design" ++ (toString design.design.designid))]
       [ div (fullImageAttributes design.design)
         [ if design.design.tiled == Untiled then
             img [class "image", src design.design.imagelocation, alt "cfdg image"] []
@@ -889,6 +889,7 @@ view cfg design =
             , ("position", "relative")
             , ("min-height", toString (minHeight design.design) ++ "px")
             ]
+            , id ("design" ++ (toString design.design.designid))
           ]
           [ div (thumbImageAttributes design.design)
             [ thumbImage design.design ]
@@ -962,7 +963,7 @@ view cfg design =
     Small ->
       let
         dhtml =
-          table [class "sm_thumbtable"]
+          table [class "sm_thumbtable", id ("design" ++ (toString design.design.designid))]
             [ tr []
               [ td [class "sm_thumbcell"]
                 [ a [ href ("#design/" ++ (toString design.design.designid)) ]
