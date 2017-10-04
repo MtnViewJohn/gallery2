@@ -92,6 +92,7 @@ type alias UserOrder =
 
 type alias Model =
   { user : Maybe User
+  , sessionPending : Bool
   , loginform : Login.Model
   , limitCC : Bool
   , authorLookup : String
@@ -121,7 +122,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model Nothing Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
+    model = Model Nothing True Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
             Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
@@ -640,9 +641,11 @@ update msg model =
     SessionUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user, errorInfo = Ok "Session loaded"}, getTags model)
+          ({model | user = Just user
+                  , errorInfo = Ok "Session loaded"
+                  , sessionPending = False}, getTags model)
         Err error ->
-          ({model | errorInfo = Err error}, getTags model)
+          ({model | errorInfo = Err error, sessionPending = False}, getTags model)
     LogoutUser logoutResult ->
       case logoutResult of
         Ok yes ->
@@ -1139,7 +1142,8 @@ view model =
             [ Html.map LoginMsg (Login.view model.loginform) ]
           ]
         Nothing ->
-          Html.map LoginMsg (Login.view model.loginform)
+          div [hidden model.sessionPending] 
+          [ Html.map LoginMsg (Login.view model.loginform)]
     ]
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
