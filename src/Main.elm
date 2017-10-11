@@ -89,10 +89,13 @@ type alias UserOrder =
   , join : OrderT
   }
 
+type Session 
+  = NotLoggedIn String
+  | LoginPending
+  | LoggedIn User
 
 type alias Model =
-  { user : Maybe User
-  , sessionPending : Bool
+  { user : Session
   , loginform : Login.Model
   , limitCC : Bool
   , authorLookup : String
@@ -122,7 +125,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model Nothing True Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
+    model = Model LoginPending Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
             Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
@@ -369,14 +372,14 @@ update msg model =
                     ("", _) -> "Username required"
                     (_, "") -> "Password required"
                     _ -> ""
-                  login_ = Login.Model user password (remember /= "0") err
+                  login_ = Login.Model user password (remember /= "0")
                   model__ = {model_ | loginform = login_}
                 in
-                  (model__, 
-                    if err == "" then
-                      Cmd.batch [loginUser model__, Navigation.modifyUrl "#"]
-                    else
-                      Navigation.modifyUrl "#")
+                  if err == "" then
+                    ({model__ | user = LoginPending}, 
+                      Cmd.batch [loginUser model__, Navigation.modifyUrl "#"])
+                  else
+                    ({model__ | user = NotLoggedIn err}, Navigation.modifyUrl "#")
               ErrorMsg msg_enc ->
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
@@ -402,8 +405,7 @@ update msg model =
                         ])
               EditDesign id ->
                 case model_.user of
-                  Nothing -> (model_, Cmd.none)
-                  Just user ->
+                  LoggedIn user ->
                     if id == 0 then
                       ({model_ | editDesign = Nothing, viewMode = Editing, errorMessage = ""}
                       , Task.perform LoadDesign Time.now)
@@ -422,6 +424,7 @@ update msg model =
                           ({model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                    , viewMode = Editing
                                    , errorMessage = ""}, Cmd.none)
+                  _ -> (model_, Cmd.none)
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -573,12 +576,12 @@ update msg model =
       ({model | mainDesign = noDesign}, Navigation.back 1)
     LoadDesign time ->
       case model.user of
-        Nothing -> (model, Cmd.none)
-        Just user ->
+        LoggedIn user ->
           let
             edesign_ = Design.initDesign user.name user.defaultccURI time
           in
             ({model | editDesign = Just edesign_}, Cmd.none)
+        _ -> (model, Cmd.none)
     NewDesign designResult ->
       case designResult of
         Ok dt ->
@@ -631,30 +634,23 @@ update msg model =
     NewUser loginResult ->
       case loginResult of
         Ok user ->
-          ({model | user = Just user, errorInfo = Ok "Login success"}, 
+          ({model | user = LoggedIn user, errorInfo = Ok "Login success"}, 
             Navigation.modifyUrl "#newest/0")
         Err error ->
-          let
-            loginform_ = Login.fail "Login failed" model.loginform          
-          in
-            ({ model | loginform = loginform_, errorInfo = Err error }, Cmd.none) 
+          ({model | user = NotLoggedIn "login failed", errorInfo = Err error }, Cmd.none) 
     SessionUser loginResult ->
       case loginResult of
-        Ok user ->
-          ({model | user = Just user
-                  , errorInfo = Ok "Session loaded"
-                  , sessionPending = False}, getTags model)
+        Ok user_ ->
+          ({model | user = LoggedIn user_
+                  , errorInfo = Ok "Session loaded"}, getTags model)
         Err error ->
-          ({model | errorInfo = Err error, sessionPending = False}, getTags model)
+          ({model | errorInfo = Err error, user = NotLoggedIn ""}, getTags model)
     LogoutUser logoutResult ->
       case logoutResult of
         Ok yes ->
-          ({model | user = Nothing, errorInfo = Ok "Logout success"}, Cmd.none)
+          ({model | user = NotLoggedIn "", errorInfo = Ok "Logout success"}, Cmd.none)
         Err error ->
-          let
-            newLoginModel = Login.fail "Logout failed" model.loginform          
-          in
-            ({ model | loginform = newLoginModel, errorInfo = Err error}, Cmd.none) 
+          ({model | errorInfo = Err error}, Navigation.newUrl "#error/Logout%20failed%2e") 
     ReceiveCfdg id cfdgResult ->
       case cfdgResult of
         Ok cfdgText ->
@@ -704,7 +700,7 @@ update msg model =
                 designList = model.designList
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                ({model | designList = designList_, errorInfo = Ok "Comments freceived"}, Cmd.none)
+                ({model | designList = designList_, errorInfo = Ok "Comments received"}, Cmd.none)
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
     NewComment commentResult ->
@@ -971,6 +967,12 @@ makeHeader thislink =
     else 
       text ""
 
+makeViewConfig : Model -> Design.ViewSize -> Design.ViewConfig
+makeViewConfig model size =
+  case model.user of
+    LoggedIn user_ -> Design.ViewConfig size <| Just user_
+    _ -> Design.ViewConfig size Nothing
+
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
   (makeHeader model.designList.thislink)
@@ -978,7 +980,7 @@ viewDesigns model =
   [ (makeUpBar model.pendingLoad model.designList)
   , div [] 
     (let
-      vcfg = Design.ViewConfig model.designMode model.user
+      vcfg = makeViewConfig model model.designMode
       htmlList = Array.toList
         (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
           model.designList.designs)
@@ -1130,7 +1132,7 @@ view model =
                                [ text "Comments" ]]
       ]
     , case model.user of
-        Just user ->
+        LoggedIn user ->
           div []
           [ h5 [] [ text ("User " ++ user.name) ]
           , ul []
@@ -1139,11 +1141,13 @@ view model =
             , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
             ]
           , div [hidden True]
-            [ Html.map LoginMsg (Login.view model.loginform) ]
+            [ Html.map LoginMsg (Login.view model.loginform "") ]
           ]
-        Nothing ->
-          div [hidden model.sessionPending] 
-          [ Html.map LoginMsg (Login.view model.loginform)]
+        LoginPending ->
+          div [hidden True] 
+          [ Html.map LoginMsg (Login.view model.loginform "")]
+        NotLoggedIn errmsg ->
+          div [] [ Html.map LoginMsg (Login.view model.loginform errmsg)]
     ]
   , div [ id "CFAcontent" ]
     ( case model.viewMode of
@@ -1168,7 +1172,7 @@ view model =
               viewDesigns model
             Just design ->
               let
-                vc = Design.ViewConfig Design.Large model.user
+                vc = makeViewConfig model Design.Large
               in
                 [ if Array.isEmpty model.designList.designs then
                     text ""   -- TODO: fix logic
@@ -1260,7 +1264,7 @@ view model =
               [div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]]
             else
               let
-                vcfg = Design.ViewConfig Design.Small model.user
+                vcfg = makeViewConfig model Design.Small
               in 
                 Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
                                   model.designList.designs)

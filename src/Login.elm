@@ -4,7 +4,6 @@ module Login exposing
 
   , Msg
   , update
-  , fail
   , view
   )
 
@@ -17,29 +16,16 @@ import GalleryUtils exposing (..)
 
 -- MODEL
 
-type alias Model = { user : String, password : String, remember : Bool, message : String }
+type alias Model = { user : String, password : String, remember : Bool }
 
 
 initModel : Model
-initModel = Model "" "" False ""
+initModel = Model "" "" False
 
 
 
 
 -- UPDATE
-
-type Validate
-    = Ok
-    | NotOk String
-
-validate: Model -> Validate
-validate model =
-  if isEmpty model.user then
-    NotOk "User name is empty"
-  else if isEmpty model.password then
-    NotOk "Password is empty"
-  else
-    Ok 
 
 
 type Msg
@@ -57,15 +43,11 @@ update msg model =
     RememberCheck remember ->
       { model | remember = remember }
 
-fail : String -> Model -> Model
-fail errMsg model =
-  { model | message = errMsg }
-
 -- VIEW
 
 
-view : Model -> Html Msg
-view model =
+view : Model -> String -> Html Msg
+view model message =
   let
     url = makeUri "#login" [model.user, model.password, if model.remember then "1" else "0"]
   in
@@ -89,7 +71,7 @@ view model =
         ]
       ]
     , li [] [ input [ type_ "submit", value "Login" ] [ ] ]
-    , li [ style [("color", "red")]] [ text model.message ]
+    , li [ style [("color", "red")]] [ text message ]
     ]
   , ul []
     [ li [] [ a [ href "../phpbb/ucp.php?mode=sendpassword" ] [ text "Lost password?" ] ]
