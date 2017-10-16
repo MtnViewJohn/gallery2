@@ -91,5 +91,26 @@
       // Connect our FileReader with the file that was selected in our `input` node.
       reader.readAsDataURL(file);
     });
+    var requestAnimationFrame = 
+       window.requestAnimationFrame ||
+       window.mozRequestAnimationFrame || 
+       window.webkitRequestAnimationFrame || 
+       window.msRequestAnimationFrame;   //Cross browser support
+    app.ports.scrollToElement.subscribe(function(id) {
+      requestAnimationFrame(function() {
+        try {
+          var node = document.getElementById(id);
+        } catch (error) {
+          app.ports.scrolledToElement.send("");
+          return ;
+        }
+        if (node === null) {
+          app.ports.scrolledToElement.send(id);
+          return ;
+        }
+        node.scrollIntoView()
+        app.ports.scrolledToElement.send("");
+      })
+    });
 </script>
 </html>

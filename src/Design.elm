@@ -103,13 +103,12 @@ type alias DisplayDesign =
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
     , ready2delete : Bool
-    , name : String
     }
 
 makeDDesign : Design -> DisplayDesign
 makeDDesign design =
   DisplayDesign design (text "") (notesHtml design.notesmd) [] 
-    (Comment.emptyComment design.designid) False ""
+    (Comment.emptyComment design.designid) False
 
 
 options : Markdown.Options
@@ -315,6 +314,8 @@ realTags = List.filter (\t -> t /= "")
 type Msg
     = DeleteClick
     | CancelDelete
+    | FocusClick
+    | DismissDesign
     | AddFavesClick
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
@@ -352,6 +353,8 @@ update msg ddesign =
       else
         ({ddesign | ready2delete = True}, Just (ClearDelete ddesign.design.designid))
     CancelDelete -> ({ddesign | ready2delete = False}, Nothing)
+    FocusClick -> (ddesign, Just (Focus ddesign.design.designid))
+    DismissDesign -> (ddesign, Just CloseDesign)
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
     RemoveFavesClick -> (ddesign, Just (RemoveFaves ddesign.design.designid))
     CommentMsg (cmsg, id) ->
@@ -535,6 +538,7 @@ type ViewSize
 type alias ViewConfig =
     { size : ViewSize
     , currentUser : Maybe User
+    , focus : Int
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -652,10 +656,10 @@ thumbImage design =
   in
     case design.tiled of
       Untiled ->
-        a [ href ("#design/" ++ (toString design.designid))]
+        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
           [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
       Hfrieze ->
-        a [ href ("#design/" ++ (toString design.designid))]
+        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -664,7 +668,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Vfrieze ->
-        a [ href ("#design/" ++ (toString design.designid))]
+        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -673,7 +677,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Tiled ->
-        a [ href ("#design/" ++ (toString design.designid))]
+        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -741,10 +745,19 @@ onSelect tagger =
 
 view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
-  case cfg.size of
+  let
+    size = if cfg.focus == design.design.designid then Large else cfg.size
+    addHRs = size == Large && cfg.size == Small
+  in case size of
     Large ->
       div [id ("design" ++ (toString design.design.designid))]
-      [ div (fullImageAttributes design.design)
+      [ if addHRs then
+          hr [] []
+        else
+          text ""
+      , div [style [("float", "left"), ("position", "relative"), ("left", "-1.75em")]]
+            [a [class "closebutton", href "#", onNav (DismissDesign,design.design.designid), title "Close this design"] []]
+      , div (fullImageAttributes design.design)
         [ if design.design.tiled == Untiled then
             img [class "image", src design.design.imagelocation, alt "cfdg image"] []
           else
@@ -879,152 +892,142 @@ view cfg design =
             ]
           ]
         ])
+      , if addHRs then
+          hr [] []
+        else
+          text ""
       ]
     Medium ->
-      let
-        dhtml =
-          div 
-          [ style 
-            [("overflow", "auto")
-            , ("position", "relative")
-            , ("min-height", toString (minHeight design.design) ++ "px")
+      div 
+      [ style 
+        [("overflow", "auto")
+        , ("position", "relative")
+        , ("min-height", toString (minHeight design.design) ++ "px")
+        ]
+        , id ("design" ++ (toString design.design.designid))
+      ]
+      [ div (thumbImageAttributes design.design)
+        [ thumbImage design.design ]
+      , div [style [("padding-left", "310px")]]
+          (List.concat
+          [ [ b [] [text design.design.title ]
+            , text " by "
+            , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                [ b [] [text design.design.owner] ]
             ]
-            , id ("design" ++ (toString design.design.designid))
-          ]
-          [ div (thumbImageAttributes design.design)
-            [ thumbImage design.design ]
-          , div [style [("padding-left", "310px")]]
-              (List.concat
-              [ [ b [] [text design.design.title ]
-                , text " by "
-                , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                    [ b [] [text design.design.owner] ]
+            , if isEmpty design.design.variation then
+                [ text "" ]
+              else
+                [ text ", Variation: ", b [] [text design.design.variation] ]
+            , [ b [] [text (tileText design.design.tiled)]
+              , text (", uploaded on " ++ (makeDate design.design.uploaddate))
+              ]
+            , if design.design.numvotes > 0 then
+                [ div [class "small"] [text (fanCount design.design.numvotes) ]
                 ]
-                , if isEmpty design.design.variation then
-                    [ text "" ]
-                  else
-                    [ text ", Variation: ", b [] [text design.design.variation] ]
-                , [ b [] [text (tileText design.design.tiled)]
-                  , text (", uploaded on " ++ (makeDate design.design.uploaddate))
-                  ]
-                , if design.design.numvotes > 0 then
-                    [ div [class "small"] [text (fanCount design.design.numvotes) ]
+              else
+                [div [] []]
+          , [ div [class "buttondiv"]
+              ( [ downloadLink design.design.filelocation " Download CFDG "
+                , text " "
+                , a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+                    , class "button viewbutton" 
+                    ] [ text " View "]
+                , text " "
+                ] ++
+                if canModify design.design.owner cfg.currentUser then
+                  if design.ready2delete then
+                    [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                        , class "keepbutton"
+                        ] [ text "Cancel"]
+                    , text " "
+                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                        , class "confirmbutton"
+                        ] [ text "Confirm"]
                     ]
                   else
-                    [div [] []]
-              , [ div [class "buttondiv"]
-                  ( [ downloadLink design.design.filelocation " Download CFDG "
+                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                        , class "button deletebutton" 
+                        ] [ text " Delete "]
                     , text " "
-                    , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                        , class "button viewbutton" 
-                        ] [ text " View "]
-                    , text " "
-                    ] ++
+                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                        , class "button editbutton"
+                        ] [ text " Edit "]
+                    ]
+                else
+                  [ ]
+              )
+            ]
+          , [ br [][]
+            , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
+            ]
+          , [ viewCC design.design ]
+          , [ br [] []
+            , div [class "filediv", style [("width","95%")]]
+                [ design.noteshtml
+                , div [class "minicfdg"] [design.cfdghtml]
+                ]
+            ]
+          ])
+      ]
+    Small ->
+      table [class "sm_thumbtable", id ("design" ++ (toString design.design.designid))]
+        [ tr []
+          [ td [class "sm_thumbcell"]
+            [ a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick, design.design.designid) ]
+              [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
+            ]
+          , td [class "sm_thumbinfo"]
+            (List.concat
+            [ [ b [] [text design.design.title ]
+              , br [] []
+              , text " by "
+              , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+                  [ b [] [text design.design.owner] ]
+              ]
+              , if design.design.numvotes > 0 then
+                  [ br [] []
+                  , span [class "small"] [text (fanCount design.design.numvotes)]
+                  ]
+                else
+                  []
+            , [ div []
+                (
+                  [ downloadLink design.design.filelocation ""
+                  , text " "
+                  , a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+                      , class "button viewbutton" 
+                      ] [ ]
+                  , text " "
+                  ] ++ 
+                  (
                     if canModify design.design.owner cfg.currentUser then
                       if design.ready2delete then
-                        [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                        [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                             , class "keepbutton"
-                            ] [ text "Cancel"]
+                            ] [ ]
                         , text " "
                         , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
                             , class "confirmbutton"
-                            ] [ text "Confirm"]
+                            ] [ ]
                         ]
                       else
                         [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                            , class "button deletebutton" 
-                            ] [ text " Delete "]
+                            , class "button deletebutton"
+                            ] [ ]
                         , text " "
                         , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
                             , class "button editbutton"
-                            ] [ text " Edit "]
+                            ] [ ]
                         ]
                     else
                       [ ]
                   )
-                ]
-              , [ br [][]
-                , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
-                ]
-              , [ viewCC design.design ]
-              , [ br [] []
-                , div [class "filediv", style [("width","95%")]]
-                    [ design.noteshtml
-                    , div [class "minicfdg"] [design.cfdghtml]
-                    ]
-                ]
-              ])
-          ]
-      in
-        if design.name == "" then
-          dhtml
-        else
-          a [name design.name] [dhtml]
-    Small ->
-      let
-        dhtml =
-          table [class "sm_thumbtable", id ("design" ++ (toString design.design.designid))]
-            [ tr []
-              [ td [class "sm_thumbcell"]
-                [ a [ href ("#design/" ++ (toString design.design.designid)) ]
-                  [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
-                ]
-              , td [class "sm_thumbinfo"]
-                (List.concat
-                [ [ b [] [text design.design.title ]
-                  , br [] []
-                  , text " by "
-                  , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                      [ b [] [text design.design.owner] ]
-                  ]
-                  , if design.design.numvotes > 0 then
-                      [ br [] []
-                      , span [class "small"] [text (fanCount design.design.numvotes)]
-                      ]
-                    else
-                      []
-                , [ div []
-                    (
-                      [ downloadLink design.design.filelocation ""
-                      , text " "
-                      , a [ href ("#design/" ++ (toString design.design.designid)), title "View design."
-                          , class "button viewbutton" 
-                          ] [ ]
-                      , text " "
-                      ] ++ 
-                      (
-                        if canModify design.design.owner cfg.currentUser then
-                          if design.ready2delete then
-                            [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                                , class "keepbutton"
-                                ] [ ]
-                            , text " "
-                            , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                                , class "confirmbutton"
-                                ] [ ]
-                            ]
-                          else
-                            [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                                , class "button deletebutton"
-                                ] [ ]
-                            , text " "
-                            , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
-                                , class "button editbutton"
-                                ] [ ]
-                            ]
-                        else
-                          [ ]
-                      )
-                    )
-                  ]
-                ])
+                )
               ]
-            ]
-      in
-        if design.name == "" then
-          dhtml
-        else
-          a [name design.name] [dhtml]
+            ])
+          ]
+        ]
 
 tagDeleteLink : String -> List (Html EMsg)
 tagDeleteLink tag =

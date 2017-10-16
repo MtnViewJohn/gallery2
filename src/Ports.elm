@@ -10,3 +10,7 @@ type alias FilePortData =
 port fileSelected : String -> Cmd msg
 
 port fileContentRead : (FilePortData -> msg) -> Sub msg
+
+port scrollToElement : String -> Cmd msg
+
+port scrolledToElement : (String -> msg) -> Sub msg

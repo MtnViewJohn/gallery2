@@ -24,11 +24,13 @@ type Action
     | UploadDesign
     | EditDesign Int
     | AddFaves Int
+    | Focus Int
     | RemoveFaves Int
     | DeleteComment Int
     | UpdateComment Int String
     | CreateComment Int String
     | CancelEditAct
+    | CloseDesign
     | GetFile String
 
 type alias TagInfo =
