@@ -1050,10 +1050,10 @@ viewUsers model =
     ]
   ]
 
-radio : String -> msg -> Bool -> Bool -> Html msg
-radio value msg isChecked isDisabled =
+radio : String -> msg -> Bool -> Html msg
+radio value msg isChecked =
   label []
-    [ input [ type_ "radio", name "design-size", onClick msg, checked isChecked, disabled isDisabled ] []
+    [ input [ type_ "radio", name "design-size", onClick msg, checked isChecked] []
     , text value
     ]
 
@@ -1107,9 +1107,9 @@ view model =
             ]
           , li [] [text " "]
           , li [] [ text "Display size:" ]
-          , fieldset []
-            [ li [] [radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small) disable]
-            , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium) disable]
+          , fieldset [disabled disable]
+            [ li [] [radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small)]
+            , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
             ]
           ])
     , h5 [] [ text "Lookup" ]
