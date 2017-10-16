@@ -8,7 +8,6 @@ module Design exposing
   , setComments
   , setComment
   , removeComment
-  , clearDeleteBut
   , decodeDDesign
   , decodeEDesign
   , decodeSize
@@ -102,13 +101,12 @@ type alias DisplayDesign =
     , noteshtml : Html MsgId
     , comments : List Comment.Comment
     , emptyComment : Comment.Comment
-    , ready2delete : Bool
     }
 
 makeDDesign : Design -> DisplayDesign
 makeDDesign design =
   DisplayDesign design (text "") (notesHtml design.notesmd) [] 
-    (Comment.emptyComment design.designid) False
+    (Comment.emptyComment design.designid)
 
 
 options : Markdown.Options
@@ -216,10 +214,6 @@ removeComment deleteid ddesign =
     comments_ = List.filter (\c -> c.commentid /= deleteid) ddesign.comments
   in
     {ddesign | comments = comments_}      
-
-clearDeleteBut : Int -> DisplayDesign -> DisplayDesign
-clearDeleteBut id ddesign =
-  { ddesign | ready2delete = ddesign.design.designid == id }
 
 decodeSize : JD.Decoder Size
 decodeSize = 
@@ -347,12 +341,8 @@ commentMsgId id cmsgid =
 update : Msg -> DisplayDesign -> (DisplayDesign, Maybe Action)
 update msg ddesign =
   case msg of
-    DeleteClick -> 
-      if ddesign.ready2delete then
-        ({ddesign | ready2delete = False}, Just (DeleteDesign ddesign.design.designid))
-      else
-        ({ddesign | ready2delete = True}, Just (ClearDelete ddesign.design.designid))
-    CancelDelete -> ({ddesign | ready2delete = False}, Nothing)
+    DeleteClick -> (ddesign, Just (DeleteDesign ddesign.design.designid))
+    CancelDelete -> (ddesign, Just (ClearDelete ddesign.design.designid))
     FocusClick -> (ddesign, Just (Focus ddesign.design.designid))
     DismissDesign -> (ddesign, Just CloseDesign)
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
@@ -539,6 +529,7 @@ type alias ViewConfig =
     { size : ViewSize
     , currentUser : Maybe User
     , focus : Int
+    , readyToDelete : Int
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -797,7 +788,7 @@ view cfg design =
             , text " "
             ] ++
             ( if canModify design.design.owner cfg.currentUser then  
-                if design.ready2delete then
+                if cfg.readyToDelete == design.design.designid then
                   [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                       , class "keepbutton"
                       ] [ text "Cancel"]
@@ -936,7 +927,7 @@ view cfg design =
                 , text " "
                 ] ++
                 if canModify design.design.owner cfg.currentUser then
-                  if design.ready2delete then
+                  if cfg.readyToDelete == design.design.designid then
                     [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                         , class "keepbutton"
                         ] [ text "Cancel"]
@@ -1002,7 +993,7 @@ view cfg design =
                   ] ++ 
                   (
                     if canModify design.design.owner cfg.currentUser then
-                      if design.ready2delete then
+                      if cfg.readyToDelete == design.design.designid then
                         [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                             , class "keepbutton"
                             ] [ ]

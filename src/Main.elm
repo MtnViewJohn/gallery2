@@ -100,6 +100,7 @@ type alias Model =
   , designLookup : Int
   , viewMode : ViewMode
   , mainDesign : Int
+  , designToDelete : Int
   , designList : DesignList
   , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
@@ -123,7 +124,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model LoginPending Login.initModel False "" 0 Designs noDesign zeroList False Nothing 
+    model = Model LoginPending Login.initModel False "" 0 Designs noDesign noDesign zeroList False Nothing 
             Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
@@ -267,7 +268,6 @@ type Msg
   | LoadDesigns String
   | LoginMsg Login.Msg
   | DesignMsg Design.MsgId
-  | ClearDeleteBut Int
   | EDesignMsg Design.EMsg
   | LookupName
   | LookupDesign
@@ -532,7 +532,12 @@ update msg model =
               designList_ = {designList | designs = Array.set index ddesign_ model.designList.designs}
               model_ = {model | designList = designList_}
             in case act_ of
-              Just (ClearDelete id) -> update (ClearDeleteBut id) model_
+              Just (ClearDelete id) -> ({model | designToDelete = noDesign}, Cmd.none)
+              Just (DeleteDesign id) ->
+                if id == model.designToDelete then
+                  (model, deleteDesign id model)
+                else
+                  ({model | designToDelete = id}, Cmd.none)
               Just (CloseDesign) -> ({model | mainDesign = noDesign}, Cmd.none)
               Just (CancelEditAct) -> case model.editDesign of
                 Nothing -> ({model | mainDesign = noDesign}, Navigation.back 1)
@@ -546,13 +551,6 @@ update msg model =
                         , scrollToDesign id
                         ])
               _ -> (model_, resolveAction act_ model_)
-    ClearDeleteBut id ->
-      let
-        designList = model.designList
-        designs_ = Array.map (Design.clearDeleteBut id) designList.designs
-        designList_ = { designList | designs = designs_ }
-      in
-        ({model | designList = designList_}, Cmd.none)
     EDesignMsg emsg -> case model.editDesign of
       Nothing -> (model, Cmd.none)
       Just edesign ->
@@ -991,8 +989,8 @@ makeViewConfig model size =
     focus = if size == Design.Large then noDesign else model.mainDesign
   in
     case model.user of
-      LoggedIn user_ -> Design.ViewConfig size (Just user_) focus
-      _ -> Design.ViewConfig size Nothing focus
+      LoggedIn user_ -> Design.ViewConfig size (Just user_) focus model.designToDelete
+      _ -> Design.ViewConfig size Nothing focus model.designToDelete
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
@@ -1334,7 +1332,6 @@ resolveAction ma model =
       AddFaves designid -> changeFave "addfave" designid model
       RemoveFaves designid -> changeFave "deletefave" designid model
       CancelEditAct -> Navigation.back 1
-      DeleteDesign designid -> deleteDesign designid model
       UploadDesign -> case model.editDesign of
         Nothing -> Cmd.none
         Just edesign -> uploadDesign edesign model
