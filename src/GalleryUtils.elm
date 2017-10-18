@@ -6,6 +6,13 @@ module GalleryUtils exposing
   , firstJust
   , justAccum
   , tagHelp
+  , DesignID (..)
+  , nonDesign
+  , idStr
+  , CommentID (..)
+  , noComment
+  , cidStr
+  , intStr
   , Action (..)
   , TagInfo
   )
@@ -18,17 +25,40 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onWithOptions)
 import Json.Decode as JD
 
+type DesignID = ID Int
+
+nonDesign : DesignID
+nonDesign = ID 0
+
+idStr : DesignID -> String
+idStr (ID num) =
+  toString num
+
+type CommentID = CID Int
+
+noComment : CommentID
+noComment = CID 0
+
+cidStr : CommentID -> String
+cidStr (CID num) =
+  toString num
+
+intStr : Int -> String
+intStr num =
+  toString num
+
+
 type Action 
-    = DeleteDesign Int
-    | ClearDelete Int
+    = DeleteDesign DesignID
+    | ClearDelete DesignID
     | UploadDesign
-    | EditDesign Int
-    | AddFaves Int
-    | Focus Int
-    | RemoveFaves Int
-    | DeleteComment Int
-    | UpdateComment Int String
-    | CreateComment Int String
+    | EditDesign DesignID
+    | AddFaves DesignID
+    | Focus DesignID
+    | RemoveFaves DesignID
+    | DeleteComment CommentID
+    | UpdateComment CommentID String
+    | CreateComment String
     | CancelEditAct
     | CloseDesign
     | GetFile String
@@ -73,7 +103,7 @@ makeDate udate =
           Date.Nov -> "November"
           Date.Dec -> "December"
   in
-    month ++ " " ++ (toString day) ++ suffix ++ ", " ++ toString (Date.year d)
+    month ++ " " ++ (intStr day) ++ suffix ++ ", " ++ intStr (Date.year d)
 
 
 makeUri : String -> List String -> String

@@ -58,7 +58,7 @@ type alias Design =
     { ccImage : String
     , ccName : String
     , ccURI : String
-    , designid : Int
+    , designid : DesignID
     , fans : List String
     , filelocation : String
     , imagelocation : String
@@ -106,7 +106,7 @@ type alias DisplayDesign =
 makeDDesign : Design -> DisplayDesign
 makeDDesign design =
   DisplayDesign design (text "") (notesHtml design.notesmd) [] 
-    (Comment.emptyComment design.designid)
+    (Comment.emptyComment)
 
 
 options : Markdown.Options
@@ -172,7 +172,7 @@ initDesign user ccURI now =
         ("https://licensebuttons.net/p/zero/1.0/88x31.png","CC0 1.0 Universal (CC0 1.0) Public Domain Dedication","https://creativecommons.org/publicdomain/zero/1.0/")
       else
         ("No license chosen", "", "")
-    design = Design image name uri 0 [] "" "" Nothing "" "" 0 user "" [] "" Untiled "" now ""
+    design = Design image name uri (ID 0) [] "" "" Nothing "" "" 0 user "" [] "" Untiled "" now ""
   in
     makeEDesign design
 
@@ -203,12 +203,12 @@ replaceComment cmt_ cmts =
   case cmts of
     c :: lc -> 
       if c.commentid == cmt_.commentid then
-        (Comment.setupHtml cmt_) :: lc
+        (Comment.setupHtml cmt_) :: lc    -- update existing comment
       else
         c :: (replaceComment cmt_ lc)
-    [] -> [Comment.setupHtml cmt_]
+    [] -> [Comment.setupHtml cmt_]        -- append new comment
 
-removeComment : Int -> DisplayDesign -> DisplayDesign
+removeComment : CommentID -> DisplayDesign -> DisplayDesign
 removeComment deleteid ddesign =
   let
     comments_ = List.filter (\c -> c.commentid /= deleteid) ddesign.comments
@@ -232,7 +232,7 @@ decodeDesign =
         |> JPipe.required "ccImage" (JD.string)
         |> JPipe.required "ccName" (JD.string)
         |> JPipe.required "ccURI" (JD.string)
-        |> JPipe.required "designid" (JD.int)
+        |> JPipe.required "designid" (JD.map ID JD.int)
         |> JPipe.optional "fans" (JD.list JD.string) []
         |> JPipe.required "filelocation" (JD.string)
         |> JPipe.required "imagelocation" (JD.string)
@@ -259,21 +259,23 @@ decodeEDesign =
 
 encodeDesign : EditDesign -> JE.Value
 encodeDesign record =
-    JE.object
-        [ ("ccImage",    JE.string  <| record.design.ccImage)
-        , ("ccName",     JE.string  <| record.design.ccName)
-        , ("ccURI",      JE.string  <| record.design.ccURI)
-        , ("cclicense",  JE.string  <| record.ccLicense)
-        , ("designid",   JE.int     <| record.design.designid)
-        , ("tags",       JE.list    <| List.map JE.string record.design.tags)
-        , ("notes",      JE.string  <| record.design.notes)
-        , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
-        , ("title",      JE.string  <| record.design.title)
-        , ("variation",  JE.string  <| record.design.variation)
-        , ("compression",JE.bool    <| record.uploadPNG)
-        , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
-        , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
-        ]
+  case record.design.designid of
+    ID designid ->
+      JE.object
+          [ ("ccImage",    JE.string  <| record.design.ccImage)
+          , ("ccName",     JE.string  <| record.design.ccName)
+          , ("ccURI",      JE.string  <| record.design.ccURI)
+          , ("cclicense",  JE.string  <| record.ccLicense)
+          , ("designid",   JE.int     <| designid)
+          , ("tags",       JE.list    <| List.map JE.string record.design.tags)
+          , ("notes",      JE.string  <| record.design.notes)
+          , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
+          , ("title",      JE.string  <| record.design.title)
+          , ("variation",  JE.string  <| record.design.variation)
+          , ("compression",JE.bool    <| record.uploadPNG)
+          , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
+          , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
+          ]
 
 encodeFileData : FilePortData -> JE.Value
 encodeFileData fpd =
@@ -332,9 +334,9 @@ type EMsg
     | NotesChange String
     | Upload
 
-type alias MsgId = (Msg, Int)
+type alias MsgId = (Msg, DesignID)
 
-commentMsgId : Int -> Comment.MsgId -> MsgId
+commentMsgId : DesignID -> Comment.MsgId -> MsgId
 commentMsgId id cmsgid =
   (CommentMsg cmsgid, id)
 
@@ -348,7 +350,7 @@ update msg ddesign =
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
     RemoveFavesClick -> (ddesign, Just (RemoveFaves ddesign.design.designid))
     CommentMsg (cmsg, id) ->
-      if id == 0 then
+      if id == noComment then
         let
           (comment_, act) = Comment.update cmsg ddesign.emptyComment
         in
@@ -510,7 +512,7 @@ fanCount cnt =
   if cnt == 1 then
     "One like"
   else
-    toString cnt ++ " likes"
+    intStr cnt ++ " likes"
 
 tileText : TileType -> String
 tileText tile =
@@ -528,8 +530,8 @@ type ViewSize
 type alias ViewConfig =
     { size : ViewSize
     , currentUser : Maybe User
-    , focus : Int
-    , readyToDelete : Int
+    , focus : DesignID
+    , readyToDelete : DesignID
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -546,14 +548,14 @@ fullImageAttributes design =
             let
               sz = Maybe.withDefault (Size 150 800) design.imagesize
             in
-              toString sz.width ++ "px"
+              intStr sz.width ++ "px"
           )
         , ("float", "left")
         , ("min-height",
             let
               sz = Maybe.withDefault (Size 150 800) design.imagesize
             in
-              toString (2 * sz.height) ++ "px"
+              intStr (2 * sz.height) ++ "px"
           )
         ]
       ]
@@ -571,7 +573,7 @@ fullImageAttributes design =
                 let
                   sz = Maybe.withDefault (Size 800 800) design.imagesize
                 in
-                  ((toString sz.height) ++ "px")
+                  ((intStr sz.height) ++ "px")
               )
             ]
           ]
@@ -584,7 +586,7 @@ fullImageAttributes design =
                 let
                   sz = Maybe.withDefault (Size 800 800) design.imagesize
                 in
-                  ((toString sz.width) ++ "px")
+                  ((intStr sz.width) ++ "px")
               )
             ]
           ]
@@ -647,10 +649,10 @@ thumbImage design =
   in
     case design.tiled of
       Untiled ->
-        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
       Hfrieze ->
-        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -659,7 +661,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Vfrieze ->
-        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -668,7 +670,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Tiled ->
-        a [ href <| "#" ++ (toString design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -696,7 +698,7 @@ viewCC design =
       date = Date.fromTime design.uploaddate
     in
         
-      text ("Copyright " ++ (toString (Date.year date)) ++ ", all rights reserved.")
+      text ("Copyright " ++ (intStr (Date.year date)) ++ ", all rights reserved.")
   else
     div [class "ccInfo"]
     [ a [class "ccIcon", href design.ccURI]
@@ -741,12 +743,12 @@ view cfg design =
     addHRs = size == Large && cfg.size == Small
   in case size of
     Large ->
-      div [id ("design" ++ (toString design.design.designid))]
+      div [id ("design" ++ (idStr design.design.designid))]
       [ if addHRs then
           hr [] []
         else
           text ""
-      , div [style [("float", "left"), ("position", "relative"), ("left", "-1.75em")]]
+          , div [class "khomut"]
             [a [class "closebutton", href "#", onNav (DismissDesign,design.design.designid), title "Close this design"] []]
       , div (fullImageAttributes design.design)
         [ if design.design.tiled == Untiled then
@@ -803,7 +805,7 @@ view cfg design =
                       , class "button deletebutton" 
                       ] [ text " Delete "]
                   , text " "
-                  , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                  , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
                       , class "button editbutton"
                       ] [ text " Edit "]
                   , text " "
@@ -842,7 +844,7 @@ view cfg design =
             [ tr []
               [ td [] [viewCC design.design]
               , td [class "rightcell"]
-                [ text ("To link to this design: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
+                [ text ("To link to this design: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")
                 ]
               ]
             , tr []
@@ -893,9 +895,9 @@ view cfg design =
       [ style 
         [("overflow", "auto")
         , ("position", "relative")
-        , ("min-height", toString (minHeight design.design) ++ "px")
+        , ("min-height", intStr (minHeight design.design) ++ "px")
         ]
-        , id ("design" ++ (toString design.design.designid))
+        , id ("design" ++ (idStr design.design.designid))
       ]
       [ div (thumbImageAttributes design.design)
         [ thumbImage design.design ]
@@ -921,7 +923,7 @@ view cfg design =
           , [ div [class "buttondiv"]
               ( [ downloadLink design.design.filelocation " Download CFDG "
                 , text " "
-                , a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+                , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
                     , class "button viewbutton" 
                     ] [ text " View "]
                 , text " "
@@ -941,7 +943,7 @@ view cfg design =
                         , class "button deletebutton" 
                         ] [ text " Delete "]
                     , text " "
-                    , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                    , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
                         , class "button editbutton"
                         ] [ text " Edit "]
                     ]
@@ -950,7 +952,7 @@ view cfg design =
               )
             ]
           , [ br [][]
-            , text ("link tag: [link design:" ++ (toString design.design.designid) ++ "] ... [/link] ")
+            , text ("link tag: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")
             ]
           , [ viewCC design.design ]
           , [ br [] []
@@ -962,10 +964,10 @@ view cfg design =
           ])
       ]
     Small ->
-      table [class "sm_thumbtable", id ("design" ++ (toString design.design.designid))]
+      table [class "sm_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "sm_thumbcell"]
-            [ a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick, design.design.designid) ]
+            [ a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
           , td [class "sm_thumbinfo"]
@@ -986,7 +988,7 @@ view cfg design =
                 (
                   [ downloadLink design.design.filelocation ""
                   , text " "
-                  , a [ href <| "#" ++ (toString design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+                  , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
                       , class "button viewbutton" 
                       ] [ ]
                   , text " "
@@ -1007,7 +1009,7 @@ view cfg design =
                             , class "button deletebutton"
                             ] [ ]
                         , text " "
-                        , a [ href ("#edit/" ++ (toString design.design.designid)), title "Edit this design."
+                        , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
                             , class "button editbutton"
                             ] [ ]
                         ]
@@ -1039,7 +1041,7 @@ tagOptions tags =
 viewEdit : List TagInfo -> EditDesign -> Html EMsg
 viewEdit tags edesign =
       div []
-      [ if edesign.design.designid == 0 then
+      [ if edesign.design.designid == nonDesign then
           h1 [] [text "Upload your artwork!"]
         else
           h1 [] [text "Update your artwork!"]
@@ -1213,7 +1215,7 @@ viewEdit tags edesign =
               [ input 
                 [ type_ "submit"
                 , value
-                    (if edesign.design.designid == 0 then
+                    (if edesign.design.designid == nonDesign then
                       "Upload Design"
                     else
                       "Update Design")
@@ -1223,7 +1225,7 @@ viewEdit tags edesign =
               , input [type_ "submit", value "Cancel", onNav CancelEdit] []
               ]
             , td [colspan 2] 
-              [ input [type_ "hidden", name "designid", value (toString edesign.design.designid)] []
+              [ input [type_ "hidden", name "designid", value (idStr edesign.design.designid)] []
               ]
             ]
           ]

@@ -35,8 +35,7 @@ type alias Comment =
     { comment : String
     , commentmd : String
     , formcomment : String
-    , commentid : Int
-    , designid : Int
+    , commentid : CommentID
     , postdate : Time.Time
     , screenname : String
     , htmltext : Html Msg
@@ -44,9 +43,9 @@ type alias Comment =
     , ready2delete : Bool
     }
 
-emptyComment : Int -> Comment
-emptyComment designid = 
-  Comment "" "" "" 0 designid 0 "" (text "") New False
+emptyComment : Comment
+emptyComment = 
+  Comment "" "" "" noComment 0 "" (text "") New False
 
 options : Markdown.Options
 options =
@@ -72,8 +71,7 @@ decodeComment =
         |> JPipe.required "comment" (JD.string)
         |> JPipe.required "commentmd" (JD.string)
         |> JPipe.hardcoded ""
-        |> JPipe.required "commentid" (JD.int)
-        |> JPipe.hardcoded 0
+        |> JPipe.required "commentid" (JD.map CID JD.int)
         |> JPipe.required "postdate" (JD.map int2Time JD.int)
         |> JPipe.required "screenname" (JD.string)
         |> JPipe.hardcoded (text "")
@@ -82,11 +80,13 @@ decodeComment =
 
 encodeComment : Comment -> JE.Value
 encodeComment record =
-    JE.object
-        [ ("comment",     JE.string  <| record.comment)
-        , ("commentid",   JE.int     <| record.commentid)
-        , ("screenname",  JE.string  <| record.screenname)
-        ]
+  case record.commentid of
+    CID cid ->
+      JE.object
+          [ ("comment",     JE.string  <| record.comment)
+          , ("commentid",   JE.int     <| cid)
+          , ("screenname",  JE.string  <| record.screenname)
+          ]
 
 
 setupHtml : Comment -> Comment
@@ -102,7 +102,7 @@ setupHtml comment =
       , makeDate comment.postdate
       ]) }
 
-setComment : Int -> String -> Comment -> Comment
+setComment : CommentID -> String -> Comment -> Comment
 setComment id newStr oldComment =
   if id == oldComment.commentid then
     let
@@ -126,7 +126,7 @@ type Msg
     | SubmitClick
     | NewText String
 
-type alias MsgId = (Msg, Int)
+type alias MsgId = (Msg, CommentID)
 
 update : Msg -> Comment -> (Comment, Maybe Action)
 update msg cmt =
@@ -149,7 +149,7 @@ update msg cmt =
       -- Revert state and wait for the Action to produce a result
       if cmt.displayMode == New then
         let
-          maction = Just (CreateComment cmt.designid cmt.formcomment)
+          maction = Just (CreateComment cmt.formcomment)
         in
           ({cmt | formcomment = ""}, maction)
       else
@@ -170,11 +170,11 @@ commentOwner loggedIn owner =
     Just user ->
       user.name == owner
 
-newTextMsg : Int -> String -> MsgId
+newTextMsg : CommentID -> String -> MsgId
 newTextMsg id text =
   (NewText text, id)
 
-newMsg : Int -> Msg -> MsgId
+newMsg : CommentID -> Msg -> MsgId
 newMsg id msg =
   (msg, id)
 
@@ -200,7 +200,7 @@ view currentUser comment =
       ]
     ]
   else
-    div [class "commentblock", id ("comment" ++ toString comment.commentid)]
+    div [class "commentblock", id ("comment" ++ cidStr comment.commentid)]
         [ Html.map (newMsg comment.commentid) comment.htmltext
         , if commentOwner currentUser comment.screenname then
             if comment.ready2delete then
