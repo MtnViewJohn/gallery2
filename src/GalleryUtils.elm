@@ -3,8 +3,6 @@ module GalleryUtils exposing
   , int2Time
   , makeUri
   , onNav
-  , firstJust
-  , justAccum
   , tagHelp
   , DesignID (..)
   , nonDesign
@@ -114,26 +112,6 @@ onNav : msg -> Attribute msg
 onNav msg =
     onWithOptions "click" { stopPropagation = False, preventDefault = True } (JD.succeed msg)
 
-
-{-mConcat : List (Maybe a) -> Maybe a
-mConcat l =
-  let
-    firstJust ma mb = case ma of
-      Just _ -> ma
-      Nothing -> mb
-  in
-    List.foldl firstJust Nothing l-}
-
-firstJust : List (Maybe a) -> Maybe a
-firstJust l = case l of
-  Just a :: _ -> Just a
-  Nothing :: l_ -> firstJust l_
-  [] -> Nothing
-
-justAccum : Maybe a -> Maybe a -> Maybe a
-justAccum ma mb = case ma of
-  Just a -> ma
-  Nothing -> mb
 
 tagHelp : Html msg
 tagHelp =
