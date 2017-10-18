@@ -11,6 +11,7 @@ module Comment exposing
   , MsgId
   , update
   , view
+  , ViewConfig
   )
 
 import Json.Encode as JE
@@ -40,12 +41,11 @@ type alias Comment =
     , screenname : String
     , htmltext : Html Msg
     , displayMode: DisplayType
-    , ready2delete : Bool
     }
 
 emptyComment : Comment
 emptyComment = 
-  Comment "" "" "" noComment 0 "" (text "") New False
+  Comment "" "" "" noComment 0 "" (text "") New
 
 options : Markdown.Options
 options =
@@ -76,7 +76,6 @@ decodeComment =
         |> JPipe.required "screenname" (JD.string)
         |> JPipe.hardcoded (text "")
         |> JPipe.hardcoded Normal
-        |> JPipe.hardcoded False
 
 encodeComment : Comment -> JE.Value
 encodeComment record =
@@ -132,12 +131,9 @@ update : Msg -> Comment -> (Comment, Maybe Action)
 update msg cmt =
   case msg of
     DeleteClick ->
-      if cmt.ready2delete then
-        (cmt, Just (DeleteComment cmt.commentid))
-      else
-        ({cmt | ready2delete = True}, Nothing)
+      (cmt, Just (DeleteComment cmt.commentid))
     CancelDeleteClick ->
-      ({cmt | ready2delete = False}, Nothing)
+      (cmt, Just (DeleteComment noComment))
     EditClick ->
         ({cmt | formcomment = cmt.comment, displayMode = Update}, Nothing)
     CancelClick ->
@@ -178,9 +174,13 @@ newMsg : CommentID -> Msg -> MsgId
 newMsg id msg =
   (msg, id)
 
+type alias ViewConfig =
+  { currentUser : Maybe User
+  , commentToDelete : CommentID
+  }
 
-view : (Maybe User) -> Comment -> Html MsgId
-view currentUser comment =
+view : ViewConfig -> Comment -> Html MsgId
+view cfg comment =
   if comment.displayMode /= Normal then
     Html.form [onSubmit (SubmitClick, comment.commentid)]
     [ div [class "addcommentdiv", id "Addcommentdiv"]
@@ -202,8 +202,8 @@ view currentUser comment =
   else
     div [class "commentblock", id ("comment" ++ cidStr comment.commentid)]
         [ Html.map (newMsg comment.commentid) comment.htmltext
-        , if commentOwner currentUser comment.screenname then
-            if comment.ready2delete then
+        , if commentOwner cfg.currentUser comment.screenname then
+            if comment.commentid == cfg.commentToDelete then
               div []
               [ a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."
                   , class "keepbutton"

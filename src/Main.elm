@@ -106,6 +106,7 @@ type alias Model =
   , viewMode : ViewMode
   , mainDesign : DesignID
   , designToDelete : DesignID
+  , commentToDelete : CommentID
   , designList : DesignList
   , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
@@ -129,7 +130,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign zeroList False Nothing 
+    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList False Nothing 
             Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
@@ -538,12 +539,16 @@ update msg model =
               designList_ = {designList | designs = Array.set index ddesign_ model.designList.designs}
               model_ = {model | designList = designList_}
             in case act_ of
-              Just (ClearDelete id) -> ({model | designToDelete = nonDesign}, Cmd.none)
               Just (DeleteDesign id) ->
-                if id == model.designToDelete then
+                if id == model.designToDelete && id /= nonDesign then
                   (model, deleteDesign id model)
                 else
                   ({model | designToDelete = id}, Cmd.none)
+              Just (DeleteComment commentid) ->
+                if commentid == model.commentToDelete && commentid /= noComment then
+                  (model, deleteComment commentid model)
+                else
+                  ({model | commentToDelete = commentid}, Cmd.none)
               Just (CloseDesign) -> ({model | mainDesign = nonDesign}, Cmd.none)
               Just (CancelEditAct) -> case model.editDesign of
                 Nothing -> ({model | mainDesign = nonDesign}, Navigation.back 1)
@@ -998,8 +1003,8 @@ makeViewConfig model size =
     focus = if size == Design.Large then nonDesign else model.mainDesign
   in
     case model.user of
-      LoggedIn user_ -> Design.ViewConfig size (Just user_) focus model.designToDelete
-      _ -> Design.ViewConfig size Nothing focus model.designToDelete
+      LoggedIn user_ -> Design.ViewConfig size (Just user_) focus model.designToDelete model.commentToDelete
+      _ -> Design.ViewConfig size Nothing focus model.designToDelete model.commentToDelete
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
@@ -1337,7 +1342,6 @@ resolveAction ma model =
     Just act -> case act of
       UpdateComment commentid comment_ -> sendComment commentid comment_ model
       CreateComment comment_ -> newComment comment_ model
-      DeleteComment commentid -> deleteComment commentid model
       AddFaves designid -> changeFave "addfave" designid model
       RemoveFaves designid -> changeFave "deletefave" designid model
       CancelEditAct -> Navigation.back 1

@@ -344,7 +344,7 @@ update : Msg -> DisplayDesign -> (DisplayDesign, Maybe Action)
 update msg ddesign =
   case msg of
     DeleteClick -> (ddesign, Just (DeleteDesign ddesign.design.designid))
-    CancelDelete -> (ddesign, Just (ClearDelete ddesign.design.designid))
+    CancelDelete -> (ddesign, Just (DeleteDesign nonDesign))
     FocusClick -> (ddesign, Just (Focus ddesign.design.designid))
     DismissDesign -> (ddesign, Just CloseDesign)
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
@@ -532,6 +532,7 @@ type alias ViewConfig =
     , currentUser : Maybe User
     , focus : DesignID
     , readyToDelete : DesignID
+    , commentToDelete : CommentID
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -866,10 +867,11 @@ view cfg design =
                 ( let
                     editing = List.any Comment.isEditable design.comments
                     user = if editing then Nothing else cfg.currentUser
+                    commentcfg = Comment.ViewConfig user cfg.commentToDelete
                   in
                     [ div [class "commentsdiv"]
                       (List.intersperse (hr [][])
-                        (List.map ((Comment.view user) >> (Html.map (commentMsgId design.design.designid)))
+                        (List.map ((Comment.view commentcfg) >> (Html.map (commentMsgId design.design.designid)))
                           ( design.comments
                             ++
                             if cfg.currentUser == Nothing || editing then
