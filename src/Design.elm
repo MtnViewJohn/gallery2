@@ -531,6 +531,8 @@ type alias ViewConfig =
     { size : ViewSize
     , currentUser : Maybe User
     , focus : DesignID
+    , prev : DesignID
+    , next : DesignID
     , readyToDelete : DesignID
     , commentToDelete : CommentID
     }
@@ -750,7 +752,28 @@ view cfg design =
         else
           text ""
           , div [class "khomut"]
-            [a [class "closebutton", href "#", onNav (DismissDesign,design.design.designid), title "Close this design"] []]
+            [ a 
+              [ style [("visibility", if cfg.prev == nonDesign then "hidden" else "visible")]
+              , class "pcnbutton prevbutton"
+              , href <| "#" ++ (idStr cfg.prev)
+              , onNav (FocusClick,cfg.prev)
+              , title "Previous design."
+              ] []
+            , text " "
+            , a 
+              [ class "pcnbutton closebutton"
+              , href "#", onNav (DismissDesign,design.design.designid)
+              , title "Close this design"
+              ] []
+            , text " "
+            , a 
+              [ style [("visibility", if cfg.next == nonDesign then "hidden" else "visible")]
+              , class "pcnbutton nextbutton"
+              , href <| "#" ++ (idStr cfg.next)
+              , onNav (FocusClick,cfg.next)
+              , title "Next design."
+              ] []
+            ]
       , div (fullImageAttributes design.design)
         [ if design.design.tiled == Untiled then
             img [class "image", src design.design.imagelocation, alt "cfdg image"] []

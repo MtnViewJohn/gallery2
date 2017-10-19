@@ -1001,10 +1001,20 @@ makeViewConfig : Model -> Design.ViewSize -> Design.ViewConfig
 makeViewConfig model size =
   let
     focus = if size == Design.Large then nonDesign else model.mainDesign
+    (index, _) = designFind focus model.designList.designs
+    prevmdsg = Array.get (index - 1) model.designList.designs
+    nextmdsg = Array.get (index + 1) model.designList.designs
+    prev = case prevmdsg of
+      Nothing -> nonDesign
+      Just ddesign -> ddesign.design.designid
+    next = case nextmdsg of
+      Nothing -> nonDesign
+      Just ddesign -> ddesign.design.designid
+    muser = case model.user of
+      LoggedIn user_ -> Just user_
+      _ -> Nothing
   in
-    case model.user of
-      LoggedIn user_ -> Design.ViewConfig size (Just user_) focus model.designToDelete model.commentToDelete
-      _ -> Design.ViewConfig size Nothing focus model.designToDelete model.commentToDelete
+    Design.ViewConfig size muser focus prev next model.designToDelete model.commentToDelete
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
