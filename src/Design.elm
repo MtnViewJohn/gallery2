@@ -526,6 +526,7 @@ type ViewSize
     = Large
     | Medium
     | Small
+    | Mini
 
 type alias ViewConfig =
     { size : ViewSize
@@ -739,11 +740,62 @@ onSelect : (String -> EMsg) -> Attribute EMsg
 onSelect tagger =
   on "change" (JD.map tagger targetValue)
 
+viewThumbInfo : ViewConfig -> DisplayDesign -> List (Html MsgId)
+viewThumbInfo cfg design =
+  List.concat
+  [ [ b [] [text design.design.title ]
+    , br [] []
+    , text " by "
+    , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+        [ b [] [text design.design.owner] ]
+    ]
+    , if design.design.numvotes > 0 then
+        [ br [] []
+        , span [class "small"] [text (fanCount design.design.numvotes)]
+        ]
+      else
+        []
+  , [ div []
+      (
+        [ downloadLink design.design.filelocation ""
+        , text " "
+        , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+            , class "button viewbutton" 
+            ] [ ]
+        , text " "
+        ] ++ 
+        (
+          if canModify design.design.owner cfg.currentUser then
+            if cfg.readyToDelete == design.design.designid then
+              [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+                  , class "keepbutton"
+                  ] [ ]
+              , text " "
+              , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+                  , class "confirmbutton"
+                  ] [ ]
+              ]
+            else
+              [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+                  , class "button deletebutton"
+                  ] [ ]
+              , text " "
+              , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
+                  , class "button editbutton"
+                  ] [ ]
+              ]
+          else
+            [ ]
+        )
+      )
+    ]
+  ]
+
 view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
   let
     size = if cfg.focus == design.design.designid then Large else cfg.size
-    addHRs = size == Large && cfg.size == Small
+    addHRs = size == Large && (cfg.size == Small || cfg.size == Mini)
   in case size of
     Large ->
       div [id ("design" ++ (idStr design.design.designid))]
@@ -989,61 +1041,25 @@ view cfg design =
           ])
       ]
     Small ->
+      table [class "med_thumbtable", id ("design" ++ (idStr design.design.designid))]
+        [ tr []
+          [ td [class "med_thumbcell"]
+            [ a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
+              [ img [ class "image", src design.design.thumblocation, alt "design thumbnail"] []]
+            ]
+          ]
+        , tr []
+          [ td [] (viewThumbInfo cfg design)
+          ]
+        ]
+    Mini ->
       table [class "sm_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "sm_thumbcell"]
             [ a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
-          , td [class "sm_thumbinfo"]
-            (List.concat
-            [ [ b [] [text design.design.title ]
-              , br [] []
-              , text " by "
-              , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                  [ b [] [text design.design.owner] ]
-              ]
-              , if design.design.numvotes > 0 then
-                  [ br [] []
-                  , span [class "small"] [text (fanCount design.design.numvotes)]
-                  ]
-                else
-                  []
-            , [ div []
-                (
-                  [ downloadLink design.design.filelocation ""
-                  , text " "
-                  , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
-                      , class "button viewbutton" 
-                      ] [ ]
-                  , text " "
-                  ] ++ 
-                  (
-                    if canModify design.design.owner cfg.currentUser then
-                      if cfg.readyToDelete == design.design.designid then
-                        [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                            , class "keepbutton"
-                            ] [ ]
-                        , text " "
-                        , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                            , class "confirmbutton"
-                            ] [ ]
-                        ]
-                      else
-                        [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                            , class "button deletebutton"
-                            ] [ ]
-                        , text " "
-                        , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
-                            , class "button editbutton"
-                            ] [ ]
-                        ]
-                    else
-                      [ ]
-                  )
-                )
-              ]
-            ])
+          , td [class "sm_thumbinfo"] (viewThumbInfo cfg design)
           ]
         ]
 

@@ -131,7 +131,7 @@ initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
     model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList False Nothing 
-            Design.Small [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
+            Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
   in
     (model, loginSession model)
 
@@ -344,11 +344,16 @@ update msg model =
       let
         qbits = String.split "&" (String.dropLeft 1 loc.search)
         cc_ = List.member "cc" qbits
-        mode_ = if (List.member "large" qbits) then Design.Medium else Design.Small
+        mode_ = if (List.member "large" qbits) then Design.Medium 
+                else if (List.member "medium" qbits) then Design.Small
+                else Design.Mini
         model_ = {model | limitCC = cc_
                         , designMode = mode_
                         , currentHash = loc.hash}
-        dcount = if model_.designMode == Design.Small then 50 else 5
+        dcount = case model_.designMode of
+          Design.Mini -> 48
+          Design.Small -> 27
+          _ -> 5
       in
         case Url.parseHash route loc of
           Nothing ->
@@ -872,11 +877,12 @@ update msg model =
 
 makeQuery : Model -> String
 makeQuery model =
-  case (model.limitCC, model.designMode == Design.Medium) of
-    (True , True ) -> "?cc&large"
-    (True , False) -> "?cc"
-    (False, True ) -> "?large"
-    (False, False) -> "?"
+  let
+    start = if model.limitCC then "?cc" else "?"
+  in case model.designMode of
+    Design.Medium -> start ++ "large"
+    Design.Small -> start ++ "medium"
+    _ -> start
 
 
 
@@ -1091,7 +1097,7 @@ view model =
       ]
     , h5 [] [ text "Display Mode:" ]
     , ( let
-          disable = not (model.viewMode == Designs)
+          disable = model.viewMode /= Designs || (String.startsWith "#design/" model.currentHash)
         in
         ul [style [("color", if disable then "#d8cb9f" else "inherit")]]
         [ li [] 
@@ -1110,7 +1116,8 @@ view model =
           , li [] [text " "]
           , li [] [ text "Display size:" ]
           , fieldset [disabled disable]
-            [ li [] [radio " Small" (SwitchTo Design.Small)  (model.designMode == Design.Small)]
+            [ li [] [radio " Small" (SwitchTo Design.Mini)  (model.designMode == Design.Mini)]
+            , li [] [radio " Medium" (SwitchTo Design.Small) (model.designMode == Design.Small)]
             , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
             ]
           ])
@@ -1271,7 +1278,7 @@ view model =
               [div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]]
             else
               let
-                vcfg = makeViewConfig model Design.Small
+                vcfg = makeViewConfig model Design.Mini
               in 
                 Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
                                   model.designList.designs)

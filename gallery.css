@@ -129,6 +129,13 @@ table.sm_thumbtable {
  text-align:left;
  margin:10px;
 }
+table.med_thumbtable {
+ display:inline-block;
+ width:300px;
+ height: 440px;
+ text-align:left;
+ margin:10px;
+}
 table.tagstable {
     border: 1px solid #ccc;
     border-collapse: collapse;
@@ -159,6 +166,12 @@ table.tagstable th.dates {
     height: 100px;
     text-align: center;
     vertical-align: middle;
+}
+.med_thumbcell { 
+    width: 300px; 
+    height: 300px;
+    text-align: center;
+    vertical-align: bottom;
 }
 .sm_thumbinfo {
     padding-left: 5px;
