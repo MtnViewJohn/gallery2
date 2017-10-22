@@ -55,6 +55,7 @@ type Action
     | EditDesign DesignID
     | AddFaves DesignID
     | Focus DesignID
+    | Translate DesignID
     | RemoveFaves DesignID
     | DeleteComment CommentID
     | UpdateComment CommentID String

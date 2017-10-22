@@ -1,6 +1,6 @@
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onClick, onSubmit, onInput, onWithOptions)
+import Html.Events exposing (onCheck, onClick, onSubmit, onInput, onWithOptions, on)
 import String exposing (trimLeft, toInt)
 import Login
 import Design
@@ -17,6 +17,7 @@ import Time exposing (Time)
 import Task
 import Array exposing (Array)
 import Ports exposing (..)
+import Base64
 
 main : Program Flags Model Msg
 main =
@@ -92,6 +93,12 @@ type alias UserOrder =
   , join : OrderT
   }
 
+type alias Cfdg3Info =
+  { text : String
+  , targeted : Bool
+  , discards : Bool
+  }
+
 type Session 
   = NotLoggedIn String
   | LoginPending
@@ -119,6 +126,8 @@ type alias Model =
   , currentHash : String
   , errorInfo : Result Http.Error String
   , backend : String
+  , cfdg2text : String
+  , cfdg3text : String
   }
 
 zeroList : DesignList
@@ -131,7 +140,7 @@ initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
     model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList False Nothing 
-            Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend
+            Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
   in
     (model, loginSession model)
 
@@ -225,6 +234,7 @@ type Route
   | TagInit String Int
   | ShowTags String
   | Users String Int Int
+  | ShowTranslate Int
 
 
 
@@ -259,6 +269,7 @@ route =
     , Url.map TagInit (Url.s "tag" </> Url.string </> int)
     , Url.map ShowTags (Url.s "tags" </> Url.string)
     , Url.map Users (Url.s "users" </> Url.string </> Url.int </> Url.int)
+    , Url.map ShowTranslate (Url.s "translate" </> Url.int)
     ]
 
 
@@ -279,6 +290,7 @@ type Msg
   | LookupDesign
   | AuthorText String
   | DesignText String
+  | Cfdg2Change String
   | NewSeed Int
   | LoadDesign Time
   | NewDesign (Result Http.Error DesignTags)
@@ -298,8 +310,12 @@ type Msg
   | NewFaves (Result Http.Error FaveInfo)
   | DeleteADesign (Result Http.Error DesignID)
   | UploadResponse (Result Http.Error DesignTags)
+  | NewCfdg3 (Result Http.Error Cfdg3Info)
   | TryScroll String
   | FileRead FilePortData
+  | FileChange String
+  | TranslateText
+
 
 updateDesigns : Model -> String -> Int -> Int -> (Model, Cmd Msg)
 updateDesigns model query start count =
@@ -320,6 +336,21 @@ scrollToDesign id =
     Cmd.none
   else
     scrollToElement <| "design" ++ (idStr id)
+
+errorModel : Http.Error -> String -> Model -> Model
+errorModel error context model =
+  let
+    msg = case error of
+      Http.BadStatus resp -> 
+        let
+          i = String.indices "</h1>" resp.body
+        in case List.head i of
+          Nothing -> resp.body
+          Just found -> "<h3>" ++ context ++ " issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
+      Http.BadPayload msg resp -> "Unexpected response."
+      _ -> "Communication error."
+  in
+    {model | errorInfo = Err error, errorMessage = msg}
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -524,6 +555,12 @@ update msg model =
                       getUsers ("users/" ++ utype) start count model_)
                   else
                     (model_, Cmd.none)
+              ShowTranslate idint ->
+                ({model_ | viewMode = Translation, cfdg3text = "", errorMessage = ""}, 
+                  if idint > 0 then
+                    translateDesign (ID idint) model_
+                  else
+                    Cmd.none)
     NewSeed seed ->
       (model, Navigation.newUrl ("#random/" ++ (intStr seed ++ "/0")))
     LoginMsg lMsg ->
@@ -585,6 +622,8 @@ update msg model =
       (model, Navigation.newUrl ("#design/" ++ (intStr model.designLookup)))
     AuthorText author ->
       ({ model | authorLookup = trimLeft author }, Cmd.none)
+    Cfdg2Change cfdg2 ->
+      ({model | cfdg2text = cfdg2}, Cmd.none)
     DesignText desText ->
       let
         des = Result.withDefault 0 (String.toInt desText)
@@ -853,27 +892,33 @@ update msg model =
               | designList = designList_, editDesign = Nothing, errorInfo = Ok "Upload success"
               , viewMode = Designs, mainDesign = id, tagList = tags_}, cmd_)
         Err error ->
+          (errorModel error "Upload" model, Cmd.none)
+    NewCfdg3 cfdg3response ->
+      case cfdg3response of
+        Ok cfdg3info -> 
           let
-            msg = case error of
-              Http.BadStatus resp -> 
-                let
-                  i = String.indices "</h1>" resp.body
-                in case List.head i of
-                  Nothing -> resp.body
-                  Just found -> "<h3>Upload issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
-              Http.BadPayload msg resp -> "Unexpected response."
-              _ -> "Communication error."
+            errorMessage_ = case (cfdg3info.targeted, cfdg3info.discards) of
+              ( True, True) -> "Color targets used! Characters were discarded!"
+              ( True,False) -> "Color targets used!"
+              (False, True) -> "Characters were discarded!"
+              (False,False) -> ""
           in
-            ({model | errorInfo = Err error, errorMessage = msg}, Cmd.none)
+            ({model | cfdg3text = cfdg3info.text, errorMessage = errorMessage_}
+            , Cmd.none)
+        Err error ->
+          (errorModel error "Translation" model, Cmd.none)
     FileRead fpd ->
       case model.editDesign of
-        Nothing -> (model, Cmd.none)
+        Nothing -> case Base64.decode <| String.dropLeft 13 fpd.contents of
+          Ok cfdg2 -> ({model | cfdg2text = cfdg2}, Cmd.none)
+          Err _ -> ({model | cfdg2text = "file read error"}, Cmd.none)
         Just edesign ->
           let
             edesign_ = Design.setFile fpd edesign
           in
             ({model | editDesign = Just edesign_}, Cmd.none)
-
+    FileChange idstr -> (model, fileSelected idstr)
+    TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model) 
 
 makeQuery : Model -> String
 makeQuery model =
@@ -1094,6 +1139,7 @@ view model =
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ a [href "#users/name/0/25"] [text "People" ]]
       , li [] [ a [href "#tags/tag"] [text "Tags"] ]
+      , li [] [ a [href "#translate/0"] [text "Translator"]]
       ]
     , h5 [] [ text "Display Mode:" ]
     , ( let
@@ -1213,7 +1259,35 @@ view model =
         People ->
           viewUsers model
         Translation ->
-        ( [text "translation"]
+        ( [ if model.errorMessage == "" then
+                  text ""
+                else
+                  div [ property "innerHTML" (JE.string model.errorMessage)
+                      , class "alertbox"] []
+          , h1 [] [text "Cfdg text translated from v2 syntax to v3:"]
+          , textarea 
+            [ id "cfdg3txt"
+            , class "cfdg"
+            , rows 100
+            , cols 100
+            , readonly True
+            , value model.cfdg3text] []
+          , button [ class "copy-button", attribute "data-clipboard-target" "#cfdg3txt" ]
+                   [ text "Copy to clipboard" ]
+          , h1 [] [text "Enter some v2 cfdg text to translate:"]
+          , Html.form [onSubmit TranslateText]
+            [ textarea [class "cfdg", rows 100, cols 100, value model.cfdg2text, onInput Cfdg2Change] []
+            , h2 [] [text "Or select (or drop) a cfdg file"]
+            , input [type_ "file", name "cfdgfile", id "cfdgfile"
+                    , on "change" (JD.succeed (FileChange "cfdgfile"))][]
+            , p [] 
+              [ text "Note: Targeted color changes are not translated. They cannot be automatically translated and require manual fixup. "
+              , a [href "https://github.com/MtnViewJohn/context-free/wiki/Version-2-Syntax#targeted-color-adjustments"] [text "This page"]
+              , text " describes why."
+              ]
+            , input [type_ "submit", name "submit", value "Translate!"] []
+            ]
+          ]
         )
         Default ->
         ( [ table []
@@ -1578,6 +1652,29 @@ decodeUsers =
     (JD.field "nextlink"  JD.string)
     (JD.field "thislink"  JD.string)
     (JD.field "count"     JD.int)
+
+translateDesign : DesignID -> Model -> Cmd Msg
+translateDesign id model =
+  let
+    url = model.backend ++ "/translate/" ++ (idStr id)
+  in
+    Http.send NewCfdg3 (get url decodeCfdg3)
+
+translateText : Model -> Cmd Msg
+translateText model =
+  let
+    url = model.backend ++ "/translate"
+  in
+    Http.send NewCfdg3 (post url (Http.stringBody "text/plain" model.cfdg2text) decodeCfdg3)
+
+
+decodeCfdg3 : JD.Decoder Cfdg3Info
+decodeCfdg3 =
+  JD.map3 Cfdg3Info
+    (JD.field "cfdg3txt"    JD.string)
+    (JD.field "colortarget" JD.bool)
+    (JD.field "discards"    JD.bool)
+      
       
 
 -- Subscriptions

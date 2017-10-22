@@ -864,6 +864,10 @@ view cfg design =
             , text " "
             , imageLink design.design.imagelocation " Download Image "
             , text " "
+            , a [href (makeUri "#translate" [idStr design.design.designid]), title "Translate v2 to v3"
+                , class "button translate"
+                ] [text "Translate"]
+            , text " "
             ] ++
             ( if canModify design.design.owner cfg.currentUser then  
                 if cfg.readyToDelete == design.design.designid then

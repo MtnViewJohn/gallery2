@@ -15,11 +15,6 @@ form {
  display:inline;
 }
 
-button {
-	border-style: none;
-	background-color: transparent;
-}
-
 li.rss {
 	background: url(graphics/feed-icon-14x14.png) no-repeat;
 	padding-left: 20px;
@@ -41,6 +36,11 @@ form input {
 	font-variant: normal;
     padding: 5px;
 }
+
+input[type=submit],
+input[type=file] {
+    font: 14px Verdana, Arial, Helvetica, sans-serif !important;
+}
 textarea, select, button {
     font-size: 14px;
 }
@@ -53,7 +53,6 @@ fieldset {border:0; margin:0; padding:0;}
     position:absolute; z-index:100;
     visibility:hidden; color:#333333; top:20px;
     left:90px; background-color:#ffffcc;
-    layer-background-color:#ffffcc;
 }
 
 .alertbox {
@@ -233,7 +232,7 @@ div.ccInfo a.ccIcon {float:left; margin-right: 4px;}
 textarea { width: 400px; height: 150px; padding: 5px;}
 
 textarea.cfdg {
-	width: 100%;
+	width: 95%;
 	height: 300px;
 	font-family: monospace;
 }
@@ -263,7 +262,6 @@ div.tabdata {
 }
 div.tabrest {
     height: 37px;
-    xwidth: 100%;
     background-repeat: repeat-x;
 }
 div.tabclear {
