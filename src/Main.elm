@@ -314,6 +314,8 @@ type Msg
   | FileRead FilePortData
   | FileChange String
   | TranslateText
+  | TickTock Time
+  | IsVisible String
 
 
 updateDesigns : Model -> String -> Int -> Int -> (Model, Cmd Msg)
@@ -916,6 +918,8 @@ update msg model =
             ({model | editDesign = Just edesign_}, Cmd.none)
     FileChange idstr -> (model, utf8FileSelected idstr)
     TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model) 
+    TickTock _ -> (model, checkVisible "moreplease")
+    IsVisible _ -> (model, Navigation.modifyUrl ("#" ++ model.designList.nextlink))
 
 makeQuery : Model -> String
 makeQuery model =
@@ -978,11 +982,11 @@ makeDownBar pending dlist =
     div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]
   else
     if String.isEmpty dlist.nextlink then
-      div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 100, height 33] []]
+      div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 200, height 64] []]
     else
       div [class "khomut"]
       [ a [href "#", onNav <| LoadDesigns dlist.nextlink] 
-          [img [src "graphics/more_down.png", alt "More designs", width 64, height 64] []]]
+          [img [src "graphics/more_down.png", alt "More designs", width 64, height 64, id "moreplease"] []]]
 
 
 makeHeader : String -> Html Msg
@@ -1680,7 +1684,16 @@ decodeCfdg3 =
 subscriptions : Model -> Sub Msg
 subscriptions model = 
   Sub.batch 
+  (
+    if model.viewMode == Designs && model.designList.nextlink /= "" then
+      [ Time.every (250*Time.millisecond) TickTock
+      , isVisible IsVisible
+      ]
+    else
+      []
+    ++
     [ fileContentRead FileRead
     , scrolledToElement TryScroll
     ]
+  )
   
