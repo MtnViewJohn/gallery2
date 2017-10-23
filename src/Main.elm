@@ -17,7 +17,6 @@ import Time exposing (Time)
 import Task
 import Array exposing (Array)
 import Ports exposing (..)
-import Base64
 
 main : Program Flags Model Msg
 main =
@@ -909,15 +908,13 @@ update msg model =
           (errorModel error "Translation" model, Cmd.none)
     FileRead fpd ->
       case model.editDesign of
-        Nothing -> case Base64.decode <| String.dropLeft 13 fpd.contents of
-          Ok cfdg2 -> ({model | cfdg2text = cfdg2}, Cmd.none)
-          Err _ -> ({model | cfdg2text = "file read error"}, Cmd.none)
+        Nothing -> ({model | cfdg2text = fpd.contents}, Cmd.none)
         Just edesign ->
           let
             edesign_ = Design.setFile fpd edesign
           in
             ({model | editDesign = Just edesign_}, Cmd.none)
-    FileChange idstr -> (model, fileSelected idstr)
+    FileChange idstr -> (model, utf8FileSelected idstr)
     TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model) 
 
 makeQuery : Model -> String

@@ -13,9 +13,8 @@
   <title>CFDG Gallery - CFDG Gallery</title>
 
   <link rel="stylesheet"  href="../site.css?20081203" type="text/css" />
-  <link rel="stylesheet"  href="gallery.css?20170831" type="text/css" />
-  <link rel="stylesheet"  href="buttons.css?20170820" type="text/css" />
-  <link rel="stylesheet"  href="widget-style.css?20081203" type="text/css" />
+  <link rel="stylesheet"  href="gallery.css?20171019" type="text/css" />
+  <link rel="stylesheet"  href="buttons.css?20171019" type="text/css" />
   <link rel="stylesheet"  href="github.css" type="text/css" />
   <link rel="alternate" type="application/rss+xml" 
      href="uploads/design_feed.xml" title="RSS feed for gallery designs" />
@@ -31,7 +30,8 @@
   <div id="CFAnavbar">
     <ul>
       <li><a href="../index.html">Home</a></li>
-      <li><a href="main.html#">Gallery</a></li>
+      <li><a href="../gallery/index.php">Gallery</a></li>
+      <li><a href="index.html#">Gallery II</a></li>
       <li><a href="../downloads.html">Download</a></li>
       <li><a href="https://github.com/MtnViewJohn/context-free/wiki">Documentation</a></li>
       <li><a href="../phpbb/index.php">Forums</a></li>
@@ -45,43 +45,8 @@
   </div>
 </body>
 
-<script type="text/javascript" src="highlight.pack.js" ></script>
-<script type="text/javascript" src="build/main.js"></script>
-<script type="text/javascript">
-    var node = document.getElementById('elm-root');
-    app = Elm.Main.embed(node);
-    app.ports.fileSelected.subscribe(function (id) {
-      var node = document.getElementById(id);
-      if (node === null) {
-        return;
-      }
-
-      // If your file upload field allows multiple files, you might
-      // want to consider turning this into a `for` loop.
-      var file = node.files[0];
-      var reader = new FileReader();
-
-      // FileReader API is event based. Once a file is selected
-      // it fires events. We hook into the `onload` event for our reader.
-      reader.onload = (function(event) {
-        // The event carries the `target`. The `target` is the file
-        // that was selected. The result is base64 encoded contents of the file.
-        var base64encoded = event.target.result;
-        // We build up the `ImagePortData` object here that will be passed to our Elm
-        // runtime through the `fileContentRead` subscription.
-        var portData = {
-          fileid:   id,
-          contents: base64encoded,
-          filename: file.name
-        };
-
-        // We call the `fileContentRead` port with the file data
-        // which will be sent to our Elm runtime via Subscriptions.
-        app.ports.fileContentRead.send(portData);
-      });
-
-      // Connect our FileReader with the file that was selected in our `input` node.
-      reader.readAsDataURL(file);
-    });
-</script>
+<script type="text/javascript" src="highlight.pack.js.gz" ></script>
+<script type="text/javascript" src="clipboard.min.js.gz" ></script>
+<script type="text/javascript" src="build/main.js.gz"></script>
+<script type="text/javascript" src="loadelm.js"></script>
 </html>

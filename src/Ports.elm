@@ -8,6 +8,7 @@ type alias FilePortData =
   }
 
 port fileSelected : String -> Cmd msg
+port utf8FileSelected : String -> Cmd msg
 
 port fileContentRead : (FilePortData -> msg) -> Sub msg
 
