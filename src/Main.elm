@@ -399,7 +399,7 @@ update msg model =
                                     , designList = zeroList
                                     , pendingLoad = True}
                 in
-                  (model__, Cmd.batch [getDesigns model__ "newest" 0 10, getNewbie model__])
+                  (model__, Cmd.batch [getDesigns model__ "popular" 0 12, getNewbie model__])
               Login user password remember ->
                 let
                   err = case (user, password) of
@@ -1135,12 +1135,12 @@ view model =
     , ul []
       [ li [] [ a [href "#newest/0"] [text "Newest" ]]
       , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
-      , li [] [ a [href "#title/0"]  [text "Title" ]]
+      , li [] [ a [href "#title/0"]  [text "By Title" ]]
       , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
       , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ a [href "#users/name/0/25"] [text "People" ]]
-      , li [] [ a [href "#tags/tag"] [text "Tags"] ]
-      , li [] [ a [href "#translate/0"] [text "Translator"]]
+      , li [] [ a [href "#tags/tag"] [text "Design Tags"] ]
+      , li [] [ a [href "#translate/0"] [text "Version Translator"]]
       ]
     , h5 [] [ text "Display Mode:" ]
     , ( let
@@ -1198,13 +1198,6 @@ view model =
             ]
           ]
         ]
-      ]
-    , h5 [] [ text "RSS Feeds"]
-    , ul []
-      [ li [ class "rss" ] [ a [ href "uploads/design_feed.xml" ] 
-                               [ text "Designs" ]]
-      , li [ class "rss" ] [ a [ href "uploads/comment_feed.xml" ] 
-                               [ text "Comments" ]]
       ]
     , case model.user of
         LoggedIn user ->
@@ -1293,28 +1286,28 @@ view model =
         Default ->
         ( [ table []
             [ tr []
-              [ td [class "halfcell"]
+              [ td [class "vupload"]
                 [ text """
-     CFDG is a simple language for generating stunning images.
+     Context Free/cfdg is a simple language for generating stunning images.
      With only a few lines you can describe abstract art, beautiful organic scenery,
      and many kinds of fractals. It's highly addictive!
                   """
                 , br [] []
                 , br [] []
-                , text "The CFDG Gallery is a public repository for artwork made "
+                , text "The Context Free Gallery is a public repository for artwork made "
                 , text "using the language."
-                , br [] []
-                , br [] []
-                , b [] [text "What now?"]
-                , br [] []
-                , br [] []
-                , text "The links at the top of the page will navigate you around the site. "
-                , a [href "../downloads.html"] [text "Get the software here. "]
-                , text " or "
-                , a [href "#newest/0"] [text "browse the latest designs uploaded. "]
-                , text "Once you've started making your own, "
-                , a [href "../phpbb/ucp.php?mode=register"] [text "join us "]
-                , text "and post your own designs to the gallery."
+                ]
+              , td [class "vupload"]
+                [ h2 [] [text "What next?"]
+                , a [ href "../downloads.html", class "call-to-action"] 
+                    [ text "Get the software"]
+                , a [ href "#newest/0", class "call-to-action"] 
+                    [ text "See what people are doing"]
+                , a [ href "https://github.com/MtnViewJohn/context-free/wiki"
+                    , class "call-to-action"]
+                    [ text "Learn Context Free"]
+                , a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
+                    [ text "Join the gallery"]
                 ]
               , td []
                 [ case model.editDesign of
@@ -1333,7 +1326,7 @@ view model =
                             [ td [] 
                               [ text "The Gallery's newest contributor is: "
                               , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
-                              , text ", whose latest piece is called "
+                              , text ". Their latest piece is called "
                               , b [] [text ddesign.design.title]
                               ]
                             ]
@@ -1344,7 +1337,7 @@ view model =
               ]
             ]
           , hr [] []
-          , b [] [text "Most recent uploaded designs:"]
+          , b [] [text "Most popular designs:"]
           , br [] []
           , br [] []
           ]
