@@ -956,14 +956,6 @@ makePNlink type_ count url =
       style [("visibility", if (String.isEmpty url) then "hidden" else "visible")]]
     [ b [] [text (type_ ++ " " ++ (intStr count))]]
 
-makePNbar : DesignList -> Html Msg
-makePNbar dlist =
-  div [class "clearleft"] 
-  [ makePNlink "Previous" dlist.count dlist.prevlink
-  , text " "
-  , makePNlink "Next" dlist.count dlist.nextlink
-  ]
-
 makeUpBar : Bool -> DesignList -> Html Msg
 makeUpBar pending dlist =
   if pending && Array.length dlist.designs > 0 then
