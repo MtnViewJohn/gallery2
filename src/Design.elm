@@ -653,10 +653,10 @@ thumbImage design =
   in
     case design.tiled of
       Untiled ->
-        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
       Hfrieze ->
-        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -665,7 +665,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Vfrieze ->
-        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -674,7 +674,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Tiled ->
-        a [ href <| "#" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -759,7 +759,7 @@ viewThumbInfo cfg design =
       (
         [ downloadLink design.design.filelocation ""
         , text " "
-        , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+        , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
             , class "button viewbutton" 
             ] [ ]
         , text " "
@@ -807,7 +807,7 @@ view cfg design =
             [ a 
               [ style [("visibility", if cfg.prev == nonDesign then "hidden" else "visible")]
               , class "pcnbutton prevbutton"
-              , href <| "#" ++ (idStr cfg.prev)
+              , href <| "#design/" ++ (idStr cfg.prev)
               , onNav (FocusClick,cfg.prev)
               , title "Previous design."
               ] []
@@ -826,7 +826,7 @@ view cfg design =
             , a 
               [ style [("visibility", if cfg.next == nonDesign then "hidden" else "visible")]
               , class "pcnbutton nextbutton"
-              , href <| "#" ++ (idStr cfg.next)
+              , href <| "#design/" ++ (idStr cfg.next)
               , onNav (FocusClick,cfg.next)
               , title "Next design."
               ] []
@@ -1009,7 +1009,7 @@ view cfg design =
           , [ div [class "buttondiv"]
               ( [ downloadLink design.design.filelocation " Download CFDG "
                 , text " "
-                , a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+                , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
                     , class "button viewbutton" 
                     ] [ text " View "]
                 , text " "
@@ -1053,7 +1053,7 @@ view cfg design =
       table [class "med_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "med_thumbcell"]
-            [ a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
+            [ a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
               [ img [ class "image", src design.design.thumblocation, alt "design thumbnail"] []]
             ]
           ]
@@ -1065,7 +1065,7 @@ view cfg design =
       table [class "sm_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "sm_thumbcell"]
-            [ a [ href <| "#" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
+            [ a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
           , td [class "sm_thumbinfo"] (viewThumbInfo cfg design)
