@@ -421,8 +421,8 @@ update msg model =
                   {model_ | errorMessage = msg, viewMode = Error} ! []
               DesignByID id ->
                 let
-                  (_, mddesign) = designFind (ID id) model_.designList.designs
                   designId = ID id
+                  (_, mddesign) = designFind designId model_.designList.designs
                 in case mddesign of
                   Nothing -> 
                     {model_ | mainDesign = nonDesign
@@ -435,6 +435,7 @@ update msg model =
                     ! [ getComments designId model_
                       , getCfdg designId model_
                       , getInfo designId model_
+                      , scrollToDesign designId
                       ]
               EditDesign id ->
                 case model_.user of
@@ -581,29 +582,29 @@ update msg model =
               model_ = {model | designList = designList_}
             in case act_ of
               Just (DeleteDesign id) ->
-                if id == model.designToDelete && id /= nonDesign then
-                  model ! [deleteDesign id model]
+                if id == model_.designToDelete && id /= nonDesign then
+                  model_ ! [deleteDesign id model]
                 else
-                  {model | designToDelete = id} ! []
+                  {model_ | designToDelete = id} ! []
               Just (DeleteComment commentid) ->
-                if commentid == model.commentToDelete && commentid /= noComment then
-                  model ! [deleteComment commentid model]
+                if commentid == model_.commentToDelete && commentid /= noComment then
+                  model_ ! [deleteComment commentid model]
                 else
-                  {model | commentToDelete = commentid} ! []
-              Just (CloseDesign) -> {model | mainDesign = nonDesign} ! []
-              Just (CancelEditAct) -> case model.editDesign of
-                Nothing -> {model | mainDesign = nonDesign} ! [Navigation.back 1]
+                  {model_ | commentToDelete = commentid} ! []
+              Just (CloseDesign) -> {model_ | mainDesign = nonDesign} ! [Navigation.back 1]
+              Just (CancelEditAct) -> case model_.editDesign of
+                Nothing -> {model_ | mainDesign = nonDesign} ! [Navigation.back 1]
                 Just edesign ->
-                  {model | mainDesign = edesign.design.designid}
+                  {model_ | mainDesign = edesign.design.designid}
                   ! [ Navigation.back 1
                     , scrollToDesign edesign.design.designid
                     ]
               Just (Focus id) -> 
-                {model_ | mainDesign = id}
-                ! [ getComments id model_
-                  , getCfdg id model_
-                  , getInfo id model_
-                  , scrollToDesign id
+                {model_ | mainDesign = id} !
+                  [ if model_.mainDesign == nonDesign then
+                      Navigation.newUrl ("#design/" ++ (idStr id))
+                    else
+                      Navigation.modifyUrl ("#design/" ++ (idStr id))
                   ]
               _ -> model_ ! [resolveAction act_ model_]
     EDesignMsg emsg -> case model.editDesign of
