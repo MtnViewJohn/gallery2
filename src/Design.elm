@@ -813,7 +813,12 @@ view cfg design =
               ] []
             , text " "
             , a 
-              [ class "pcnbutton closebutton"
+              [ style [("visibility", 
+                        if cfg.prev == nonDesign && cfg.next == nonDesign then 
+                          "hidden" 
+                        else
+                          "visible")]
+              , class "pcnbutton closebutton"
               , href "#", onNav (DismissDesign,design.design.designid)
               , title "Close this design"
               ] []
