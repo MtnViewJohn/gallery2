@@ -310,6 +310,7 @@ type Msg
   | DeleteADesign (Result Http.Error DesignID)
   | UploadResponse (Result Http.Error DesignTags)
   | NewCfdg3 (Result Http.Error Cfdg3Info)
+  | DesignStatusUpdated (Result Http.Error Bool)
   | TryScroll String
   | FileRead FilePortData
   | FileChange String
@@ -702,7 +703,14 @@ update msg model =
     SessionUser loginResult ->
       case loginResult of
         Ok user_ ->
-          {model | user = LoggedIn user_ , errorInfo = Ok "Session loaded"} ! [getTags model]
+          let
+            cmds =
+              if user_.unseen > 0 then
+                [getTags model, updateDesignStatus model]
+              else
+                [getTags model]
+          in
+            {model | user = LoggedIn user_ , errorInfo = Ok "Session loaded"} ! cmds
         Err error ->
           {model | errorInfo = Err error, user = NotLoggedIn ""} ! [getTags model]
     LogoutUser logoutResult ->
@@ -909,6 +917,7 @@ update msg model =
             {model | cfdg3text = cfdg3info.text, errorMessage = errorMessage_} ! []
         Err error ->
           (errorModel error "Translation" model) ! []
+    DesignStatusUpdated _ -> model ! []
     FileRead fpd ->
       case model.editDesign of
         Nothing -> {model | cfdg2text = fpd.contents} ! []
@@ -1126,7 +1135,16 @@ view model =
   [ div [ id "CFAcolumn" ]
     [ h5 [] [ text "Gallery Tools:" ]
     , ul []
-      [ li [] [ a [href "#newest/0"] [text "Newest" ]]
+      [ li [] [ a [href "#newest/0"] 
+                  [ case model.user of
+                      LoggedIn u ->
+                        if u.unseen > 0 then
+                          text ("Newest (" ++ (intStr u.unseen) ++ " new)")
+                        else
+                          text "Newest"
+                      _ -> text "Newest"
+                  ]
+              ]
       , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
       , li [] [ a [href "#title/0"]  [text "By Title" ]]
       , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
@@ -1406,6 +1424,18 @@ resolveAction ma model =
         Just edesign -> uploadDesign edesign model
       GetFile id -> fileSelected id
       _ -> Cmd.none
+
+updateDesignStatus : Model -> Cmd Msg
+updateDesignStatus model =
+  let
+    url = model.backend ++ "/newdesigns"
+  in
+    Http.send DesignStatusUpdated (post url Http.emptyBody decodeStatus)
+
+
+decodeStatus : JD.Decoder Bool
+decodeStatus =
+  JD.field "newdesigns" <| JD.map (\i -> i /= 0) JD.int
 
 changeFave : String -> DesignID -> Model -> Cmd Msg
 changeFave change designid model =

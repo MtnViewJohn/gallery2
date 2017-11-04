@@ -20,6 +20,7 @@ type alias User =
   , joinedOn : Time.Time
   , numPosts : Int
   , numLogins : Int
+  , unseen : Int
   , notify : Bool
   , defaultccURI : String
   }
@@ -42,6 +43,7 @@ decodeUser =
         |> JPipe.required "joinedon" (JD.map int2Time JD.int)
         |> JPipe.required "numposts" (JD.int)
         |> JPipe.required "numlogins" (JD.int)
+        |> JPipe.optional "unseen" (JD.int) 0
         |> JPipe.required "notify" (JD.bool)
         |> JPipe.required "ccURI" (JD.string)
 
