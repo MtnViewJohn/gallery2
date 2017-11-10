@@ -17,6 +17,9 @@ import Time exposing (Time)
 import Task
 import Array exposing (Array)
 import Ports exposing (..)
+import Dom
+import Dom.Size
+import Dict exposing (Dict)
 
 main : Program Flags Model Msg
 main =
@@ -115,7 +118,7 @@ type alias Model =
   , designToDelete : DesignID
   , commentToDelete : CommentID
   , designList : DesignList
-  , miniList : List Design.DisplayDesign
+  , miniLists : Dict String (List Design.DisplayDesign)
   , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
   , designMode : Design.ViewSize
@@ -140,7 +143,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList [] False Nothing 
+    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList Dict.empty False Nothing 
             Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
   in
     (model, loginSession model)
@@ -295,6 +298,7 @@ type Msg
   | DesignText String
   | Cfdg2Change String
   | NewSeed Int
+  | NewMiniSeed Int Int
   | LoadDesign Time
   | NewDesign (Result Http.Error DesignTags)
   | NewEditDesign (Result Http.Error Design.EditDesign)
@@ -315,8 +319,9 @@ type Msg
   | UploadResponse (Result Http.Error DesignTags)
   | NewCfdg3 (Result Http.Error Cfdg3Info)
   | DesignStatusUpdated (Result Http.Error Bool)
-  | NewMiniList (Result Http.Error (List Design.DisplayDesign))
+  | NewMiniList String (Result Http.Error (List Design.DisplayDesign))
   | ReceiveUnseen (Result Http.Error Int)
+  | GetCFAWidth (Result Dom.Error Float)
   | TryScroll String
   | FileRead FilePortData
   | FileChange String
@@ -404,19 +409,12 @@ update msg model =
                   model__ = {model_ | viewMode = Default
                                     , mainDesign = nonDesign
                                     , designList = zeroList
-                                    , pendingLoad = True}
-                  unseen = case model__.user of
-                    LoggedIn u -> clamp 0 4 u.unseen
-                    _ -> 0
-                  miniCmd = 
-                    if unseen > 0 then 
-                      [getMiniList model__ unseen]
-                    else
-                      [checkUnseen model__]
+                                    , pendingLoad = False}
                 in
-                  model__ ! ([ getDesigns model__ "popular" 0 12
+                  model__ ! [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
+                            , checkUnseen model__
                             , getNewbie model__
-                            ] ++ miniCmd)
+                            ]
               Login user password remember ->
                 let
                   err = case (user, password) of
@@ -732,12 +730,12 @@ update msg model =
                 scroll :: (List.map (getCfdgfromDesign model) (Array.toList designs.designs))
         Err error ->
           {model | designList = zeroList, errorInfo = Err error, pendingLoad = False} ! []
-    NewMiniList miniListResult ->
+    NewMiniList listType miniListResult ->
       case miniListResult of
         Ok miniList_ ->
-          {model | miniList = miniList_} ! []
+          {model | miniLists = Dict.insert listType miniList_ model.miniLists} ! []
         Err error ->
-          {model | miniList = [], errorInfo = Err error} ! []
+          {model | errorInfo = Err error} ! []
     TryScroll _ ->
       model ! []
     NewUser loginResult ->
@@ -986,9 +984,22 @@ update msg model =
     ReceiveUnseen unseenResult -> 
       case (unseenResult,model.user) of
         (Ok unseen_,LoggedIn u) ->
-          {model | user = LoggedIn {u | unseen = unseen_}} ! [getMiniList model <| clamp 0 4 unseen_]
+          {model | user = LoggedIn {u | unseen = unseen_}} ! []
         (Ok _,_) -> model ! []
         (Err error,_) -> {model | errorInfo = Err error} ! []
+    GetCFAWidth widthResult ->
+      let
+        num = case widthResult of
+          Ok width -> Basics.max 1 ((floor width) // 295) 
+          Err _ -> 5
+        _ = Debug.log "width" <| intStr num
+      in
+        model ! [ getMiniList model "newest" num
+                , getMiniList model "popular" num
+                , Random.generate (NewMiniSeed num) (Random.int 1 1000000000)
+                ]
+    NewMiniSeed num seed ->
+      model ! [getMiniList model ("random/" ++ (intStr seed)) num]
     FileRead fpd ->
       case model.editDesign of
         Nothing -> {model | cfdg2text = fpd.contents} ! []
@@ -1378,104 +1389,98 @@ view model =
           ]
         )
         Default ->
-        ( [ table []
-            [ tr []
-              ((let
-                  unseen = case model.user of
-                    LoggedIn u -> u.unseen
-                    _ -> 0
-                in
-                  if unseen > 0 then
-                    [ td [class "vupload"]
-                      ( [ b [] [text "New designs:"]
-                        , br [] []
-                        ] ++
-                        ( let
-                            vcfg = makeViewConfig model Design.Mini
-                          in 
-                            List.map ((Design.view vcfg) >> (Html.map DesignMsg))
-                                              model.miniList
-                        ) ++
-                        ( if unseen > 4 then
-                            [ br [] []
-                            , a [href "#newest/0"] 
-                                [ text ("+" ++ (intStr (unseen - 4)) ++ " more") ]
+        [ table []
+          [ tr []
+            [ td [class "vupload"]
+              [ text """
+   Context Free/cfdg is a simple language for generating stunning images.
+   With only a few lines you can describe abstract art, beautiful organic scenery,
+   and many kinds of fractals. It's highly addictive!
+                """
+              , br [] []
+              , br [] []
+              , text "The Context Free Gallery is a public repository for artwork made "
+              , text "using the language."
+              ]
+            , td [class "vupload"]
+              [ h2 [] [text "What next?"]
+              , a [ href "../downloads.html", class "call-to-action"] 
+                  [ text "Get the software"]
+              , a [ href "#newest/0", class "call-to-action"] 
+                  [ text "See what people are doing"]
+              , a [ href "https://github.com/MtnViewJohn/context-free/wiki"
+                  , class "call-to-action"]
+                  [ text "Learn Context Free"]
+              , a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
+                  [ text "Join the gallery"]
+              ]
+            , td [style [("width", "310px")]]
+              [ case model.editDesign of
+                  Just edesign ->
+                    let
+                      ddesign = Design.makeDDesign edesign.design
+                    in
+                      table [class "welcometable"]
+                        [ tr []
+                          [ td [class "thumbcell"] 
+                            [ a [href ("#design/" ++ (idStr ddesign.design.designid))] 
+                              [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
                             ]
-                          else
-                            []
-                        )
-                      )
-                    ]
-                  else
-                   [ td [class "vupload"]
-                        [ text """
-             Context Free/cfdg is a simple language for generating stunning images.
-             With only a few lines you can describe abstract art, beautiful organic scenery,
-             and many kinds of fractals. It's highly addictive!
-                          """
-                        , br [] []
-                        , br [] []
-                        , text "The Context Free Gallery is a public repository for artwork made "
-                        , text "using the language."
-                        ]
-                      , td [class "vupload"]
-                        [ h2 [] [text "What next?"]
-                        , a [ href "../downloads.html", class "call-to-action"] 
-                            [ text "Get the software"]
-                        , a [ href "#newest/0", class "call-to-action"] 
-                            [ text "See what people are doing"]
-                        , a [ href "https://github.com/MtnViewJohn/context-free/wiki"
-                            , class "call-to-action"]
-                            [ text "Learn Context Free"]
-                        , a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
-                            [ text "Join the gallery"]
-                        ]
-                    ]
-                  ) ++ 
-                [ td [style [("width", "310px")]]
-                  [ case model.editDesign of
-                      Just edesign ->
-                        let
-                          ddesign = Design.makeDDesign edesign.design
-                        in
-                          table [class "welcometable"]
-                            [ tr []
-                              [ td [class "thumbcell"] 
-                                [ a [href ("#design/" ++ (idStr ddesign.design.designid))] 
-                                  [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
-                                ]
-                              ]
-                            , tr []
-                              [ td [] 
-                                [ text "The Gallery's newest contributor is: "
-                                , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
-                                , text ". Their latest piece is called "
-                                , b [] [text ddesign.design.title]
-                                ]
-                              ]
+                          ]
+                        , tr []
+                          [ td [] 
+                            [ text "The Gallery's newest contributor is: "
+                            , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
+                            , text ". Their latest piece is called "
+                            , b [] [text ddesign.design.title]
                             ]
-                      Nothing ->
-                        text ""
-                  ]
-                ])
+                          ]
+                        ]
+                  Nothing ->
+                    text ""
+              ]
             ]
-          , hr [] []
-          , b [] [text "Most popular designs:"]
-          , br [] []
-          , br [] []
           ]
-          ++
-          ( if model.pendingLoad then
-              [div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]]
-            else
-              let
-                vcfg = makeViewConfig model Design.Mini
-              in 
-                Array.toList (Array.map ((Design.view vcfg) >> (Html.map DesignMsg))
-                                  model.designList.designs)
-          )
-        )
-
+        , case Dict.get "newest" model.miniLists of
+            Just minilist ->
+              div []
+              ( [ hr [] []
+                , h3 [] [text "Newest designs:"]
+                ]
+                ++
+                  let
+                    vcfg = makeViewConfig model Design.Mini
+                  in 
+                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
+              )
+            Nothing -> text ""
+        , case Dict.get "popula" model.miniLists of
+            Just minilist ->
+              div []
+              ( [ hr [] []
+                , h3 [] [text "Most popular designs:"]
+                ]
+                ++
+                  let
+                    vcfg = makeViewConfig model Design.Mini
+                  in 
+                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
+              )
+            Nothing -> text ""
+        , case Dict.get "random" model.miniLists of
+            Just minilist ->
+              div []
+              ( [ hr [] []
+                , h3 [] [text "Some random designs:"]
+                ]
+                ++
+                  let
+                    vcfg = makeViewConfig model Design.Mini
+                  in 
+                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
+              )
+            Nothing -> text ""
+        ]
     )
   ]
 
@@ -1669,12 +1674,12 @@ decodeDesigns =
     (JD.field "count"    JD.int)
     (JD.succeed "")
 
-getMiniList : Model -> Int -> Cmd Msg
-getMiniList model count =
+getMiniList : Model -> String -> Int -> Cmd Msg
+getMiniList model listType count =
   let
-    url = String.join "/" [model.backend, "newest", "0", intStr(count)]
+    url = String.join "/" [model.backend, listType, "0", intStr(count)]
   in
-    Http.send NewMiniList (get url decodeMiniList)
+    Http.send (NewMiniList (String.left 6 listType)) (get url decodeMiniList)
 
 decodeMiniList : JD.Decoder (List Design.DisplayDesign)
 decodeMiniList =
