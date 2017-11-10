@@ -52,6 +52,7 @@ intStr num =
 type Action 
     = DeleteDesign DesignID
     | UploadDesign
+    | UploadDesignTags
     | EditDesign DesignID
     | AddFaves DesignID
     | Focus DesignID

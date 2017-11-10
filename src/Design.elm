@@ -25,6 +25,7 @@ module Design exposing
   , Size
   , view
   , viewEdit
+  , viewEditTags
   )
 
 
@@ -333,6 +334,7 @@ type EMsg
     | TagSelect String
     | NotesChange String
     | Upload
+    | UploadTags
 
 type alias MsgId = (Msg, DesignID)
 
@@ -424,6 +426,8 @@ editupdate msg edesign = case msg of
         ({edesign | design = design_}, Nothing)
     Upload ->
       (edesign, Just UploadDesign)
+    UploadTags ->
+      (edesign, Just UploadDesignTags)
 
 
 
@@ -896,7 +900,13 @@ view cfg design =
                   , text " "
                   ]
               else
-                [ ]
+                if canTag design.design.owner cfg.currentUser then
+                  [ a [ href ("#edittags/" ++ (idStr design.design.designid)), title "Edit this design's tags."
+                      , class "button editbutton"
+                      ] [ text "Edit Tag"]
+                  ]
+                else
+                  [ ]
             ) ++
             (
               [ div [id (if (List.length design.design.fans) <= 5 then "favelist" else "foolist")] 
@@ -1088,6 +1098,40 @@ tagOptions tags =
   in
     List.map opt tags_
 
+viewTagEdit : List TagInfo -> EditDesign -> Html EMsg
+viewTagEdit tags edesign =
+  tr []
+    [ td [] [b [] [text "Tags"], text ":"]
+    , td [colspan 2] 
+      (( input 
+        [ type_ "text", size 12, name "tags"
+        , value edesign.newTag
+        , autocomplete False
+        , onFocus (TagFocus True), onBlur (TagFocus False)
+        , onInput TagType
+        ] []
+       ):: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
+        ++ (List.concat (List.map tagDeleteLink edesign.design.tags))
+        ++ [ let
+                match tag tagi = String.contains tag tagi.name
+                matching = List.filter (match edesign.newTag) tags
+                show =  (edesign.focusTag || edesign.focusTaglist) && 
+                        (not edesign.tagSelected) &&
+                        (not (List.isEmpty matching))
+              in
+                div 
+                  [ id "taglist", hidden (not show)]
+                  [ select 
+                    [ size (clamp 2 10 (List.length matching))
+                    , required False
+                    , onFocus (TagsFocus True), onBlur (TagsFocus False)
+                    ]
+                    (tagOptions matching)
+                  ]
+           ]
+      )
+    ]
+
 viewEdit : List TagInfo -> EditDesign -> Html EMsg
 viewEdit tags edesign =
       div []
@@ -1179,37 +1223,7 @@ viewEdit tags edesign =
              , style [("visibility", if (validateVariation edesign.design.variation) then "hidden" else "visible")]
              ] [text "Variation must be 0 to 6 letters."]
             ]
-          , tr []
-            [ td [] [b [] [text "Tags"], text ":"]
-            , td [colspan 2] 
-              (( input 
-                [ type_ "text", size 12, name "tags"
-                , value edesign.newTag
-                , autocomplete False
-                , onFocus (TagFocus True), onBlur (TagFocus False)
-                , onInput TagType
-                ] []
-               ):: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
-                ++ (List.concat (List.map tagDeleteLink edesign.design.tags))
-                ++ [ let
-                        match tag tagi = String.contains tag tagi.name
-                        matching = List.filter (match edesign.newTag) tags
-                        show =  (edesign.focusTag || edesign.focusTaglist) && 
-                                (not edesign.tagSelected) &&
-                                (not (List.isEmpty matching))
-                      in
-                        div 
-                          [ id "taglist", hidden (not show)]
-                          [ select 
-                            [ size (clamp 2 10 (List.length matching))
-                            , required False
-                            , onFocus (TagsFocus True), onBlur (TagsFocus False)
-                            ]
-                            (tagOptions matching)
-                          ]
-                   ]
-              )
-            ]
+          , viewTagEdit tags edesign
           , tr []
             [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
             , td [] 
@@ -1282,3 +1296,39 @@ viewEdit tags edesign =
         ]
       ]
 
+viewEditTags : List TagInfo -> EditDesign -> Html EMsg
+viewEditTags tags edesign =
+  div []
+  [ h1 [] [text "Edit the tags for this design:"]
+  , Html.form [method "POST", action "#", 
+          enctype "multipart/form-data", onSubmit UploadTags]
+    [ table []
+      [ tr []
+        [ td [colspan 3, class "fullimagediv"]
+          [ img [class "image", src edesign.design.imagelocation, alt "cfdg image"] [] ]
+        ]
+      , tr []
+        [ td [] [b [] [text "Title"], text ":"]
+        , td [] [input [type_ "text", size 30, maxlength 100, name "title"
+                , attribute "data-lpignore" "true"
+                , value edesign.design.title
+                , readonly True][]]
+        , td [] []
+        ]
+      , viewTagEdit tags edesign
+      , tr []
+        [ td [] 
+          [ input 
+            [ type_ "submit"
+            , value "Update Tags"
+            ] []
+          , text " "
+          , input [type_ "submit", value "Cancel", onNav CancelEdit] []
+          ]
+        , td [colspan 2] 
+          [ input [type_ "hidden", name "designid", value (idStr edesign.design.designid)] []
+          ]
+        ]
+      ]
+    ]
+  ]
