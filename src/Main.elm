@@ -462,7 +462,8 @@ update msg model =
                       ! [Task.perform LoadDesign Time.now]
                     else
                       let
-                        (_, mddesign) = designFind (ID id) model_.designList.designs
+                        designid = (ID id)
+                        (_, mddesign) = designFind designid model_.designList.designs
                       in case mddesign of
                         Nothing ->
                           {model_ | editDesign = Nothing
@@ -470,17 +471,18 @@ update msg model =
                                   , errorMessage = ""
                                   , designList = zeroList
                                   , pendingLoad = True}
-                          ! [loadEditDesign (ID id) model_]
+                          ! [loadEditDesign designid model_]
                         Just ddesign ->
                           {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                   , viewMode = Editing
-                                  , errorMessage = ""} ! []
+                                  , errorMessage = ""} ! [getInfo designid model_]
                   _ -> (model_, Cmd.none)
               EditTags id ->
                 case model_.user of
                   LoggedIn user ->
                     let
-                      (_, mddesign) = designFind (ID id) model_.designList.designs
+                      designid = (ID id)
+                      (_, mddesign) = designFind designid model_.designList.designs
                     in case mddesign of
                       Nothing ->
                         {model_ | editDesign = Nothing
@@ -488,11 +490,11 @@ update msg model =
                                 , errorMessage = ""
                                 , designList = zeroList
                                 , pendingLoad = True}
-                        ! [loadEditDesign (ID id) model_]
+                        ! [loadEditDesign designid model_]
                       Just ddesign ->
                         {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                 , viewMode = EditingTags
-                                , errorMessage = ""} ! []
+                                , errorMessage = ""} ! [getInfo designid model_]
                   _ -> (model_, Cmd.none)
               Author name_enc start count ->
                 let
@@ -785,8 +787,22 @@ update msg model =
         Ok info ->
           let
             (index, mddesign) = designFind id model.designList.designs
+            editDesign_ = case model.editDesign of
+              Just edesign ->
+                if edesign.design.designid == id then
+                  let
+                    design = edesign.design
+                    design_ = {design | fans = info.fans
+                                      , tags = info.tags
+                                      , imagesize = info.imagesize}
+                    edesign_ = {edesign | design = design_}
+                  in
+                    Just edesign_
+                else
+                  model.editDesign
+              Nothing -> model.editDesign
           in case mddesign of
-            Nothing -> model ! []     -- Shouldn't happen
+            Nothing -> {model | editDesign = editDesign_} ! []
             Just ddesign ->
               let
                 design = ddesign.design
@@ -797,7 +813,9 @@ update msg model =
                 designList = model.designList
                 designList_ = {designList | designs = Array.set index ddesign_ designList.designs}
               in
-                {model | designList = designList_, errorInfo = Ok "Info received"} ! []
+                {model  | designList = designList_
+                        , editDesign = editDesign_
+                        , errorInfo = Ok "Info received"} ! []
         Err error ->
           {model | errorInfo = Err error} ! []
     NewComments commentResult ->
