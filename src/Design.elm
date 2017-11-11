@@ -540,6 +540,7 @@ type alias ViewConfig =
     , next : DesignID
     , readyToDelete : DesignID
     , commentToDelete : CommentID
+    , miniListMode : Bool
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -744,6 +745,20 @@ onSelect : (String -> EMsg) -> Attribute EMsg
 onSelect tagger =
   on "change" (JD.map tagger targetValue)
 
+thumbLink : ViewConfig -> String -> DesignID -> List (Html MsgId) -> Html MsgId
+thumbLink cfg linkClass id contents =
+  if cfg.miniListMode then
+    a [ href <| "#design/" ++ (idStr id)
+      , title "View design."
+      , class linkClass 
+      ] contents
+  else
+    a [ href <| "#design/" ++ (idStr id)
+      , onNav (FocusClick,id)
+      , title "View design."
+      , class linkClass 
+      ] contents
+
 viewThumbInfo : ViewConfig -> DisplayDesign -> List (Html MsgId)
 viewThumbInfo cfg design =
   List.concat
@@ -763,13 +778,11 @@ viewThumbInfo cfg design =
       (
         [ downloadLink design.design.filelocation ""
         , text " "
-        , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
-            , class "button viewbutton" 
-            ] [ ]
+        , thumbLink cfg "button viewbutton" design.design.designid []
         , text " "
         ] ++ 
         (
-          if canModify design.design.owner cfg.currentUser then
+          if not cfg.miniListMode && canModify design.design.owner cfg.currentUser then
             if cfg.readyToDelete == design.design.designid then
               [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
                   , class "keepbutton"
@@ -1075,7 +1088,7 @@ view cfg design =
       table [class "sm_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "sm_thumbcell"]
-            [ a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
+            [ thumbLink cfg "" design.design.designid
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
           , td [class "sm_thumbinfo"] (viewThumbInfo cfg design)

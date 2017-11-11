@@ -1127,8 +1127,9 @@ makeViewConfig model size =
     muser = case model.user of
       LoggedIn user_ -> Just user_
       _ -> Nothing
+    minilist = model.viewMode == Default
   in
-    Design.ViewConfig size muser focus prev next model.designToDelete model.commentToDelete
+    Design.ViewConfig size muser focus prev next model.designToDelete model.commentToDelete minilist
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
