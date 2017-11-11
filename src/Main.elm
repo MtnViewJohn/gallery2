@@ -119,6 +119,7 @@ type alias Model =
   , commentToDelete : CommentID
   , designList : DesignList
   , miniLists : Dict String (List Design.DisplayDesign)
+  , miniSeed : Int
   , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
   , designMode : Design.ViewSize
@@ -143,7 +144,7 @@ zeroUList = UserList [] "" "" "" 0
 initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
-    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList Dict.empty False Nothing 
+    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList Dict.empty 0 False Nothing 
             Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
   in
     (model, loginSession model)
@@ -409,6 +410,7 @@ update msg model =
                   model__ = {model_ | viewMode = Default
                                     , mainDesign = nonDesign
                                     , designList = zeroList
+                                    , miniLists = Dict.empty
                                     , pendingLoad = False}
                 in
                   model__ ! [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
@@ -990,16 +992,18 @@ update msg model =
     GetCFAWidth widthResult ->
       let
         num = case widthResult of
-          Ok width -> Basics.max 1 ((floor width) // 295) 
+          Ok width -> Basics.clamp 1 8 ((floor width) // 295) 
           Err _ -> 5
         _ = Debug.log "width" <| intStr num
       in
         model ! [ getMiniList model "newest" num
-                , getMiniList model "popular" num
                 , Random.generate (NewMiniSeed num) (Random.int 1 1000000000)
                 ]
     NewMiniSeed num seed ->
-      model ! [getMiniList model ("random/" ++ (intStr seed)) num]
+      {model | miniSeed = seed}
+      ! [ getMiniList model ("random/" ++ (intStr seed)) num
+        , getMiniList model ("popularrandom/" ++ (intStr seed)) num
+        ]
     FileRead fpd ->
       case model.editDesign of
         Nothing -> {model | cfdg2text = fpd.contents} ! []
@@ -1211,6 +1215,26 @@ viewMiniUser muser =
   , td [align "right"] [text (intStr muser.numPosts)]
   , td [align "right"] [text (makeDate muser.joinedOn)]
   ]
+
+viewMiniList : String -> String -> String -> Model -> Html Msg
+viewMiniList listType desc moreUrl model =
+  case Dict.get listType model.miniLists of
+    Just minilist ->
+      div []
+      ( [ hr [] []
+        , h3 [] [text desc]
+        ]
+        ++
+        ( let
+            vcfg = makeViewConfig model Design.Mini
+          in 
+            List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
+        ) ++ 
+        [ br [] []
+        , a [href moreUrl] [text "view more"]
+        ]
+      )
+    Nothing -> text ""
 
 view : Model -> Html Msg
 view model =
@@ -1442,45 +1466,10 @@ view model =
               ]
             ]
           ]
-        , case Dict.get "newest" model.miniLists of
-            Just minilist ->
-              div []
-              ( [ hr [] []
-                , h3 [] [text "Newest designs:"]
-                ]
-                ++
-                  let
-                    vcfg = makeViewConfig model Design.Mini
-                  in 
-                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
-              )
-            Nothing -> text ""
-        , case Dict.get "popula" model.miniLists of
-            Just minilist ->
-              div []
-              ( [ hr [] []
-                , h3 [] [text "Most popular designs:"]
-                ]
-                ++
-                  let
-                    vcfg = makeViewConfig model Design.Mini
-                  in 
-                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
-              )
-            Nothing -> text ""
-        , case Dict.get "random" model.miniLists of
-            Just minilist ->
-              div []
-              ( [ hr [] []
-                , h3 [] [text "Some random designs:"]
-                ]
-                ++
-                  let
-                    vcfg = makeViewConfig model Design.Mini
-                  in 
-                    List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
-              )
-            Nothing -> text ""
+        , viewMiniList "newest" "Newest designs:" "#newest/0" model
+        , viewMiniList "popula" "Some popular designs:" "#popular/0" model
+        , viewMiniList "random" "Some random designs:" 
+            ("#random/" ++ (intStr model.miniSeed) ++ "/0") model
         ]
     )
   ]
