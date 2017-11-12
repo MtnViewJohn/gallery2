@@ -331,17 +331,19 @@ type Msg
   | IsVisible String
 
 
-updateDesigns : Model -> String -> Int -> Int -> (Model, Cmd Msg)
-updateDesigns model query start count =
+updateDesigns : String -> Model -> String -> Int -> Int -> (Model, Cmd Msg)
+updateDesigns title model query start count =
   let
     go2server = model.currentHash /= model.designList.currentHash ||
                 model.currentHash == ""
   in
     {model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server} !
       if go2server then
-        [getDesigns model query start count]
+        [ getDesigns model query start count
+        , pageTitle <| "CFDG Gallery - " ++ title ++ " view"
+        ]
       else
-        []
+        [ pageTitle <| "CFDG Gallery - " ++ title ++ " view" ]
 
 scrollToDesign : DesignID -> Cmd Msg
 scrollToDesign id = 
@@ -415,6 +417,7 @@ update msg model =
                   model__ ! [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
                             , checkUnseen model__
                             , getNewbie model__
+                            , pageTitle "CFDG Gallery"
                             ]
               Login user password remember ->
                 let
@@ -434,7 +437,8 @@ update msg model =
                 let
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
                 in
-                  {model_ | errorMessage = msg, viewMode = Error} ! []
+                  {model_ | errorMessage = msg, viewMode = Error}
+                  ! [ pageTitle "CFDG Gallery - Error" ]
               DesignByID id ->
                 let
                   designId = ID id
@@ -445,13 +449,16 @@ update msg model =
                             , viewMode = Designs
                             , designList = zeroList
                             , pendingLoad = True }
-                    ! [getDesign designId model_]
+                    ! [ getDesign designId model_
+                      , pageTitle <| "CFDG Gallery - Design " ++ (intStr id)
+                      ]
                   Just ddesign ->
                     {model_ | mainDesign = designId , viewMode = Designs}
                     ! [ getComments designId model_
                       , getCfdg designId model_
                       , getInfo designId model_
                       , scrollToDesign designId
+                      , pageTitle <| "CFDG Gallery - Design " ++ (intStr id)
                       ]
               EditDesign id ->
                 case model_.user of
@@ -470,11 +477,16 @@ update msg model =
                                   , errorMessage = ""
                                   , designList = zeroList
                                   , pendingLoad = True}
-                          ! [loadEditDesign designid model_]
+                          ! [ loadEditDesign designid model_
+                            , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                            ]
                         Just ddesign ->
                           {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                   , viewMode = Editing
-                                  , errorMessage = ""} ! [getInfo designid model_]
+                                  , errorMessage = ""}
+                          ! [ getInfo designid model_
+                            , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                            ]
                   _ -> (model_, Cmd.none)
               EditTags id ->
                 case model_.user of
@@ -489,17 +501,22 @@ update msg model =
                                 , errorMessage = ""
                                 , designList = zeroList
                                 , pendingLoad = True}
-                        ! [loadEditDesign designid model_]
+                        ! [ loadEditDesign designid model_
+                          , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                          ]
                       Just ddesign ->
                         {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                 , viewMode = EditingTags
-                                , errorMessage = ""} ! [getInfo designid model_]
+                                , errorMessage = ""}
+                        ! [ getInfo designid model_
+                          , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                          ]
                   _ -> (model_, Cmd.none)
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  updateDesigns model_ (makeUri "by" [name]) start count
+                  updateDesigns ("Author " ++ name) model_ (makeUri "by" [name]) start count
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -515,7 +532,7 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  updateDesigns model_ (makeUri "faves" [name]) start count
+                  updateDesigns ("Favorites of " ++ name) model_ (makeUri "faves" [name]) start count
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -523,7 +540,7 @@ update msg model =
                   {model_ | designList = zeroList }
                   ! [Navigation.modifyUrl (makeUri "#faves" [name, intStr start, intStr dcount])]
               Newest start count ->
-                updateDesigns model_ "newest" start count
+                updateDesigns "Latest" model_ "newest" start count
               NewestInit start ->
                 let
                   user_ = case model_.user of
@@ -533,24 +550,24 @@ update msg model =
                   {model_ | designList = zeroList, user = user_}
                   ! [Navigation.modifyUrl (makeUri "#newest" [intStr start, intStr dcount])]
               Oldest start count ->
-                updateDesigns model_ "oldest" start count
+                updateDesigns "Oldest" model_ "oldest" start count
               OldestInit start ->
                 {model_ | designList = zeroList }
                 ! [Navigation.modifyUrl (makeUri "#oldest" [intStr start, intStr dcount])]
               Title start count ->
-                updateDesigns model_ "title" start count
+                updateDesigns "Title" model_ "title" start count
               TitleInit start ->
                 {model_ | designList = zeroList }
                 ! [Navigation.modifyUrl (makeUri "#title" [intStr start, intStr dcount])]
               TitleIndex title ->
                 model_ ! [getTitle model_ title]
               Popular start count ->
-                updateDesigns model_ "popular" start count
+                updateDesigns "Likes" model_ "popular" start count
               PopularInit start ->
                 {model_ | designList = zeroList }
                 ! [Navigation.modifyUrl (makeUri "#popular" ["0", intStr dcount])]
               RandomDes seed start count ->
-                updateDesigns model_ ("random/" ++ (intStr seed)) start count
+                updateDesigns "Random" model_ ("random/" ++ (intStr seed)) start count
               RandomInit seed start ->
                 {model_ | designList = zeroList }
                 ! [Navigation.modifyUrl (makeUri "#random" [intStr seed, "0", intStr dcount])]
@@ -560,7 +577,7 @@ update msg model =
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
-                  updateDesigns model_ (makeUri "tag" [tag]) start count
+                  updateDesigns ("Tag " ++ tag) model_ (makeUri "tag" [tag]) start count
               TagInit tag_enc start ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
@@ -579,7 +596,8 @@ update msg model =
                         else
                           compare b.count a.count   -- descending order
                 in
-                  {model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags} ! []
+                  {model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}
+                  ! [ pageTitle "CFDG Gallery - Tag list" ]
               Users utype start count ->
                 let
                   (userOrder_, valid) = case utype of
@@ -593,13 +611,17 @@ update msg model =
                 in
                   if valid then
                     {model_ | viewMode = People, userOrder = userOrder_}
-                    ! [getUsers ("users/" ++ utype) start count model_]
+                    ! [ getUsers ("users/" ++ utype) start count model_
+                      , pageTitle "CFDG Gallery - User list"
+                      ]
                   else
                     model_ ! []
               ShowTranslate idint ->
                 {model_ | viewMode = Translation, cfdg3text = "", errorMessage = ""}
                 ! if idint > 0 then
-                    [translateDesign (ID idint) model_]
+                    [ translateDesign (ID idint) model_
+                    , pageTitle <| "CFDG Gallery - Translation for " ++ (intStr idint)
+                    ]
                   else
                     []
     NewSeed seed ->
@@ -993,7 +1015,6 @@ update msg model =
         num = case widthResult of
           Ok width -> Basics.clamp 1 8 ((floor width) // 295) 
           Err _ -> 5
-        _ = Debug.log "width" <| intStr num
       in
         model ! [ getMiniList model "newest" num
                 , Random.generate (NewMiniSeed num) (Random.int 1 1000000000)
