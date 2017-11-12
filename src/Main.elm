@@ -235,6 +235,7 @@ type Route
   | PopularInit Int
   | RandomDes Int Int Int
   | RandomInit Int Int
+  | RandomSeed
   | Tag String Int Int
   | TagInit String Int
   | ShowTags String
@@ -270,6 +271,7 @@ route =
     , Url.map PopularInit (Url.s "popular" </> int)
     , Url.map RandomDes (Url.s "random" </> int </> int </> int)
     , Url.map RandomInit (Url.s "random" </> int </> int)
+    , Url.map RandomSeed (Url.s "random")
     , Url.map Tag (Url.s "tag" </> Url.string </> int </> int)
     , Url.map TagInit (Url.s "tag" </> Url.string </> int)
     , Url.map ShowTags (Url.s "tags" </> Url.string)
@@ -296,6 +298,7 @@ type Msg
   | AuthorText String
   | DesignText String
   | Cfdg2Change String
+  | NewSeed Int
   | NewMiniSeed Int Int
   | LoadDesign Time
   | NewDesign (Result Http.Error DesignTags)
@@ -568,6 +571,8 @@ update msg model =
               RandomInit seed start ->
                 {model_ | designList = zeroList }
                 ! [Navigation.modifyUrl (makeUri "#random" [intStr seed, "0", intStr dcount])]
+              RandomSeed ->
+                model_ ! [Random.generate NewSeed (Random.int 1 1000000000)]
               Tag tag_enc start count ->
                 let
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
@@ -619,6 +624,8 @@ update msg model =
                     ]
                   else
                     []
+    NewSeed seed ->
+      model ![Navigation.modifyUrl ("#random/" ++ (intStr seed ++ "/0"))]
     LoginMsg lMsg ->
       let
         newLoginModel = Login.update lMsg model.loginform          
@@ -1268,7 +1275,7 @@ view model =
       , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
       , li [] [ a [href "#title/0"]  [text "By Title" ]]
       , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
-      , li [] [ a [href "#random/0/0"] [text "Random" ]]
+      , li [] [ a [href "#random"] [text "Random" ]]
       , li [] [ a [href "#users/name/0/25"] [text "People" ]]
       , li [] [ a [href "#tags/tag"] [text "Design Tags"] ]
       , li [] [ a [href "#translate/0"] [text "Version Translator"]]
