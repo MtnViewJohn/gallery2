@@ -336,9 +336,8 @@ updateDesigns model query start count =
   let
     go2server = model.currentHash /= model.designList.currentHash ||
                 model.currentHash == ""
-    mainDesign_ = if go2server then nonDesign else model.mainDesign
   in
-    {model | mainDesign = mainDesign_, viewMode = Designs, pendingLoad = go2server} !
+    {model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server} !
       if go2server then
         [getDesigns model query start count]
       else
