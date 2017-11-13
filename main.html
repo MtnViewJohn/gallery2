@@ -10,7 +10,7 @@
   <meta http-equiv="Content-Type"
     content="text/html;
     charset=utf-8" />
-  <title>CFDG Gallery</title>
+  <title>Gallery</title>
 
   <link rel="stylesheet"  href="../site.css?20081203" type="text/css" />
   <link rel="stylesheet"  href="gallery.css?20170831" type="text/css" />
@@ -26,7 +26,7 @@
         <p>Context Free Art</p>
   </div>
   <div id="CFAtitle">
-    <h1>Gallery</h1>
+    <h1 id="titlenode">Gallery</h1>
   </div>
   <div id="CFAnavbar">
     <ul>
@@ -165,6 +165,7 @@
     });
     app.ports.pageTitle.subscribe(function(title) {
         document.title = title;
+        document.getElementById("titlenode").innerHTML = title;
     });
 </script>
 </html>

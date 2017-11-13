@@ -340,10 +340,10 @@ updateDesigns title model query start count =
     {model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server} !
       if go2server then
         [ getDesigns model query start count
-        , pageTitle <| "CFDG Gallery - " ++ title ++ " view"
+        , pageTitle <| "Gallery - " ++ title ++ " designs"
         ]
       else
-        [ pageTitle <| "CFDG Gallery - " ++ title ++ " view" ]
+        [ pageTitle <| "Gallery - " ++ title ++ " designs" ]
 
 scrollToDesign : DesignID -> Cmd Msg
 scrollToDesign id = 
@@ -416,7 +416,7 @@ update msg model =
                 in
                   model__ ! [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
                             , checkUnseen model__
-                            , pageTitle "CFDG Gallery"
+                            , pageTitle "Gallery"
                             ]
               Login user password remember ->
                 let
@@ -437,7 +437,7 @@ update msg model =
                   msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
                 in
                   {model_ | errorMessage = msg, viewMode = Error}
-                  ! [ pageTitle "CFDG Gallery - Error" ]
+                  ! [ pageTitle "Gallery - Error" ]
               DesignByID id ->
                 let
                   designId = ID id
@@ -449,7 +449,7 @@ update msg model =
                             , designList = zeroList
                             , pendingLoad = True }
                     ! [ getDesign designId model_
-                      , pageTitle <| "CFDG Gallery - Design " ++ (intStr id)
+                      , pageTitle <| "Gallery - Design"
                       ]
                   Just ddesign ->
                     {model_ | mainDesign = designId , viewMode = Designs}
@@ -457,7 +457,7 @@ update msg model =
                       , getCfdg designId model_
                       , getInfo designId model_
                       , scrollToDesign designId
-                      , pageTitle <| "CFDG Gallery - Design " ++ (intStr id)
+                      , pageTitle <| "Gallery - Design: " ++ ddesign.design.title
                       ]
               EditDesign id ->
                 case model_.user of
@@ -477,14 +477,14 @@ update msg model =
                                   , designList = zeroList
                                   , pendingLoad = True}
                           ! [ loadEditDesign designid model_
-                            , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                            , pageTitle <| "Gallery - Edit Design"
                             ]
                         Just ddesign ->
                           {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                   , viewMode = Editing
                                   , errorMessage = ""}
                           ! [ getInfo designid model_
-                            , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                            , pageTitle <| "Gallery - Edit Design: " ++ ddesign.design.title
                             ]
                   _ -> (model_, Cmd.none)
               EditTags id ->
@@ -501,21 +501,21 @@ update msg model =
                                 , designList = zeroList
                                 , pendingLoad = True}
                         ! [ loadEditDesign designid model_
-                          , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                          , pageTitle <| "Gallery - Edit Design"
                           ]
                       Just ddesign ->
                         {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                 , viewMode = EditingTags
                                 , errorMessage = ""}
                         ! [ getInfo designid model_
-                          , pageTitle <| "CFDG Gallery - Edit Design " ++ (intStr id)
+                          , pageTitle <| "Gallery - Edit Design: " ++ ddesign.design.title
                           ]
                   _ -> (model_, Cmd.none)
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  updateDesigns ("Author " ++ name) model_ (makeUri "by" [name]) start count
+                  updateDesigns name model_ (makeUri "by" [name]) start count
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -531,7 +531,7 @@ update msg model =
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  updateDesigns ("Favorites of " ++ name) model_ (makeUri "faves" [name]) start count
+                  updateDesigns (name ++ " favorite") model_ (makeUri "faves" [name]) start count
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -596,7 +596,7 @@ update msg model =
                           compare b.count a.count   -- descending order
                 in
                   {model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}
-                  ! [ pageTitle "CFDG Gallery - Tag list" ]
+                  ! [ pageTitle "Gallery - Tag list" ]
               Users utype start count ->
                 let
                   (userOrder_, valid) = case utype of
@@ -611,7 +611,7 @@ update msg model =
                   if valid then
                     {model_ | viewMode = People, userOrder = userOrder_}
                     ! [ getUsers ("users/" ++ utype) start count model_
-                      , pageTitle "CFDG Gallery - User list"
+                      , pageTitle "Gallery - User list"
                       ]
                   else
                     model_ ! []
@@ -619,7 +619,7 @@ update msg model =
                 {model_ | viewMode = Translation, cfdg3text = "", errorMessage = ""}
                 ! if idint > 0 then
                     [ translateDesign (ID idint) model_
-                    , pageTitle <| "CFDG Gallery - Translation for " ++ (intStr idint)
+                    , pageTitle <| "Gallery - Translation"
                     ]
                   else
                     []
@@ -717,6 +717,7 @@ update msg model =
                     , errorInfo = Ok "New design"}
             ! [ getComments id model
               , getCfdg id model
+              , pageTitle <| "Gallery - Design: " ++ design.design.title
               ]
         Err error ->
           { model | mainDesign = nonDesign
@@ -730,7 +731,8 @@ update msg model =
           Ok design ->
             { model | editDesign = Just design
                     , pendingLoad = stillPending
-                    , errorInfo = Ok "New edit design"} ! []
+                    , errorInfo = Ok "New edit design"}
+            ! [pageTitle <| "Gallery - Edit Design: " ++ design.design.title]
           Err error ->
             { model | editDesign = Nothing
                     , errorInfo = Err error
@@ -1459,8 +1461,9 @@ view model =
                         [ text "Get the software"]]
                   , td []
                     [ a [ href "https://github.com/MtnViewJohn/context-free/wiki"
-                      , class "call-to-action"]
-                      [ text "Learn Context Free"]]
+                        , class "call-to-action"
+                        ]
+                        [ text "Learn Context Free"]]
                   ]
                 , tr []
                   [ td []
