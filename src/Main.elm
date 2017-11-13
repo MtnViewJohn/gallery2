@@ -416,7 +416,6 @@ update msg model =
                 in
                   model__ ! [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
                             , checkUnseen model__
-                            , getNewbie model__
                             , pageTitle "CFDG Gallery"
                             ]
               Login user password remember ->
@@ -1017,6 +1016,7 @@ update msg model =
           Err _ -> 5
       in
         model ! [ getMiniList model "newest" num
+                , getMiniList model "newbies" num
                 , Random.generate (NewMiniSeed num) (Random.int 1 1000000000)
                 ]
     NewMiniSeed num seed ->
@@ -1250,9 +1250,12 @@ viewMiniList listType desc moreUrl model =
           in 
             List.map ((Design.view vcfg) >> (Html.map DesignMsg)) minilist
         ) ++ 
-        [ br [] []
-        , a [href moreUrl] [text "view more"]
-        ]
+        if moreUrl /= "" then
+          [ br [] []
+          , a [href moreUrl] [text "view more"]
+          ]
+        else
+          []
       )
     Nothing -> text ""
 
@@ -1449,44 +1452,30 @@ view model =
               ]
             , td [class "vupload"]
               [ h2 [] [text "What next?"]
-              , a [ href "../downloads.html", class "call-to-action"] 
-                  [ text "Get the software"]
-              , a [ href "#newest/0", class "call-to-action"] 
-                  [ text "See what people are doing"]
-              , a [ href "https://github.com/MtnViewJohn/context-free/wiki"
-                  , class "call-to-action"]
-                  [ text "Learn Context Free"]
-              , a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
-                  [ text "Join the gallery"]
-              ]
-            , td [style [("width", "310px")]]
-              [ case model.editDesign of
-                  Just edesign ->
-                    let
-                      ddesign = Design.makeDDesign edesign.design
-                    in
-                      table [class "welcometable"]
-                        [ tr []
-                          [ td [class "thumbcell"] 
-                            [ a [href ("#design/" ++ (idStr ddesign.design.designid))] 
-                              [ img [ class "image", src ddesign.design.thumblocation, alt "design thumbnail"] []]
-                            ]
-                          ]
-                        , tr []
-                          [ td [] 
-                            [ text "The Gallery's newest contributor is: "
-                            , a [href (makeUri "#user" [ddesign.design.owner, "0"])] [text ddesign.design.owner]
-                            , text ". Their latest piece is called "
-                            , b [] [text ddesign.design.title]
-                            ]
-                          ]
-                        ]
-                  Nothing ->
-                    text ""
+              , table []
+                [ tr []
+                  [ td []
+                    [ a [ href "../downloads.html", class "call-to-action"] 
+                        [ text "Get the software"]]
+                  , td []
+                    [ a [ href "https://github.com/MtnViewJohn/context-free/wiki"
+                      , class "call-to-action"]
+                      [ text "Learn Context Free"]]
+                  ]
+                , tr []
+                  [ td []
+                    [ a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
+                        [ text " Join the gallery "]]
+                  , td []
+                    [ a [ href "#newest/0", class "call-to-action"] 
+                        [ text "See what people are doing"]]
+                  ]
+                ]
               ]
             ]
           ]
         , viewMiniList "newest" "Newest designs:" "#newest/0" model
+        , viewMiniList "newbie" "Newest designers:" "" model
         , viewMiniList "popula" "Some popular designs:" "#popular/0" model
         , viewMiniList "random" "Some random designs:" 
             ("#random/" ++ (intStr model.miniSeed) ++ "/0") model
@@ -1615,13 +1604,6 @@ deleteComment commentid model =
 decodeCommentId : JD.Decoder CommentID
 decodeCommentId =
   JD.field "commentid" (JD.map CID JD.int)
-      
-getNewbie : Model -> Cmd Msg
-getNewbie model =
-  let
-    url = model.backend ++ "/newbie"
-  in
-    Http.send NewEditDesign (get url decodeEDesign)
       
 
 getDesign : DesignID -> Model -> Cmd Msg
