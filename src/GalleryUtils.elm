@@ -113,8 +113,8 @@ makeUri base rest =
   String.join "/" (base :: (List.map Http.encodeUri rest))
 
 onNav : msg -> Attribute msg
-onNav msg =
-    onWithOptions "click" { stopPropagation = False, preventDefault = True } (JD.succeed msg)
+onNav message =
+    onWithOptions "click" { stopPropagation = False, preventDefault = True } (JD.succeed message)
 
 
 tagHelp : Html msg
