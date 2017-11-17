@@ -1478,7 +1478,7 @@ view model =
             ]
           ]
         , viewMiniList "newest" "Newest designs:" "#newest/0" model
-        , viewMiniList "newbie" "Newest designers:" "" model
+        , viewMiniList "newbie" "Newest contributors:" "" model
         , viewMiniList "popula" "Some popular designs:" "#popular/0" model
         , viewMiniList "random" "Some random designs:" 
             ("#random/" ++ (intStr model.miniSeed) ++ "/0") model
