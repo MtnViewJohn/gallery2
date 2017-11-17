@@ -273,7 +273,7 @@ encodeDesign record =
           , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
           , ("title",      JE.string  <| record.design.title)
           , ("variation",  JE.string  <| record.design.variation)
-          , ("compression",JE.bool    <| record.uploadPNG)
+          , ("compression",JE.string  <| if record.uploadPNG then "PNG-8" else "JPEG")
           , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
           , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
           ]
