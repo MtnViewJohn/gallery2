@@ -123,6 +123,7 @@ type alias Model =
   , pendingLoad : Bool
   , editDesign : Maybe Design.EditDesign
   , designMode : Design.ViewSize
+  , showFans : Bool
   , tagList : List TagInfo
   , userList : UserList
   , userOrder : UserOrder
@@ -145,7 +146,7 @@ initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
 initModel flags loc = 
   let
     model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList Dict.empty 0 False Nothing 
-            Design.Mini [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
+            Design.Mini False [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
   in
     (model, loginSession model)
 
@@ -337,7 +338,7 @@ updateDesigns title model query start count =
     go2server = model.currentHash /= model.designList.currentHash ||
                 model.currentHash == ""
   in
-    {model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server} !
+    {model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server, showFans = False} !
       if go2server then
         [ getDesigns model query start count
         , pageTitle <| "Gallery - " ++ title ++ " designs"
@@ -410,6 +411,7 @@ update msg model =
                 let
                   model__ = {model_ | viewMode = Default
                                     , mainDesign = nonDesign
+                                    , showFans = False
                                     , designList = zeroList
                                     , miniLists = Dict.empty
                                     , pendingLoad = False}
@@ -445,6 +447,7 @@ update msg model =
                 in case mddesign of
                   Nothing -> 
                     {model_ | mainDesign = nonDesign
+                            , showFans = False
                             , viewMode = Designs
                             , designList = zeroList
                             , pendingLoad = True }
@@ -452,7 +455,7 @@ update msg model =
                       , pageTitle <| "Gallery - Design"
                       ]
                   Just ddesign ->
-                    {model_ | mainDesign = designId , viewMode = Designs}
+                    {model_ | mainDesign = designId, showFans = False, viewMode = Designs}
                     ! [ getComments designId model_
                       , getCfdg designId model_
                       , getInfo designId model_
@@ -653,7 +656,7 @@ update msg model =
                   model_ ! [deleteComment commentid model]
                 else
                   {model_ | commentToDelete = commentid} ! []
-              Just (CloseDesign) -> {model_ | mainDesign = nonDesign} ! [Navigation.back 1]
+              Just (CloseDesign) -> {model_ | mainDesign = nonDesign, showFans = False} ! [Navigation.back 1]
               Just (CancelEditAct) -> case model_.editDesign of
                 Nothing -> {model_ | mainDesign = nonDesign} ! [Navigation.back 1]
                 Just edesign ->
@@ -662,12 +665,14 @@ update msg model =
                     , scrollToDesign edesign.design.designid
                     ]
               Just (Focus id) -> 
-                {model_ | mainDesign = id} !
+                {model_ | mainDesign = id, showFans = False} !
                   [ if model_.mainDesign == nonDesign then
                       Navigation.newUrl ("#design/" ++ (idStr id))
                     else
                       Navigation.modifyUrl ("#design/" ++ (idStr id))
                   ]
+              Just (ShowFans show) ->
+                {model_ | showFans = show} ! []
               _ -> model_ ! [resolveAction act_ model_]
     EDesignMsg emsg -> case model.editDesign of
       Nothing -> model ! []
@@ -713,6 +718,7 @@ update msg model =
             { model | designList = designList_
                     , tagList = tags_
                     , mainDesign = id
+                    , showFans = False
                     , pendingLoad = False
                     , errorInfo = Ok "New design"}
             ! [ getComments id model
@@ -721,6 +727,7 @@ update msg model =
               ]
         Err error ->
           { model | mainDesign = nonDesign
+                  , showFans = False
                   , errorInfo = Err error
                   , pendingLoad = False} ! []
     NewEditDesign designResult ->
@@ -746,6 +753,7 @@ update msg model =
           in
             { model | designList = merger
                     , mainDesign = nonDesign
+                    , showFans = False
                     , pendingLoad = False
                     , errorInfo = Ok "New designs"}
             ! if model.designMode == Design.Small then
@@ -948,7 +956,7 @@ update msg model =
               else
                 [Navigation.newUrl ("#" ++ designList_.thislink)]
           in
-            { model | designList = designList_, mainDesign = nonDesign
+            { model | designList = designList_, mainDesign = nonDesign, showFans = False
                     , errorInfo = Ok "Design deleted"} ! cmds_
         Err error ->
           {model | errorInfo = Err error} ! [Navigation.newUrl "#error/Delete%20failed%2e"]
@@ -986,6 +994,7 @@ update msg model =
                     , errorInfo = Ok "Upload success"
                     , viewMode = Designs
                     , mainDesign = id
+                    , showFans = False
                     , tagList = tags_} ! cmds_
         Err error ->
           (errorModel error "Upload" model) ! []
@@ -1155,7 +1164,7 @@ makeViewConfig model size =
       _ -> Nothing
     minilist = model.viewMode == Default
   in
-    Design.ViewConfig size muser focus prev next model.designToDelete model.commentToDelete minilist
+    Design.ViewConfig size muser focus prev next model.designToDelete model.commentToDelete minilist model.showFans
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =

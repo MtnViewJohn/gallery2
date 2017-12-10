@@ -63,6 +63,7 @@ type Action
     | CreateComment String
     | CancelEditAct
     | CloseDesign
+    | ShowFans Bool
     | GetFile String
 
 type alias TagInfo =

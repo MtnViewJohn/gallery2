@@ -313,6 +313,7 @@ type Msg
     | CancelDelete
     | FocusClick
     | DismissDesign
+    | ViewFans Bool
     | AddFavesClick
     | RemoveFavesClick
     | CommentMsg Comment.MsgId
@@ -349,6 +350,7 @@ update msg ddesign =
     CancelDelete -> (ddesign, Just (DeleteDesign nonDesign))
     FocusClick -> (ddesign, Just (Focus ddesign.design.designid))
     DismissDesign -> (ddesign, Just CloseDesign)
+    ViewFans v -> (ddesign, Just <| ShowFans v)
     AddFavesClick -> (ddesign, Just (AddFaves ddesign.design.designid))
     RemoveFavesClick -> (ddesign, Just (RemoveFaves ddesign.design.designid))
     CommentMsg (cmsg, id) ->
@@ -541,6 +543,7 @@ type alias ViewConfig =
     , readyToDelete : DesignID
     , commentToDelete : CommentID
     , miniListMode : Bool
+    , showFanlist : Bool
     }
 
 fullImageAttributes : Design -> List (Attribute MsgId)
@@ -922,7 +925,7 @@ view cfg design =
                   [ ]
             ) ++
             (
-              [ div [id (if (List.length design.design.fans) <= 5 then "favelist" else "foolist")] 
+              [ div [id "favelist"] 
                   (( case cfg.currentUser of
                       Nothing -> text ""
                       Just user ->
@@ -938,9 +941,20 @@ view cfg design =
                             ] [ text ""]
                   ) ::
                   ( if not (List.isEmpty design.design.fans) then
-                    ( [text (fanCount design.design.numvotes), text ": "] ++ 
-                      (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
-                    )
+                      [ text (fanCount design.design.numvotes), text ": "
+                      , a [href "#", onNav ((ViewFans True),design.design.designid)] 
+                          [text "See who liked it"]
+                      , div
+                        [ class "popup"
+                        , style [("display", if cfg.showFanlist then "block" else "none")]
+                        ]
+                      ( [ h2 [] [text "Fans:"]
+                        , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
+                            [text "✖"]
+                        ] ++ 
+                        (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
+                      )
+                      ] 
                     else
                       []
                   ))
