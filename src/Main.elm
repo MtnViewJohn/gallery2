@@ -15,7 +15,7 @@ import Random
 import GalleryUtils exposing (..)
 import Time exposing (Time)
 import Task
-import Array exposing (Array)
+import Array.Hamt as Array exposing (Array)
 import Ports exposing (..)
 import Dom
 import Dom.Size
@@ -1670,7 +1670,8 @@ getDesigns model query start count =
 decodeDesigns : JD.Decoder DesignList
 decodeDesigns = 
   JD.map7 DesignList
-    (JD.field "designs" (JD.array Design.decodeDDesign))
+    -- Have to use JD.list instead of JD.array because of the Skinney array replacement
+    (JD.field "designs" (JD.map Array.fromList <| JD.list Design.decodeDDesign))
     (JD.field "prevlink" JD.string)
     (JD.field "nextlink" JD.string)
     (JD.field "thislink" JD.string)
