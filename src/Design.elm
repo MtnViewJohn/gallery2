@@ -64,6 +64,7 @@ type alias Design =
     , filelocation : String
     , imagelocation : String
     , imagesize : Maybe Size
+    , thumbsize : Maybe Size
     , notes : String
     , notesmd : String
     , numvotes : Int
@@ -173,7 +174,7 @@ initDesign user ccURI now =
         ("https://licensebuttons.net/p/zero/1.0/88x31.png","CC0 1.0 Universal (CC0 1.0) Public Domain Dedication","https://creativecommons.org/publicdomain/zero/1.0/")
       else
         ("No license chosen", "", "")
-    design = Design image name uri (ID 0) [] "" "" Nothing "" "" 0 user "" [] "" Untiled "" now ""
+    design = Design image name uri (ID 0) [] "" "" Nothing Nothing "" "" 0 user "" [] "" Untiled "" now ""
   in
     makeEDesign design
 
@@ -238,6 +239,7 @@ decodeDesign =
         |> JPipe.required "filelocation" (JD.string)
         |> JPipe.required "imagelocation" (JD.string)
         |> JPipe.optional "imagesize" (JD.maybe decodeSize) Nothing
+        |> JPipe.optional "thumbsize" (JD.maybe decodeSize) Nothing
         |> JPipe.required "notes" (JD.string)
         |> JPipe.required "notesmd" (JD.string)
         |> JPipe.required "numvotes" (JD.int)
@@ -660,7 +662,7 @@ thumbImageAttributes design =
 thumbImage : Design -> Html MsgId
 thumbImage design =
   let
-    sz = Maybe.withDefault (Size 300 300) design.imagesize
+    sz = Maybe.withDefault (Size 300 300) design.thumbsize
   in
     case design.tiled of
       Untiled ->
@@ -697,7 +699,7 @@ thumbImage design =
 minHeight : Design -> Int
 minHeight design =
   let
-    sz = Maybe.withDefault (Size 300 300) design.imagesize
+    sz = Maybe.withDefault (Size 300 300) design.thumbsize
   in
     case design.tiled of
       Untiled -> sz.height + 5
