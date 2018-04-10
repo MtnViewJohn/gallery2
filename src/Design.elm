@@ -569,6 +569,9 @@ fullImageAttributes design =
             in
               intStr (2 * sz.height) ++ "px"
           )
+        , ("position", "absolute")
+        , ("height", "100%")
+        , ("margin-top", "-36px")
         ]
       ]
     else
@@ -818,7 +821,10 @@ view cfg design =
     addHRs = size == Large && (cfg.size == Small || cfg.size == Mini)
   in case size of
     Large ->
-      div [id ("design" ++ (idStr design.design.designid))]
+      div 
+      [ id ("design" ++ (idStr design.design.designid))
+      , style [("position", "relative")]
+      ]
       [ if addHRs then
           hr [] []
         else
