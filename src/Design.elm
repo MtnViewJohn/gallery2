@@ -618,8 +618,8 @@ fullImageAttributes design =
 thumbImageAttributes : Design -> List (Attribute MsgId)
 thumbImageAttributes design =
   let
-    imageurl = "url(" ++ design.imagelocation ++ ")"
-    sz = Maybe.withDefault (Size 300 300) design.imagesize
+    imageurl = "url(" ++ design.thumblocation ++ ")"
+    sz = Maybe.withDefault (Size 300 300) design.thumbsize
   in
     case design.tiled of
       Untiled ->
