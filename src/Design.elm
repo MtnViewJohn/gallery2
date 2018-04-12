@@ -767,54 +767,158 @@ thumbLink cfg linkClass id contents =
       , class linkClass 
       ] contents
 
-viewThumbInfo : ViewConfig -> DisplayDesign -> List (Html MsgId)
-viewThumbInfo cfg design =
-  List.concat
-  [ [ b [] [text design.design.title ]
-    , br [] []
-    , text " by "
-    , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-        [ b [] [text design.design.owner] ]
-    ]
-    , if design.design.numvotes > 0 then
-        [ br [] []
-        , span [class "small"] [text (fanCount design.design.numvotes)]
-        ]
-      else
-        []
-  , [ div []
-      (
-        [ downloadLink design.design.filelocation ""
-        , text " "
-        , thumbLink cfg "button viewbutton" design.design.designid []
-        , text " "
-        ] ++ 
-        (
-          if not cfg.miniListMode && canModify design.design.owner cfg.currentUser then
-            if cfg.readyToDelete == design.design.designid then
-              [a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                  , class "keepbutton"
-                  ] [ ]
-              , text " "
-              , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                  , class "confirmbutton"
-                  ] [ ]
-              ]
-            else
-              [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                  , class "button deletebutton"
-                  ] [ ]
-              , text " "
-              , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
-                  , class "button editbutton"
-                  ] [ ]
-              ]
-          else
-            [ ]
+viewEditDeleteButtons : Bool -> ViewConfig -> DisplayDesign -> List (Html MsgId)
+viewEditDeleteButtons icons cfg design =
+  if canModify design.design.owner cfg.currentUser then  
+    if cfg.readyToDelete == design.design.designid then
+      [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
+          , class "keepbutton"
+          ] [ text <| if icons then "" else "Cancel"]
+      , text " "
+      , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
+          , class "confirmbutton"
+          ] [ text <| if icons then "" else "Confirm"]
+      , text " "
+      ]
+    else
+      [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
+          , class "button deletebutton" 
+          ] [ text  <| if icons then "" else " Delete "]
+      , text " "
+      , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
+          , class "button editbutton"
+          ] [ text  <| if icons then "" else " Edit "]
+      , text " "
+      ]
+  else
+    if not icons && canTag design.design.owner cfg.currentUser then
+      [ a [ href ("#edittags/" ++ (idStr design.design.designid)), title "Edit this design's tags."
+          , class "button editbutton"
+          ] [ text "Edit Tag"]
+      ]
+    else
+      [ ]
+
+
+
+viewDesignInfo : ViewSize -> ViewConfig -> DisplayDesign -> List (Html MsgId)
+viewDesignInfo size cfg design =
+  case size of
+    Large ->
+      [ b [] [ text design.design.title ]
+      , br [] []
+      , text "by " 
+      , a [href (makeUri "#user" [design.design.owner, "0"])] 
+          [ b [] [text design.design.owner]]
+      , if isEmpty design.design.variation then
+          text ""
+        else
+          span [] [text ", Variation: ", b [] [text design.design.variation]]
+      , b [] [text (tileText design.design.tiled)]
+        , text (", uploaded on " ++ (makeDate design.design.uploaddate))
+      , if not (List.isEmpty design.design.tags) then
+          div [] 
+           ([text "Tags: "] ++ (List.map makeTagLink design.design.tags))
+        else
+          text " "
+      , div [class "buttondiv"] 
+        ( [ downloadLink design.design.filelocation " Download CFDG "
+          , text " "
+          , imageLink design.design.imagelocation " Download Image "
+          , text " "
+          , a [href (makeUri "#translate" [idStr design.design.designid]), title "Translate v2 to v3"
+              , class "button translate"
+              ] [text "Translate"]
+          , text " "
+          ] ++
+          ( viewEditDeleteButtons False cfg design
+          ) ++
+          (
+            [ div [id "favelist"] 
+              (( case cfg.currentUser of
+                  Nothing -> text ""
+                  Just user ->
+                    if List.member user.name design.design.fans then
+                      a [ href "#", onNav (RemoveFavesClick,design.design.designid)
+                        , title "Click to 'Unlike' this design."
+                        , class "button favebutton removefave"
+                        ] [ text ""]
+                    else
+                      a [ href "#", onNav (AddFavesClick,design.design.designid)
+                        , title "Click to 'Like' this design."
+                        , class "button favebutton addfave"
+                        ] [ text ""]
+              ) ::
+              ( if not (List.isEmpty design.design.fans) then
+                  [ text (fanCount design.design.numvotes), text ": "
+                  , a [href "#", onNav ((ViewFans True),design.design.designid)] 
+                      [text "See who liked it"]
+                  , div
+                    [ class "popup"
+                    , style [("display", if cfg.showFanlist then "block" else "none")]
+                    ]
+                  ( [ h2 [] [text "Fans:"]
+                    , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
+                        [text "✖"]
+                    ] ++ 
+                    (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
+                  )
+                  ] 
+                else
+                  []
+              ))
+            ]
+          )
         )
-      )
-    ]
-  ]
+      ]
+    Medium ->
+      [ b [] [text design.design.title ]
+      , text " by "
+      , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+          [ b [] [text design.design.owner] ]
+      , if isEmpty design.design.variation then
+          text ""
+        else
+          span [] [text ", Variation: ", b [] [text design.design.variation]]
+      , b [] [text (tileText design.design.tiled)]
+      , text (", uploaded on " ++ (makeDate design.design.uploaddate))
+      , if design.design.numvotes > 0 then
+          div [class "small"] [text (fanCount design.design.numvotes) ]
+        else
+          div [] []
+      , div [class "buttondiv"]
+        ( [ downloadLink design.design.filelocation " Download CFDG "
+          , text " "
+          , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
+              , class "button viewbutton" 
+              ] [ text " View "]
+          , text " "
+          ] ++
+          viewEditDeleteButtons False cfg design
+        )
+      , div [] [text ("link tag: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")]
+      , div [style [("padding-bottom", "10px")]] [ viewCC design.design ]
+      ]
+    _ ->
+      [ b [] [text design.design.title ]
+      , br [] []
+      , text " by "
+      , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
+          [ b [] [text design.design.owner] ]
+      , if design.design.numvotes > 0 then
+          div [class "small"] [text (fanCount design.design.numvotes)]
+        else
+          text " "
+      , div []
+        (
+          [ downloadLink design.design.filelocation ""
+          , text " "
+          , thumbLink cfg "button viewbutton" design.design.designid []
+          , text " "
+          ] ++ 
+          viewEditDeleteButtons True cfg design
+        )
+      ]
 
 view : ViewConfig -> DisplayDesign -> Html MsgId
 view cfg design =
@@ -867,155 +971,57 @@ view cfg design =
         ]
       , div 
         ( if showOnSide design.design then
-            [ style [("padding-left", "150px")]
-            ]
+            [ style [("padding-left", "150px")] ]
           else
             []
         )
-        (List.concat
-        [ [ b [] [ text design.design.title ]
-          , br [] []
-          , text "by " 
-          , a [href (makeUri "#user" [design.design.owner, "0"])] 
-              [ b [] [text design.design.owner]]
-          ]
-        , if isEmpty design.design.variation then
-            [ text "" ]
-          else
-            [ text ", Variation: ", b [] [text design.design.variation] ]
-        , [ b [] [text (tileText design.design.tiled)]
-          , text (", uploaded on " ++ (makeDate design.design.uploaddate))
-          ]
-        , if not (List.isEmpty design.design.tags) then
-            [ div [] 
-               ([text "Tags: "] ++ (List.map makeTagLink design.design.tags))
+        [ table [style [("table-layout","fixed"),("width","100%")]]
+          [ tr [] 
+            [ td [colspan 2]
+                 [ div [class "ccInfo"] <| viewDesignInfo size cfg design]
             ]
-          else
-            []
-        , [ div [class "buttondiv"] 
-          ( [ downloadLink design.design.filelocation " Download CFDG "
-            , text " "
-            , imageLink design.design.imagelocation " Download Image "
-            , text " "
-            , a [href (makeUri "#translate" [idStr design.design.designid]), title "Translate v2 to v3"
-                , class "button translate"
-                ] [text "Translate"]
-            , text " "
-            ] ++
-            ( if canModify design.design.owner cfg.currentUser then  
-                if cfg.readyToDelete == design.design.designid then
-                  [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                      , class "keepbutton"
-                      ] [ text "Cancel"]
-                  , text " "
-                  , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                      , class "confirmbutton"
-                      ] [ text "Confirm"]
-                  , text " "
-                  ]
-                else
-                  [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                      , class "button deletebutton" 
-                      ] [ text " Delete "]
-                  , text " "
-                  , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
-                      , class "button editbutton"
-                      ] [ text " Edit "]
-                  , text " "
-                  ]
-              else
-                if canTag design.design.owner cfg.currentUser then
-                  [ a [ href ("#edittags/" ++ (idStr design.design.designid)), title "Edit this design's tags."
-                      , class "button editbutton"
-                      ] [ text "Edit Tag"]
-                  ]
-                else
-                  [ ]
-            ) ++
-            (
-              [ div [id "favelist"] 
-                  (( case cfg.currentUser of
-                      Nothing -> text ""
-                      Just user ->
-                        if List.member user.name design.design.fans then
-                          a [ href "#", onNav (RemoveFavesClick,design.design.designid)
-                            , title "Click to 'Unlike' this design."
-                            , class "button favebutton removefave"
-                            ] [ text ""]
-                        else
-                          a [ href "#", onNav (AddFavesClick,design.design.designid)
-                            , title "Click to 'Like' this design."
-                            , class "button favebutton addfave"
-                            ] [ text ""]
-                  ) ::
-                  ( if not (List.isEmpty design.design.fans) then
-                      [ text (fanCount design.design.numvotes), text ": "
-                      , a [href "#", onNav ((ViewFans True),design.design.designid)] 
-                          [text "See who liked it"]
-                      , div
-                        [ class "popup"
-                        , style [("display", if cfg.showFanlist then "block" else "none")]
-                        ]
-                      ( [ h2 [] [text "Fans:"]
-                        , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
-                            [text "✖"]
-                        ] ++ 
-                        (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
-                      )
-                      ] 
-                    else
-                      []
-                  ))
+          , tr []
+            [ td [] [viewCC design.design]
+            , td [class "rightcell"]
+              [ text ("To link to this design: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")
               ]
-            )
-          )
-          ]
-        , [ table [style [("table-layout","fixed"),("width","100%")]]
-            [ tr []
-              [ td [] [viewCC design.design]
-              , td [class "rightcell"]
-                [ text ("To link to this design: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")
+            ]
+          , tr []
+            [ td [class "halfcell"]
+              [ div [class "filediv"]
+                [ design.noteshtml
+                , design.cfdghtml
+                ]
+              , div [class "disclaimer"]
+                [ text """
+  An uploaded image and the corresponding CFDG are both presumed to be owned by the uploader. 
+  The CFDG Gallery makes no claims about ownership whatsoever. Peace!
+  """
                 ]
               ]
-            , tr []
-              [ td [class "halfcell"]
-                [ div [class "filediv"]
-                  [ design.noteshtml
-                  , design.cfdghtml
-                  ]
-                , div [class "disclaimer"]
-                  [ br [] []
-                  , br [] []
-                  , text """
-    An uploaded image and the corresponding CFDG are both presumed to be owned by the uploader. 
-    The CFDG Gallery makes no claims about ownership whatsoever. Peace!
-    """
-                  ]
-                ]
-              , td [class "commentcell"]
-                ( let
-                    editing = List.any Comment.isEditable design.comments
-                    user = if editing then Nothing else cfg.currentUser
-                    commentcfg = Comment.ViewConfig user cfg.commentToDelete
-                  in
-                    [ div [class "commentsdiv"]
-                      (List.intersperse (hr [][])
-                        (List.map ((Comment.view commentcfg) >> (Html.map (commentMsgId design.design.designid)))
-                          ( design.comments
-                            ++
-                            if cfg.currentUser == Nothing || editing then
-                              []
-                            else
-                              [design.emptyComment]
-                          )
+            , td [class "commentcell"]
+              ( let
+                  editing = List.any Comment.isEditable design.comments
+                  user = if editing then Nothing else cfg.currentUser
+                  commentcfg = Comment.ViewConfig user cfg.commentToDelete
+                in
+                  [ div [class "commentsdiv"]
+                    (List.intersperse (hr [][])
+                      (List.map ((Comment.view commentcfg) >> (Html.map (commentMsgId design.design.designid)))
+                        ( design.comments
+                          ++
+                          if cfg.currentUser == Nothing || editing then
+                            []
+                          else
+                            [design.emptyComment]
                         )
                       )
-                    ]
-                )
-              ]
+                    )
+                  ]
+              )
             ]
           ]
-        ])
+        ]
       , if addHRs then
           hr [] []
         else
@@ -1033,66 +1039,12 @@ view cfg design =
       [ div (thumbImageAttributes design.design)
         [ thumbImage design.design ]
       , div [style [("padding-left", "310px")]]
-          (List.concat
-          [ [ b [] [text design.design.title ]
-            , text " by "
-            , a [ href (makeUri "#user" [design.design.owner, "0"]) ] 
-                [ b [] [text design.design.owner] ]
-            ]
-            , if isEmpty design.design.variation then
-                [ text "" ]
-              else
-                [ text ", Variation: ", b [] [text design.design.variation] ]
-            , [ b [] [text (tileText design.design.tiled)]
-              , text (", uploaded on " ++ (makeDate design.design.uploaddate))
+        [ div [style [("padding-left", "5px")]] <| viewDesignInfo size cfg design
+        , div [class "filediv", style [("width","95%")]]
+              [ design.noteshtml
+              , div [class "minicfdg"] [design.cfdghtml]
               ]
-            , if design.design.numvotes > 0 then
-                [ div [class "small"] [text (fanCount design.design.numvotes) ]
-                ]
-              else
-                [div [] []]
-          , [ div [class "buttondiv"]
-              ( [ downloadLink design.design.filelocation " Download CFDG "
-                , text " "
-                , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
-                    , class "button viewbutton" 
-                    ] [ text " View "]
-                , text " "
-                ] ++
-                if canModify design.design.owner cfg.currentUser then
-                  if cfg.readyToDelete == design.design.designid then
-                    [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-                        , class "keepbutton"
-                        ] [ text "Cancel"]
-                    , text " "
-                    , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-                        , class "confirmbutton"
-                        ] [ text "Confirm"]
-                    ]
-                  else
-                    [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-                        , class "button deletebutton" 
-                        ] [ text " Delete "]
-                    , text " "
-                    , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
-                        , class "button editbutton"
-                        ] [ text " Edit "]
-                    ]
-                else
-                  [ ]
-              )
-            ]
-          , [ br [][]
-            , text ("link tag: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")
-            ]
-          , [ viewCC design.design ]
-          , [ br [] []
-            , div [class "filediv", style [("width","95%")]]
-                [ design.noteshtml
-                , div [class "minicfdg"] [design.cfdghtml]
-                ]
-            ]
-          ])
+        ]
       ]
     Small ->
       table [class "med_thumbtable", id ("design" ++ (idStr design.design.designid))]
@@ -1103,7 +1055,7 @@ view cfg design =
             ]
           ]
         , tr []
-          [ td [] (viewThumbInfo cfg design)
+          [ td [] (viewDesignInfo size cfg design)
           ]
         ]
     Mini ->
@@ -1113,7 +1065,7 @@ view cfg design =
             [ thumbLink cfg "" design.design.designid
               [ img [ class "image", src design.design.smthumblocation, alt "design thumbnail"] []]
             ]
-          , td [class "sm_thumbinfo"] (viewThumbInfo cfg design)
+          , td [class "sm_thumbinfo"] (viewDesignInfo size cfg design)
           ]
         ]
 
@@ -1169,167 +1121,167 @@ viewTagEdit tags edesign =
 
 viewEdit : List TagInfo -> EditDesign -> Html EMsg
 viewEdit tags edesign =
-      div []
-      [ if edesign.design.designid == nonDesign then
-          h1 [] [text "Upload your artwork!"]
-        else
-          h1 [] [text "Update your artwork!"]
-      , div [style [("width", "600px")]]
-        [ text "Pick a title for your artwork (e.g. \"People Dancing and Dying\") "
-        , text "and upload it here. If you are using "
-        , b [] [text "Context Free"]
-        , text " for Mac or Windows you can upload directly from the program."
-        , br [][]
-        , br [][]
+  div []
+  [ if edesign.design.designid == nonDesign then
+      h1 [] [text "Upload your artwork!"]
+    else
+      h1 [] [text "Update your artwork!"]
+  , div [style [("width", "600px")]]
+    [ text "Pick a title for your artwork (e.g. \"People Dancing and Dying\") "
+    , text "and upload it here. If you are using "
+    , b [] [text "Context Free"]
+    , text " for Mac or Windows you can upload directly from the program."
+    , br [][]
+    , br [][]
+    ]
+  , Html.form [method "POST", action "#", 
+          enctype "multipart/form-data", onSubmit Upload]
+    [ table [class "upload"]
+      [ tr []
+        [ td [] [b [] [text "Title"], text ":"]
+        , td [] [input [type_ "text", size 30, maxlength 100, name "title"
+                , attribute "data-lpignore" "true"
+                , value edesign.design.title, onInput TitleChange][]]
+        , td 
+          [ class "alert"
+         , style [("visibility", if (validateTitle edesign.design.title) then "hidden" else "visible")]
+          ] [text "Title must be between 3 and 100 characters."]
         ]
-      , Html.form [method "POST", action "#", 
-              enctype "multipart/form-data", onSubmit Upload]
-        [ table [class "upload"]
-          [ tr []
-            [ td [] [b [] [text "Title"], text ":"]
-            , td [] [input [type_ "text", size 30, maxlength 100, name "title"
-                    , attribute "data-lpignore" "true"
-                    , value edesign.design.title, onInput TitleChange][]]
-            , td 
-              [ class "alert"
-             , style [("visibility", if (validateTitle edesign.design.title) then "hidden" else "visible")]
-              ] [text "Title must be between 3 and 100 characters."]
+      , tr []
+        [ td [] [b [] [text "CFDG"], text " file:"]
+        , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
+                , on "change" (JD.succeed (FileChange "cfdgfile"))][]]
+        , td 
+          [ class (if (validateCfdg edesign) then "foo" else "alert")]
+          [ if validateCfdg edesign then
+              if (edesign.fileSelected) then
+                text " "
+              else
+                text "Existing CFDG file will be kept."
+            else
+              text "CFDG file must be chosen."
+          ]
+        ]
+      , tr []
+        [ td [] [b [] [text "PNG"], text " file:"]
+        , td [] [ input [type_ "file", name "imagefile", id "imagefile"
+                , on "change" (JD.succeed (FileChange "imagefile"))] []]
+        , td 
+          [ class (if (validateImage edesign) then "foo" else "alert")]
+          [ if validateImage edesign then
+              if (edesign.imageSelected) then
+                text " "
+              else
+                text "Existing image file will be kept."
+            else
+              text "PNG file must be chosen."
+          ]
+        ]
+      , tr [] 
+        [ td [] [text "Image upload compression type:"]
+        , td [] 
+          [ input 
+            [ type_ "radio"
+            , name "compression"
+            , value "JPEG"
+            , checked (not edesign.uploadPNG)
+            , onClick (PNGchoose False)
+            ][]
+          , text " JPEG "
+          , input 
+            [ type_ "radio"
+            , name "compression"
+            , value "PNG-8"
+            , checked (edesign.uploadPNG)
+            , onClick (PNGchoose True)
+            ][]
+          , text " PNG-8 "
+          ]
+        , td [][]
+        ]
+      , tr []
+        [ td [] [b [] [text "Variation"], text ":"]
+        , td [] [ input [type_ "text", size 9, maxlength 6, name "variation"
+                , value edesign.design.variation
+                , onInput VariationChange
+                ][]]
+        , td 
+         [ class "alert"
+         , style [("visibility", if (validateVariation edesign.design.variation) then "hidden" else "visible")]
+         ] [text "Variation must be 0 to 6 letters."]
+        ]
+      , viewTagEdit tags edesign
+      , tr []
+        [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
+        , td [] 
+          [ select [name "tiledtype", size 1, onSelect TiledChange]
+            [ option [value "0", selected (edesign.design.tiled == Untiled)] [text "Not tiled"]
+            , option [value "1", selected (edesign.design.tiled == Hfrieze)] [text "Horizontal frieze"]
+            , option [value "2", selected (edesign.design.tiled == Vfrieze)] [text "Vertical frieze"]
+            , option [value "3", selected (edesign.design.tiled == Tiled)]   [text "Tiled"]
             ]
-          , tr []
-            [ td [] [b [] [text "CFDG"], text " file:"]
-            , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
-                    , on "change" (JD.succeed (FileChange "cfdgfile"))][]]
-            , td 
-              [ class (if (validateCfdg edesign) then "foo" else "alert")]
-              [ if validateCfdg edesign then
-                  if (edesign.fileSelected) then
-                    text " "
-                  else
-                    text "Existing CFDG file will be kept."
-                else
-                  text "CFDG file must be chosen."
+          ]
+        , td [][]
+        ]
+      , tr []
+        [ td [class "vupload"]
+          [ p [] [b [] [text "Author notes"], text ":"]
+          , p [] [text "Please, please, please make sure that any included cfdg files are in the gallery as well and put links to them here."]
+          ]
+        , td [colspan 2]
+          [ textarea
+            [ rows 5, cols 20, maxlength 1000
+            , name "notes", value edesign.design.notes
+            , onInput NotesChange
+            ] []
+          , tagHelp
+          ]
+        ]
+      , tr []
+        [ td [class "vupload"] [b [] [text "Set License"], text ":"]
+        , td [colspan 2]
+          [ select [name "cclicense", size 1, onSelect CCchange]
+            [ option (makeSelectAttrs "-" edesign.ccLicense) [text "No change"]
+            , optgroup [attribute "label" "Public Domain"]
+              [ option (makeSelectAttrs "zero" edesign.ccLicense) [text "Creative Commons Zero"]]
+            , optgroup [attribute "label" "Creative Commons Licenses"]
+              [ option (makeSelectAttrs "by" edesign.ccLicense) [text "Creative Commons Attribution"]
+              , option (makeSelectAttrs "by-sa" edesign.ccLicense) [text "Creative Commons Attribution-ShareAlike"]
+              , option (makeSelectAttrs "by-nd" edesign.ccLicense) [text "Creative Commons Attribution-NoDerivatives"]
+              , option (makeSelectAttrs "by-nc" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial"]
+              , option (makeSelectAttrs "by-nc-sa" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial-ShareAlike"]
+              , option (makeSelectAttrs "by-nc-nd" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial-NoDerivatives"]
               ]
-            ]
-          , tr []
-            [ td [] [b [] [text "PNG"], text " file:"]
-            , td [] [ input [type_ "file", name "imagefile", id "imagefile"
-                    , on "change" (JD.succeed (FileChange "imagefile"))] []]
-            , td 
-              [ class (if (validateImage edesign) then "foo" else "alert")]
-              [ if validateImage edesign then
-                  if (edesign.imageSelected) then
-                    text " "
-                  else
-                    text "Existing image file will be kept."
-                else
-                  text "PNG file must be chosen."
-              ]
-            ]
-          , tr [] 
-            [ td [] [text "Image upload compression type:"]
-            , td [] 
-              [ input 
-                [ type_ "radio"
-                , name "compression"
-                , value "JPEG"
-                , checked (not edesign.uploadPNG)
-                , onClick (PNGchoose False)
-                ][]
-              , text " JPEG "
-              , input 
-                [ type_ "radio"
-                , name "compression"
-                , value "PNG-8"
-                , checked (edesign.uploadPNG)
-                , onClick (PNGchoose True)
-                ][]
-              , text " PNG-8 "
-              ]
-            , td [][]
-            ]
-          , tr []
-            [ td [] [b [] [text "Variation"], text ":"]
-            , td [] [ input [type_ "text", size 9, maxlength 6, name "variation"
-                    , value edesign.design.variation
-                    , onInput VariationChange
-                    ][]]
-            , td 
-             [ class "alert"
-             , style [("visibility", if (validateVariation edesign.design.variation) then "hidden" else "visible")]
-             ] [text "Variation must be 0 to 6 letters."]
-            ]
-          , viewTagEdit tags edesign
-          , tr []
-            [ td [] [text "Design is ", b[] [text "tiled"], text " or ", b [][text "frieze"], text ":"]
-            , td [] 
-              [ select [name "tiledtype", size 1, onSelect TiledChange]
-                [ option [value "0", selected (edesign.design.tiled == Untiled)] [text "Not tiled"]
-                , option [value "1", selected (edesign.design.tiled == Hfrieze)] [text "Horizontal frieze"]
-                , option [value "2", selected (edesign.design.tiled == Vfrieze)] [text "Vertical frieze"]
-                , option [value "3", selected (edesign.design.tiled == Tiled)]   [text "Tiled"]
-                ]
-              ]
-            , td [][]
-            ]
-          , tr []
-            [ td [class "vupload"]
-              [ p [] [b [] [text "Author notes"], text ":"]
-              , p [] [text "Please, please, please make sure that any included cfdg files are in the gallery as well and put links to them here."]
-              ]
-            , td [colspan 2]
-              [ textarea
-                [ rows 5, cols 20, maxlength 1000
-                , name "notes", value edesign.design.notes
-                , onInput NotesChange
-                ] []
-              , tagHelp
-              ]
-            ]
-          , tr []
-            [ td [class "vupload"] [b [] [text "Set License"], text ":"]
-            , td [colspan 2]
-              [ select [name "cclicense", size 1, onSelect CCchange]
-                [ option (makeSelectAttrs "-" edesign.ccLicense) [text "No change"]
-                , optgroup [attribute "label" "Public Domain"]
-                  [ option (makeSelectAttrs "zero" edesign.ccLicense) [text "Creative Commons Zero"]]
-                , optgroup [attribute "label" "Creative Commons Licenses"]
-                  [ option (makeSelectAttrs "by" edesign.ccLicense) [text "Creative Commons Attribution"]
-                  , option (makeSelectAttrs "by-sa" edesign.ccLicense) [text "Creative Commons Attribution-ShareAlike"]
-                  , option (makeSelectAttrs "by-nd" edesign.ccLicense) [text "Creative Commons Attribution-NoDerivatives"]
-                  , option (makeSelectAttrs "by-nc" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial"]
-                  , option (makeSelectAttrs "by-nc-sa" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial-ShareAlike"]
-                  , option (makeSelectAttrs "by-nc-nd" edesign.ccLicense) [text "Creative Commons Attribution-NonCommercial-NoDerivatives"]
-                  ]
-                , optgroup [attribute "label" "Default Copyright"]
-                  [ option [value ""][text "All Rights Reserved"]]
-                ]
-              ]
-            ]
-          , tr []
-            [ td [][text "Current License:"]
-            , td [colspan 2] [viewCC edesign.design]
-            ]
-          , tr []
-            [ td [] 
-              [ input 
-                [ type_ "submit"
-                , value
-                    (if edesign.design.designid == nonDesign then
-                      "Upload Design"
-                    else
-                      "Update Design")
-                , disabled (not (validDesign edesign))
-                ] []
-              , text " "
-              , input [type_ "submit", value "Cancel", onNav CancelEdit] []
-              ]
-            , td [colspan 2] 
-              [ input [type_ "hidden", name "designid", value (idStr edesign.design.designid)] []
-              ]
+            , optgroup [attribute "label" "Default Copyright"]
+              [ option [value ""][text "All Rights Reserved"]]
             ]
           ]
         ]
+      , tr []
+        [ td [][text "Current License:"]
+        , td [colspan 2] [viewCC edesign.design]
+        ]
+      , tr []
+        [ td [] 
+          [ input 
+            [ type_ "submit"
+            , value
+                (if edesign.design.designid == nonDesign then
+                  "Upload Design"
+                else
+                  "Update Design")
+            , disabled (not (validDesign edesign))
+            ] []
+          , text " "
+          , input [type_ "submit", value "Cancel", onNav CancelEdit] []
+          ]
+        , td [colspan 2] 
+          [ input [type_ "hidden", name "designid", value (idStr edesign.design.designid)] []
+          ]
+        ]
       ]
+    ]
+  ]
 
 viewEditTags : List TagInfo -> EditDesign -> Html EMsg
 viewEditTags tags edesign =

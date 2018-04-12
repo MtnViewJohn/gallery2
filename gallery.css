@@ -224,7 +224,7 @@ table.tagstable th.dates {
     border-bottom:1px solid #aaccff;
     margin-bottom:15px;
 }
-div.ccInfo {margin: 4px 0;}
+div.ccInfo {margin: 4px 6px;}
 div.ccInfo a.ccIcon {float:left; margin-right: 4px;}
 .alert { color:#990000; font-weight:bold; }
 .clearleft { clear: left; padding: 5px;}
