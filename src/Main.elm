@@ -1123,20 +1123,20 @@ makeHeader thislink =
     likes = namepos ++ " Likes"
     linktext = "To link to this author: [link user:" ++ name ++ "] ... [/link] "
   in case urltype of
-    "title" ->
+    "#title" ->
       div []
         ([ a [class "letterref", href "#title/0"] [b [] [text "all"]], text " "]
         ++
         List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
         ++ [hr [][]])
-    "faves" ->
+    "#faves" ->
       makeTabs 
         [ TabInfo Empty " " ""
         , TabInfo Inactive designs <| makeUri "#user" [urlname, "0"]
         , TabInfo Active likes ""
         , TabInfo Rest linktext ""
         ]
-    "user" ->
+    "#user" ->
       makeTabs 
         [ TabInfo Empty " " ""
         , TabInfo Active designs ""
@@ -1168,7 +1168,7 @@ makeViewConfig model size =
 
 viewDesigns : Model -> List (Html Msg)
 viewDesigns model =
-  (makeHeader model.designList.thislink)
+  (makeHeader model.currentHash)
   ::
   [ (makeUpBar model.pendingLoad model.designList)
   , div [] 
