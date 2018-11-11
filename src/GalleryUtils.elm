@@ -18,11 +18,10 @@ module GalleryUtils exposing
   )
 
 import Time
-import Date
-import Http
+import Url
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onWithOptions)
+import Html.Events exposing (custom)
 import Json.Decode as JD
 
 type DesignID = ID Int
@@ -68,49 +67,48 @@ type alias TagInfo =
 
 
 
-int2Time : Int -> Time.Time
+int2Time : Int -> Time.Posix
 int2Time i = 
-  (toFloat i) * 1000.0
+  Time.millisToPosix i
 
-makeDate : Time.Time -> String
+makeDate : Time.Posix -> String
 makeDate udate =
   let
-    d = Date.fromTime udate
-    day = Date.day d
+    day = Time.toDay Time.utc udate
     suffix = 
       if day // 10 == 1 then
         "th"
       else
-        case day % 10 of
+        case modBy day 10 of
           1 -> "st"
           2 -> "nd"
           3 -> "rd"
           _ -> "th"
     month = 
-      case Date.month d of
-          Date.Jan -> "January"
-          Date.Feb -> "February"
-          Date.Mar -> "March"
-          Date.Apr -> "April"
-          Date.May -> "May"
-          Date.Jun -> "June"
-          Date.Jul -> "July"
-          Date.Aug -> "August"
-          Date.Sep -> "September"
-          Date.Oct -> "October"
-          Date.Nov -> "November"
-          Date.Dec -> "December"
+      case Time.toMonth Time.utc udate of
+          Time.Jan -> "January"
+          Time.Feb -> "February"
+          Time.Mar -> "March"
+          Time.Apr -> "April"
+          Time.May -> "May"
+          Time.Jun -> "June"
+          Time.Jul -> "July"
+          Time.Aug -> "August"
+          Time.Sep -> "September"
+          Time.Oct -> "October"
+          Time.Nov -> "November"
+          Time.Dec -> "December"
   in
-    month ++ " " ++ (String.fromInt day) ++ suffix ++ ", " ++ String.fromInt (Date.year d)
+    month ++ " " ++ (String.fromInt day) ++ suffix ++ ", " ++ String.fromInt (Time.toYear Time.utc udate)
 
 
 makeUri : String -> List String -> String
 makeUri base rest =
-  String.join "/" (base :: (List.map Http.encodeUri rest))
+  String.join "/" (base :: (List.map Url.percentEncode rest))
 
 onNav : msg -> Attribute msg
 onNav message =
-    onWithOptions "click" { stopPropagation = False, preventDefault = True } (JD.succeed message)
+    custom "click" (JD.succeed { message = message, stopPropagation = False, preventDefault = True })
 
 
 tagHelp : Html msg
