@@ -539,12 +539,12 @@ update msg model =
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ( {model_  | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#user" [name, intStr start, intStr dcount]))
+                  , Navigation.modifyUrl (makeUri "#user" [name, String.fromInt start, String.fromInt dcount]))
               AuthorInit2 name_enc ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
-                  (model_, Navigation.modifyUrl (makeUri "#user" [name, "0", intStr dcount]))
+                  (model_, Navigation.modifyUrl (makeUri "#user" [name, "0", String.fromInt dcount]))
               Faves name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
@@ -555,7 +555,7 @@ update msg model =
                   name = Maybe.withDefault "" (Http.decodeUri name_enc)
                 in
                   ({model_ | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#faves" [name, intStr start, intStr dcount]))
+                  , Navigation.modifyUrl (makeUri "#faves" [name, String.fromInt start, String.fromInt dcount]))
               Newest start count ->
                 updateDesigns "Latest" model_ "newest" start count
               NewestInit start ->
@@ -565,29 +565,29 @@ update msg model =
                     _ -> model_.user
                 in
                   ({model_ | designList = zeroList, user = user_}
-                  , Navigation.modifyUrl (makeUri "#newest" [intStr start, intStr dcount]))
+                  , Navigation.modifyUrl (makeUri "#newest" [String.fromInt start, String.fromInt dcount]))
               Oldest start count ->
                 updateDesigns "Oldest" model_ "oldest" start count
               OldestInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#oldest" [intStr start, intStr dcount]))
+                , Navigation.modifyUrl (makeUri "#oldest" [String.fromInt start, String.fromInt dcount]))
               Title start count ->
                 updateDesigns "Title" model_ "title" start count
               TitleInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#title" [intStr start, intStr dcount]))
+                , Navigation.modifyUrl (makeUri "#title" [String.fromInt start, String.fromInt dcount]))
               TitleIndex title ->
                 (model_, getTitle model_ title)
               Popular start count ->
                 updateDesigns "Likes" model_ "popular" start count
               PopularInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#popular" ["0", intStr dcount]))
+                , Navigation.modifyUrl (makeUri "#popular" ["0", String.fromInt dcount]))
               RandomDes seed start count ->
-                updateDesigns "Random" model_ ("random/" ++ (intStr seed)) start count
+                updateDesigns "Random" model_ ("random/" ++ (String.fromInt seed)) start count
               RandomInit seed start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#random" [intStr seed, "0", intStr dcount]))
+                , Navigation.modifyUrl (makeUri "#random" [String.fromInt seed, "0", String.fromInt dcount]))
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
               Tag tag_enc start count ->
@@ -600,7 +600,7 @@ update msg model =
                   tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
                 in
                   ({model_ | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#tag" [tag, "0", intStr dcount]))
+                  , Navigation.modifyUrl (makeUri "#tag" [tag, "0", String.fromInt dcount]))
               ShowTags tagType ->
                 let
                   comp = 
@@ -646,7 +646,7 @@ update msg model =
                     Cmd.none
                 )
     NewSeed seed ->
-      (model, Navigation.modifyUrl ("#random/" ++ (intStr seed ++ "/0")))
+      (model, Navigation.modifyUrl ("#random/" ++ (String.fromInt seed ++ "/0")))
     LoginMsg lMsg ->
       let
         newLoginModel = Login.update lMsg model.loginform          
@@ -708,7 +708,7 @@ update msg model =
     LookupName ->
       (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
-      (model, Navigation.newUrl ("#design/" ++ (intStr model.designLookup)))
+      (model, Navigation.newUrl ("#design/" ++ (String.fromInt model.designLookup)))
     AuthorText author ->
       ({ model | authorLookup = trimLeft author }, Cmd.none)
     Cfdg2Change cfdg2 ->
@@ -934,7 +934,7 @@ update msg model =
       case indexResult of
         Ok index ->
           ( { model | errorInfo = Ok "Title index"}
-          , Navigation.newUrl ("#title/" ++ (intStr index))
+          , Navigation.newUrl ("#title/" ++ (String.fromInt index))
           )
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
@@ -1081,8 +1081,8 @@ update msg model =
     NewMiniSeed num seed ->
       ( {model | miniSeed = seed}
       , Cmd.batch
-        [ getMiniList model ("random/" ++ (intStr seed)) num
-        , getMiniList model ("popularrandom/" ++ (intStr seed)) num
+        [ getMiniList model ("random/" ++ (String.fromInt seed)) num
+        , getMiniList model ("popularrandom/" ++ (String.fromInt seed)) num
         ]
       )
     FileRead fpd ->
@@ -1118,7 +1118,7 @@ designString des =
   if des < 1 then
     ""
   else
-    intStr des
+    String.fromInt des
 
 makeIndexLink : Char -> List (Html Msg)
 makeIndexLink c =
@@ -1131,7 +1131,7 @@ makePNlink : String -> Int -> String -> Html Msg
 makePNlink type_ count url =
   a [ href ("#" ++ url), 
       style "visibility" if (String.isEmpty url) then "hidden" else "visible"]
-    [ b [] [text (type_ ++ " " ++ (intStr count))]]
+    [ b [] [text (type_ ++ " " ++ (String.fromInt count))]]
 
 makeUpBar : Bool -> DesignList -> Html Msg
 makeUpBar pending dlist =
@@ -1285,7 +1285,7 @@ radio value msg isChecked =
 viewTagInfo : TagInfo -> Html Msg
 viewTagInfo tag =
   tr [] 
-  [ td [align "right"] [text (intStr tag.count)]
+  [ td [align "right"] [text (String.fromInt tag.count)]
   , td [align "left"] [a [href (makeUri "#tag" [tag.name, "0"])] [text tag.name]]
   ]
 
@@ -1293,7 +1293,7 @@ viewMiniUser : MiniUser -> Html Msg
 viewMiniUser muser = 
   tr []
   [ td [align "left"] [a [href (makeUri "#user" [muser.name, "0"])] [text muser.name]]
-  , td [align "right"] [text (intStr muser.numPosts)]
+  , td [align "right"] [text (String.fromInt muser.numPosts)]
   , td [align "right"] [text (makeDate muser.joinedOn)]
   ]
 
@@ -1330,7 +1330,7 @@ view model =
                   [ case model.user of
                       LoggedIn u ->
                         if u.unseen > 0 then
-                          text ("Newest (" ++ (intStr u.unseen) ++ " new)")
+                          text ("Newest (" ++ (String.fromInt u.unseen) ++ " new)")
                         else
                           text "Newest"
                       _ -> text "Newest"
@@ -1540,7 +1540,7 @@ view model =
         , viewMiniList "newbie" "Newest contributors:" "" model
         , viewMiniList "popula" "Some popular designs:" "#popular/0" model
         , viewMiniList "random" "Some random designs:" 
-            ("#random/" ++ (intStr model.miniSeed) ++ "/0") model
+            ("#random/" ++ (String.fromInt model.miniSeed) ++ "/0") model
         ]
     )
   ]
@@ -1713,7 +1713,7 @@ getDesigns model query start count =
   let
     ccquery = if model.limitCC then "cc" ++ query else query
     url = String.join "/" [model.backend, ccquery, 
-                           intStr(start), intStr(count)]
+                           String.fromInt(start), String.fromInt(count)]
   in
     Http.send NewDesigns (get url decodeDesigns)
 
@@ -1731,7 +1731,7 @@ decodeDesigns =
 getMiniList : Model -> String -> Int -> Cmd Msg
 getMiniList model listType count =
   let
-    url = String.join "/" [model.backend, listType, "0", intStr(count)]
+    url = String.join "/" [model.backend, listType, "0", String.fromInt(count)]
   in
     Http.send (NewMiniList (String.left 6 listType)) (get url decodeMiniList)
 
@@ -1861,7 +1861,7 @@ getUsers: String -> Int -> Int -> Model -> Cmd Msg
 getUsers query start count model =
   let
     url = String.join "/" [model.backend, query, 
-                           intStr(start), intStr(count)]
+                           String.fromInt(start), String.fromInt(count)]
   in
     Http.send NewUsers (get url decodeUsers)
 

@@ -10,7 +10,6 @@ module GalleryUtils exposing
   , CommentID (..)
   , noComment
   , cidStr
-  , intStr
   , Action (..)
   , TagInfo
   , TabStyle (..)
@@ -33,7 +32,7 @@ nonDesign = ID 0
 
 idStr : DesignID -> String
 idStr (ID num) =
-  toString num
+  String.fromInt num
 
 type CommentID = CID Int
 
@@ -42,11 +41,7 @@ noComment = CID 0
 
 cidStr : CommentID -> String
 cidStr (CID num) =
-  toString num
-
-intStr : Int -> String
-intStr num =
-  toString num
+  String.fromInt num
 
 
 type Action 
@@ -106,7 +101,7 @@ makeDate udate =
           Date.Nov -> "November"
           Date.Dec -> "December"
   in
-    month ++ " " ++ (intStr day) ++ suffix ++ ", " ++ intStr (Date.year d)
+    month ++ " " ++ (String.fromInt day) ++ suffix ++ ", " ++ String.fromInt (Date.year d)
 
 
 makeUri : String -> List String -> String

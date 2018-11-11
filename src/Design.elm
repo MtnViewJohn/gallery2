@@ -520,7 +520,7 @@ fanCount cnt =
   if cnt == 1 then
     "One like"
   else
-    intStr cnt ++ " likes"
+    String.fromInt cnt ++ " likes"
 
 tileText : TileType -> String
 tileText tile =
@@ -561,13 +561,13 @@ fullImageAttributes design =
           let
             sz = Maybe.withDefault (Size 150 800) design.imagesize
           in
-            intStr sz.width ++ "px"
+            String.fromInt sz.width ++ "px"
       , style "float" "left"
       , style "min-height"
           let
             sz = Maybe.withDefault (Size 150 800) design.imagesize
           in
-            intStr (2 * sz.height) ++ "px"
+            String.fromInt (2 * sz.height) ++ "px"
       , style "position" "absolute"
       , style "height" "100%"
       , style "margin-top" "-36px"
@@ -585,7 +585,7 @@ fullImageAttributes design =
               let
                 sz = Maybe.withDefault (Size 800 800) design.imagesize
               in
-                ((intStr sz.height) ++ "px")
+                ((String.fromInt sz.height) ++ "px")
           ]
         Vfrieze ->
           [ class "tiledimagediv"
@@ -595,7 +595,7 @@ fullImageAttributes design =
               let
                 sz = Maybe.withDefault (Size 800 800) design.imagesize
               in
-                ((intStr sz.width) ++ "px")
+                ((String.fromInt sz.width) ++ "px")
           ]
         Tiled ->
           [ class "tiledimagediv"
@@ -695,7 +695,7 @@ viewCC design =
       date = Date.fromTime design.uploaddate
     in
         
-      text ("Copyright " ++ (intStr (Date.year date)) ++ ", all rights reserved.")
+      text ("Copyright " ++ (String.fromInt (Date.year date)) ++ ", all rights reserved.")
   else
     div [class "ccInfo"]
     [ a [class "ccIcon", href design.ccURI]
@@ -1011,7 +1011,7 @@ view cfg design =
       div 
       [ style "overflow" "auto"
       , style "position" "relative"
-      , style "min-height" intStr (minHeight design.design) ++ "px"
+      , style "min-height" String.fromInt (minHeight design.design) ++ "px"
       , id ("design" ++ (idStr design.design.designid))
       ]
       [ div (thumbImageAttributes design.design)
