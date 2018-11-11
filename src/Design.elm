@@ -554,27 +554,23 @@ fullImageAttributes design =
     imageurl = "url(" ++ design.imagelocation ++ ")"
   in
     if showOnSide design then
-      [ style
-        [ ("background-image", imageurl)
-        , ("background-repeat", "repeat-y")
-        , ("margin-bottom", "5px")
-        , ("width", 
-            let
-              sz = Maybe.withDefault (Size 150 800) design.imagesize
-            in
-              intStr sz.width ++ "px"
-          )
-        , ("float", "left")
-        , ("min-height",
-            let
-              sz = Maybe.withDefault (Size 150 800) design.imagesize
-            in
-              intStr (2 * sz.height) ++ "px"
-          )
-        , ("position", "absolute")
-        , ("height", "100%")
-        , ("margin-top", "-36px")
-        ]
+      [ style "background-image" imageurl
+      , style "background-repeat" "repeat-y"
+      , style "margin-bottom" "5px"
+      , style "width" 
+          let
+            sz = Maybe.withDefault (Size 150 800) design.imagesize
+          in
+            intStr sz.width ++ "px"
+      , style "float" "left"
+      , style "min-height"
+          let
+            sz = Maybe.withDefault (Size 150 800) design.imagesize
+          in
+            intStr (2 * sz.height) ++ "px"
+      , style "position" "absolute"
+      , style "height" "100%"
+      , style "margin-top" "-36px"
       ]
     else
       case design.tiled of
@@ -583,36 +579,28 @@ fullImageAttributes design =
           ]
         Hfrieze ->
           [ class "tiledimagediv"
-          , style 
-            [ ("background-image", imageurl)
-            , ("background-repeat", "repeat-x")
-            , ("height", 
-                let
-                  sz = Maybe.withDefault (Size 800 800) design.imagesize
-                in
-                  ((intStr sz.height) ++ "px")
-              )
-            ]
+          , style "background-image" imageurl
+          , style "background-repeat" "repeat-x"
+          , style "height"
+              let
+                sz = Maybe.withDefault (Size 800 800) design.imagesize
+              in
+                ((intStr sz.height) ++ "px")
           ]
         Vfrieze ->
           [ class "tiledimagediv"
-          , style 
-            [ ("background-image", imageurl)
-            , ("background-repeat", "repeat-y")
-            , ("width", 
-                let
-                  sz = Maybe.withDefault (Size 800 800) design.imagesize
-                in
-                  ((intStr sz.width) ++ "px")
-              )
-            ]
+          , style "background-image" imageurl
+          , style "background-repeat" "repeat-y"
+          , style "width"
+              let
+                sz = Maybe.withDefault (Size 800 800) design.imagesize
+              in
+                ((intStr sz.width) ++ "px")
           ]
         Tiled ->
           [ class "tiledimagediv"
-          , style 
-            [ ("background-image", imageurl)
-            , ("background-repeat", "repeat")
-            ]
+          , style "background-image" imageurl
+          , style "background-repeat" "repeat"
           ]
 
 thumbImageAttributes : Design -> List (Attribute MsgId)
@@ -624,39 +612,31 @@ thumbImageAttributes design =
     case design.tiled of
       Untiled ->
         [ class "thumbcell"
-        , style 
-          [ ("float", "left")
-          ]
+        , style "float" "left"
         ]
       Hfrieze ->
         [ class "thumbcell"
-        , style
-          [ ("background-image", imageurl)
-          , ("background-repeat", "repeat-x")
-          , ("text-align", "left")
-          , ("width", "100%")
-          ]
+        , style "background-image" imageurl
+        , style "background-repeat" "repeat-x"
+        , style "text-align" "left"
+        , style "width" "100%"
         ]
       Vfrieze ->
         [ class "thumbcell"
-        , style
-          [ ("background-image", imageurl)
-          , ("background-repeat", "repeat-y")
-          , ("background-position", "right")
-          , ("height", "100%")
-          , ("position", "absolute")
-          , ("float", "left")
-          ]
+        , style "background-image" imageurl
+        , style "background-repeat" "repeat-y"
+        , style "background-position" "right"
+        , style "height" "100%"
+        , style "position" "absolute"
+        , style "float" "left"
         ]
       Tiled ->
         [ class "thumbcell"
-        , style
-          [ ("background-image", imageurl)
-          , ("background-repeat", "repeat")
-          , ("height", "100%")
-          , ("position", "absolute")
-          , ("float", "left")
-          ]
+        , style "background-image" imageurl
+        , style "background-repeat" "repeat"
+        , style "height" "100%"
+        , style "position" "absolute"
+        , style "float" "left"
         ]
 
 thumbImage : Design -> Html MsgId
@@ -855,7 +835,7 @@ viewDesignInfo size cfg design =
                       [text "See who liked it"]
                   , div
                     [ class "popup"
-                    , style [("display", if cfg.showFanlist then "block" else "none")]
+                    , style "display" if cfg.showFanlist then "block" else "none"
                     ]
                   ( [ h2 [] [text "Fans:"]
                     , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
@@ -897,7 +877,7 @@ viewDesignInfo size cfg design =
           viewEditDeleteButtons False cfg design
         )
       , div [] [text ("link tag: [link design:" ++ (idStr design.design.designid) ++ "] ... [/link] ")]
-      , div [style [("padding-bottom", "10px")]] [ viewCC design.design ]
+      , div [style "padding-bottom" "10px"] [ viewCC design.design ]
       ]
     _ ->
       [ b [] [text design.design.title ]
@@ -929,7 +909,7 @@ view cfg design =
     Large ->
       div 
       [ id ("design" ++ (idStr design.design.designid))
-      , style [("position", "relative")]
+      , style "position" "relative"
       ]
       [ if addHRs then
           hr [] []
@@ -937,7 +917,7 @@ view cfg design =
           text ""
           , div [class "khomut"]
             [ a 
-              [ style [("visibility", if cfg.prev == nonDesign then "hidden" else "visible")]
+              [ style "visibility" if cfg.prev == nonDesign then "hidden" else "visible"
               , class "pcnbutton prevbutton"
               , href <| "#design/" ++ (idStr cfg.prev)
               , onNav (FocusClick,cfg.prev)
@@ -945,18 +925,18 @@ view cfg design =
               ] []
             , text " "
             , a 
-              [ style [("visibility", 
-                        if cfg.prev == nonDesign && cfg.next == nonDesign then 
-                          "hidden" 
-                        else
-                          "visible")]
+              [ style "visibility"
+                      if cfg.prev == nonDesign && cfg.next == nonDesign then 
+                        "hidden" 
+                      else
+                        "visible"
               , class "pcnbutton closebutton"
               , href "#", onNav (DismissDesign,design.design.designid)
               , title "Close this design"
               ] []
             , text " "
             , a 
-              [ style [("visibility", if cfg.next == nonDesign then "hidden" else "visible")]
+              [ style "visibility" if cfg.next == nonDesign then "hidden" else "visible"
               , class "pcnbutton nextbutton"
               , href <| "#design/" ++ (idStr cfg.next)
               , onNav (FocusClick,cfg.next)
@@ -971,11 +951,11 @@ view cfg design =
         ]
       , div 
         ( if showOnSide design.design then
-            [ style [("padding-left", "150px")] ]
+            [ style "padding-left" "150px" ]
           else
             []
         )
-        [ table [style [("table-layout","fixed"),("width","100%")]]
+        [ table [style "table-layout" "fixed", style "width" "100%"]
           [ tr [] 
             [ td [colspan 2]
                  [ div [class "ccInfo"] <| viewDesignInfo size cfg design]
@@ -1029,18 +1009,16 @@ view cfg design =
       ]
     Medium ->
       div 
-      [ style 
-        [("overflow", "auto")
-        , ("position", "relative")
-        , ("min-height", intStr (minHeight design.design) ++ "px")
-        ]
-        , id ("design" ++ (idStr design.design.designid))
+      [ style "overflow" "auto"
+      , style "position" "relative"
+      , style "min-height" intStr (minHeight design.design) ++ "px"
+      , id ("design" ++ (idStr design.design.designid))
       ]
       [ div (thumbImageAttributes design.design)
         [ thumbImage design.design ]
-      , div [style [("padding-left", "310px")]]
-        [ div [style [("padding-left", "5px")]] <| viewDesignInfo size cfg design
-        , div [class "filediv", style [("width","95%")]]
+      , div [style "padding-left" "310px"]
+        [ div [style "padding-left" "5px"] <| viewDesignInfo size cfg design
+        , div [class "filediv", style "width" "95%"]
               [ design.noteshtml
               , div [class "minicfdg"] [design.cfdghtml]
               ]
@@ -1126,7 +1104,7 @@ viewEdit tags edesign =
       h1 [] [text "Upload your artwork!"]
     else
       h1 [] [text "Update your artwork!"]
-  , div [style [("width", "600px")]]
+  , div [style "width" "600px"]
     [ text "Pick a title for your artwork (e.g. \"People Dancing and Dying\") "
     , text "and upload it here. If you are using "
     , b [] [text "Context Free"]
@@ -1144,7 +1122,11 @@ viewEdit tags edesign =
                 , value edesign.design.title, onInput TitleChange][]]
         , td 
           [ class "alert"
-         , style [("visibility", if (validateTitle edesign.design.title) then "hidden" else "visible")]
+          , style "visibility" 
+                  if (validateTitle edesign.design.title) then
+                    "hidden"
+                  else
+                    "visible"
           ] [text "Title must be between 3 and 100 characters."]
         ]
       , tr []
@@ -1206,9 +1188,13 @@ viewEdit tags edesign =
                 , onInput VariationChange
                 ][]]
         , td 
-         [ class "alert"
-         , style [("visibility", if (validateVariation edesign.design.variation) then "hidden" else "visible")]
-         ] [text "Variation must be 0 to 6 letters."]
+          [ class "alert"
+          , style "visibility"
+                  if (validateVariation edesign.design.variation) then
+                    "hidden"
+                  else
+                    "visible"
+          ] [text "Variation must be 0 to 6 letters."]
         ]
       , viewTagEdit tags edesign
       , tr []

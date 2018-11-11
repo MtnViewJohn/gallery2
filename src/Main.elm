@@ -1130,7 +1130,7 @@ makeIndexLink c =
 makePNlink : String -> Int -> String -> Html Msg
 makePNlink type_ count url =
   a [ href ("#" ++ url), 
-      style [("visibility", if (String.isEmpty url) then "hidden" else "visible")]]
+      style "visibility" if (String.isEmpty url) then "hidden" else "visible"]
     [ b [] [text (type_ ++ " " ++ (intStr count))]]
 
 makeUpBar : Bool -> DesignList -> Html Msg
@@ -1348,14 +1348,14 @@ view model =
     , ( let
           disable = model.viewMode /= Designs || (String.startsWith "#design/" model.currentHash)
         in
-        ul [style [("color", if disable then "#d8cb9f" else "inherit")]]
+        ul [style "color" if disable then "#d8cb9f" else "inherit"]
         [ li [] 
             [ label []
               [ input
                 [ type_ "checkbox", onCheck CCcheck, checked model.limitCC, disabled disable] []
               , img 
                 [ class "top"
-                , style [ ("padding", "0px 5px") ]
+                , style "padding" "0px 5px"
                 , src "graphics/CC.badge.png"
                 , alt "Creative Commons badge"
                 ] []
@@ -1380,8 +1380,8 @@ view model =
               , input [ type_ "text", name "by", size 8, placeholder "name", id "lookname"
                       , value model.authorLookup, onInput AuthorText
                       , attribute "data-lpignore" "true"
-                      , style [("padding", "1px")]] []
-              , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
+                      , style "padding" "1px"] []
+              , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
               ]
             ]
           ]
@@ -1394,8 +1394,8 @@ view model =
               , input [ type_ "text", name "id", size 8, placeholder "id #", id "lookid"
                       , value (designString model.designLookup), onInput DesignText
                       , attribute "data-lpignore" "true"
-                      , style [("padding", "1px")]] []
-              , input [ type_ "submit", value "Go", style [("padding", "1px")]] [ ]
+                      , style "padding" "1px"] []
+              , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
               ]
             ]
           ]

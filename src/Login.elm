@@ -71,7 +71,7 @@ view model message =
         ]
       ]
     , li [] [ input [ type_ "submit", value "Login" ] [ ] ]
-    , li [ style [("color", "red")]] [ text message ]
+    , li [ style "color" "red"] [ text message ]
     ]
   , ul []
     [ li [] [ a [ href "../phpbb/ucp.php?mode=sendpassword" ] [ text "Lost password?" ] ]
