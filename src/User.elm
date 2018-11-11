@@ -18,8 +18,8 @@ type alias User =
   , email : String
   , isAdmin : Bool
   , isTagger : Bool
-  , lastLogin : Time.Time
-  , joinedOn : Time.Time
+  , lastLogin : Time.Posix
+  , joinedOn : Time.Posix
   , numPosts : Int
   , numLogins : Int
   , unseen : Int
@@ -29,7 +29,7 @@ type alias User =
 
 type alias MiniUser = 
   { name : String
-  , joinedOn : Time.Time
+  , joinedOn : Time.Posix
   , numPosts : Int
   }
 
@@ -37,7 +37,7 @@ type alias MiniUser =
 
 decodeUser : JD.Decoder User
 decodeUser =
-    JPipe.decode User
+    JD.succeed User
         |> JPipe.required "username" (JD.string)
         |> JPipe.required "email" (JD.string)
         |> JPipe.required "admin" (JD.bool)
@@ -52,7 +52,7 @@ decodeUser =
 
 decodeMiniUser : JD.Decoder MiniUser
 decodeMiniUser =
-    JPipe.decode MiniUser
+    JD.succeed MiniUser
         |> JPipe.required "username" (JD.string)
         |> JPipe.required "joinedon" (JD.map int2Time JD.int)
         |> JPipe.required "numposts" (JD.int)
