@@ -24,7 +24,7 @@ import Html.Events exposing (onClick, onInput, onSubmit)
 import GalleryUtils exposing (..)
 import User exposing (..)
 import Markdown
-import Http exposing (encodeUri)
+import Url exposing (percentEncode)
 --import Debug
 
 -- MODEL
@@ -37,7 +37,7 @@ type alias Comment =
     , commentmd : String
     , formcomment : String
     , commentid : CommentID
-    , postdate : Time.Time
+    , postdate : Time.Posix
     , screenname : String
     , htmltext : Html Msg
     , displayMode: DisplayType
@@ -45,7 +45,7 @@ type alias Comment =
 
 emptyComment : Comment
 emptyComment = 
-  Comment "" "" "" noComment 0 "" (text "") New
+  Comment "" "" "" noComment (int2Time 0) "" (text "") New
 
 options : Markdown.Options
 options =
@@ -60,14 +60,10 @@ toHtml : String -> Html Msg
 toHtml = Markdown.toHtmlWith options []
 
 
-int2Time : Int -> Time.Time
-int2Time i = 
-  (toFloat i) * 1000.0
-
 
 decodeComment : JD.Decoder Comment
 decodeComment =
-    JPipe.decode Comment
+    JD.succeed Comment
         |> JPipe.required "comment" (JD.string)
         |> JPipe.required "commentmd" (JD.string)
         |> JPipe.hardcoded ""
@@ -96,7 +92,7 @@ setupHtml comment =
       , " \\- [**"
       , comment.screenname
       , "**](#user/"
-      , encodeUri comment.screenname
+      , percentEncode comment.screenname
       , ") on "
       , makeDate comment.postdate
       ]) }
