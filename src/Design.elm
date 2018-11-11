@@ -42,7 +42,6 @@ import User exposing (..)
 import Comment
 import GalleryUtils exposing (..)
 import Markdown
-import Date
 import Char
 import Ports exposing (FilePortData, fileSelected, fileContentRead)
 
@@ -74,7 +73,7 @@ type alias Design =
     , thumblocation : String
     , tiled : TileType
     , title : String
-    , uploaddate : Time.Time
+    , uploaddate : Time.Posix
     , variation : String
     }
 
@@ -154,7 +153,7 @@ tiled2Int tt =
     Vfrieze -> 2
     Tiled -> 3
 
-initDesign: String -> String -> Time.Time -> EditDesign
+initDesign: String -> String -> Time.Posix -> EditDesign
 initDesign user ccURI now = 
   let
     (image,name,uri) = 
@@ -230,7 +229,7 @@ decodeNotesMarkdown =
 
 decodeDesign : JD.Decoder Design
 decodeDesign =
-    JPipe.decode Design
+    JD.succeed Design
         |> JPipe.required "ccImage" (JD.string)
         |> JPipe.required "ccName" (JD.string)
         |> JPipe.required "ccURI" (JD.string)
@@ -265,17 +264,17 @@ encodeDesign record =
   case record.design.designid of
     ID designid ->
       JE.object
-          [ ("ccImage",    JE.string  <| record.design.ccImage)
-          , ("ccName",     JE.string  <| record.design.ccName)
-          , ("ccURI",      JE.string  <| record.design.ccURI)
-          , ("cclicense",  JE.string  <| record.ccLicense)
-          , ("designid",   JE.int     <| designid)
-          , ("tags",       JE.list    <| List.map JE.string record.design.tags)
-          , ("notes",      JE.string  <| record.design.notes)
-          , ("tiled",      JE.int     <| (tiled2Int record.design.tiled))
-          , ("title",      JE.string  <| record.design.title)
-          , ("variation",  JE.string  <| record.design.variation)
-          , ("compression",JE.string  <| if record.uploadPNG then "PNG-8" else "JPEG")
+          [ ("ccImage",    JE.string record.design.ccImage)
+          , ("ccName",     JE.string record.design.ccName)
+          , ("ccURI",      JE.string record.design.ccURI)
+          , ("cclicense",  JE.string record.ccLicense)
+          , ("designid",   JE.int    designid)
+          , ("tags",       JE.list   JE.string record.design.tags)
+          , ("notes",      JE.string record.design.notes)
+          , ("tiled",      JE.int    <| tiled2Int record.design.tiled)
+          , ("title",      JE.string record.design.title)
+          , ("variation",  JE.string record.design.variation)
+          , ("compression",JE.string <| if record.uploadPNG then "PNG-8" else "JPEG")
           , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
           , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
           ]
@@ -463,8 +462,8 @@ isGraph char =
     '\t' -> False
     '\n' -> False
     '\r' -> False
-    '\f' -> False
-    '\v' -> False
+    '\u{000c}' -> False
+    '\u{000b}' -> False
     _ -> True
 
 validateTitle : String -> Bool
@@ -557,13 +556,13 @@ fullImageAttributes design =
       [ style "background-image" imageurl
       , style "background-repeat" "repeat-y"
       , style "margin-bottom" "5px"
-      , style "width" 
+      , style "width" <|
           let
             sz = Maybe.withDefault (Size 150 800) design.imagesize
           in
             String.fromInt sz.width ++ "px"
       , style "float" "left"
-      , style "min-height"
+      , style "min-height" <|
           let
             sz = Maybe.withDefault (Size 150 800) design.imagesize
           in
@@ -581,7 +580,7 @@ fullImageAttributes design =
           [ class "tiledimagediv"
           , style "background-image" imageurl
           , style "background-repeat" "repeat-x"
-          , style "height"
+          , style "height" <|
               let
                 sz = Maybe.withDefault (Size 800 800) design.imagesize
               in
@@ -591,7 +590,7 @@ fullImageAttributes design =
           [ class "tiledimagediv"
           , style "background-image" imageurl
           , style "background-repeat" "repeat-y"
-          , style "width"
+          , style "width" <|
               let
                 sz = Maybe.withDefault (Size 800 800) design.imagesize
               in
@@ -692,10 +691,10 @@ viewCC : Design -> Html msg
 viewCC design =
   if isEmpty design.ccURI || isEmpty design.ccName || isEmpty design.ccImage then
     let
-      date = Date.fromTime design.uploaddate
+      date = Time.toYear Time.utc design.uploaddate
     in
         
-      text ("Copyright " ++ (String.fromInt (Date.year date)) ++ ", all rights reserved.")
+      text ("Copyright " ++ (String.fromInt date) ++ ", all rights reserved.")
   else
     div [class "ccInfo"]
     [ a [class "ccIcon", href design.ccURI]
@@ -709,7 +708,7 @@ downloadLink filepath content =
     mfilename = List.head <| List.reverse <| (String.split "/" filepath)
     filename = Maybe.withDefault filepath mfilename
   in
-    a [href filepath, downloadAs filename, title "Download the cfdg file to your computer."
+    a [href filepath, download filename, title "Download the cfdg file to your computer."
       , class "button download"
       ] [ text content ]
       
@@ -721,7 +720,7 @@ imageLink filepath content =
     mfilename2 = List.head <| String.split "?" filename
     filename2 = Maybe.withDefault filename mfilename2
   in
-    a [href filepath, downloadAs filename2, title "Download the image to your computer."
+    a [href filepath, download filename2, title "Download the image to your computer."
       , class "button download"
       ] [ text content ]
       
@@ -835,7 +834,7 @@ viewDesignInfo size cfg design =
                       [text "See who liked it"]
                   , div
                     [ class "popup"
-                    , style "display" if cfg.showFanlist then "block" else "none"
+                    , style "display" <| if cfg.showFanlist then "block" else "none"
                     ]
                   ( [ h2 [] [text "Fans:"]
                     , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
@@ -917,7 +916,7 @@ view cfg design =
           text ""
           , div [class "khomut"]
             [ a 
-              [ style "visibility" if cfg.prev == nonDesign then "hidden" else "visible"
+              [ style "visibility" <| if cfg.prev == nonDesign then "hidden" else "visible"
               , class "pcnbutton prevbutton"
               , href <| "#design/" ++ (idStr cfg.prev)
               , onNav (FocusClick,cfg.prev)
@@ -925,7 +924,7 @@ view cfg design =
               ] []
             , text " "
             , a 
-              [ style "visibility"
+              [ style "visibility" <|
                       if cfg.prev == nonDesign && cfg.next == nonDesign then 
                         "hidden" 
                       else
@@ -936,7 +935,7 @@ view cfg design =
               ] []
             , text " "
             , a 
-              [ style "visibility" if cfg.next == nonDesign then "hidden" else "visible"
+              [ style "visibility" <| if cfg.next == nonDesign then "hidden" else "visible"
               , class "pcnbutton nextbutton"
               , href <| "#design/" ++ (idStr cfg.next)
               , onNav (FocusClick,cfg.next)
@@ -1011,7 +1010,7 @@ view cfg design =
       div 
       [ style "overflow" "auto"
       , style "position" "relative"
-      , style "min-height" String.fromInt (minHeight design.design) ++ "px"
+      , style "min-height" <| String.fromInt (minHeight design.design) ++ "px"
       , id ("design" ++ (idStr design.design.designid))
       ]
       [ div (thumbImageAttributes design.design)
@@ -1122,7 +1121,7 @@ viewEdit tags edesign =
                 , value edesign.design.title, onInput TitleChange][]]
         , td 
           [ class "alert"
-          , style "visibility" 
+          , style "visibility" <|
                   if (validateTitle edesign.design.title) then
                     "hidden"
                   else
@@ -1189,7 +1188,7 @@ viewEdit tags edesign =
                 ][]]
         , td 
           [ class "alert"
-          , style "visibility"
+          , style "visibility" <|
                   if (validateVariation edesign.design.variation) then
                     "hidden"
                   else
