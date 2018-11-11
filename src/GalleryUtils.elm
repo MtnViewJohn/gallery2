@@ -196,7 +196,7 @@ makeTab : TabInfo -> Html msg
 makeTab tab =
   div 
     [ class <| styleClass tab.style
-    , style [("background-image", styleImage tab.style)]
+    , style "background-image"  (styleImage tab.style)
     ]
     [ if tab.url == "" then
         text <| toNB tab.content
