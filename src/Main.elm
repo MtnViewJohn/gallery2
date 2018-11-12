@@ -565,8 +565,9 @@ update msg model =
               Author name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Url.percentDecode name_enc)
+                  namepos = possessive name
                 in
-                  updateDesigns name model_ (makeUri "by" [name]) start count
+                  updateDesigns namepos model_ (makeUri "by" [name]) start count
               AuthorInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Url.percentDecode name_enc)
@@ -581,8 +582,9 @@ update msg model =
               Faves name_enc start count ->
                 let
                   name = Maybe.withDefault "" (Url.percentDecode name_enc)
+                  namepos = possessive name
                 in
-                  updateDesigns (name ++ " favorite") model_ (makeUri "faves" [name]) start count
+                  updateDesigns (namepos ++ " favorite") model_ (makeUri "faves" [name]) start count
               FavesInit name_enc start ->
                 let
                   name = Maybe.withDefault "" (Url.percentDecode name_enc)
@@ -1209,29 +1211,25 @@ makeHeader thislink =
     urlname = Maybe.withDefault "" (List.head <| (List.drop 1) <| urlparts)
     urltype = Maybe.withDefault "" (List.head urlparts)
     name = Maybe.withDefault "What's his name" (Url.percentDecode urlname)
-    namepos = 
-      if String.endsWith "s" name then
-        name ++ "'"
-      else
-        name ++ "'s"
+    namepos = possessive name
     designs = namepos ++ " Designs"
     likes = namepos ++ " Likes"
     linktext = "To link to this author: [link user:" ++ name ++ "] ... [/link] "
   in case urltype of
-    "#title" ->
+    "title" ->
       div []
         ([ a [class "letterref", href "#title/0"] [b [] [text "all"]], text " "]
         ++
         List.concat (List.map makeIndexLink (String.toList "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
         ++ [hr [][]])
-    "#faves" ->
+    "faves" ->
       makeTabs 
         [ TabInfo Empty " " ""
         , TabInfo Inactive designs <| makeUri "#user" [urlname, "0"]
         , TabInfo Active likes ""
         , TabInfo Rest linktext ""
         ]
-    "#user" ->
+    "user" ->
       makeTabs 
         [ TabInfo Empty " " ""
         , TabInfo Active designs ""

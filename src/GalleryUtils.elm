@@ -7,6 +7,7 @@ module GalleryUtils exposing
   , DesignID (..)
   , nonDesign
   , idStr
+  , possessive
   , CommentID (..)
   , noComment
   , cidStr
@@ -66,6 +67,12 @@ type alias TagInfo =
   }
 
 
+possessive : String -> String
+possessive name =
+  if String.endsWith "s" name then
+    name ++ "'"
+  else
+    name ++ "'s"
 
 int2Time : Int -> Time.Posix
 int2Time i = 
