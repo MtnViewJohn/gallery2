@@ -54,11 +54,9 @@
 <script type="text/javascript" src="clipboard.min.js" ></script>
 <script type="text/javascript" src="/_compile/src/Main.elm"></script>
 <script type="text/javascript">
-    var node = document.getElementById('elm-root');
-    while (node.firstChild) {
-        node.removeChild(node.firstChild);
-    }
-    app = Elm.Main.embed(node, {backend: 'http://localhost:5000'});
+    var app = Elm.Main.init({
+      flags: 'http://localhost:5000'
+    });
     app.ports.fileSelected.subscribe(function (id) {
       var node = document.getElementById(id);
       if (node === null) {

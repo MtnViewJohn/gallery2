@@ -1,6 +1,7 @@
 import Html exposing (..)
+import Array exposing (Array)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onCheck, onClick, onSubmit, onInput, onWithOptions, on)
+import Html.Events exposing (onCheck, onClick, onSubmit, onInput, custom, on)
 import String exposing (trimLeft, toInt)
 import Login
 import Design
@@ -9,27 +10,28 @@ import User exposing (..)
 import Json.Decode as JD
 import Json.Encode as JE
 import Http
-import Navigation
-import UrlParser as Url exposing ((</>), (<?>), s, int, stringParam, top)
+import Browser
+import Browser.Navigation as Nav
+import Url exposing (Url)
+import Url.Parser as Url exposing ((</>), (<?>), s, int, top)
+import Url.Parser.Query as UrlQ
 import Random
 import GalleryUtils exposing (..)
-import Time exposing (Time)
+import Time exposing (Posix)
 import Task
 import Ports exposing (..)
-import Dom
-import Dom.Size
+import Browser.Dom
 import Dict exposing (Dict)
 
-main : Program Flags Model Msg
 main =
-  Navigation.programWithFlags
-    NewURL
+  Browser.application
     { init = initModel
     , view = view
     , update = update
     , subscriptions = subscriptions
+    , onUrlRequest = LinkClicked
+    , onUrlChange = NewURL
     }
-
 
 
 -- MODEL
@@ -109,6 +111,7 @@ type Session
 type alias Model =
   { user : Session
   , loginform : Login.Model
+  , key : Nav.Key
   , limitCC : Bool
   , authorLookup : String
   , designLookup : Int
@@ -141,13 +144,38 @@ zeroList = DesignList Array.empty "" "" "" 0 0 ""
 zeroUList : UserList
 zeroUList = UserList [] "" "" "" 0
 
-initModel : Flags -> Navigation.Location -> (Model, Cmd Msg)
-initModel flags loc = 
-  let
-    model = Model LoginPending Login.initModel False "" 0 Designs nonDesign nonDesign noComment zeroList Dict.empty 0 False Nothing 
-            Design.Mini False [] zeroUList (UserOrder ASC None None) "" loc.href "" (Ok "") flags.backend "" ""
-  in
-    (model, loginSession model)
+initModel : String -> Url -> Nav.Key -> (Model, Cmd Msg)
+initModel backend loc key = 
+  ( { user              = LoginPending
+    , loginform         = Login.initModel
+    , key               = key
+    , limitCC           = False
+    , authorLookup      = ""
+    , designLookup      = 0
+    , viewMode          = Designs
+    , mainDesign        = nonDesign
+    , designToDelete    = nonDesign
+    , commentToDelete   = noComment
+    , designList        = zeroList
+    , miniLists         = Dict.empty
+    , miniSeed          = 0
+    , pendingLoad       = False
+    , editDesign        = Nothing
+    , designMode        = Design.Mini
+    , showFans          = False
+    , tagList           = []
+    , userList          = zeroUList
+    , userOrder         = UserOrder ASC None None
+    , errorMessage      = ""
+    , initUrl           = Url.toString loc
+    , currentHash       = Maybe.withDefault "" loc.fragment
+    , errorInfo         = Ok ""
+    , backend           = backend
+    , cfdg2text         = ""
+    , cfdg3text         = ""
+    }
+  , loginSession backend
+  )
 
 designMap : (Design.DisplayDesign -> Design.DisplayDesign) -> DesignList -> DesignList
 designMap mapping oldList =
@@ -156,22 +184,23 @@ designMap mapping oldList =
 nonDesignIndex : Int
 nonDesignIndex = -1
 
-designFind : DesignID -> (Array Design.DisplayDesign) -> (Int, Maybe Design.DisplayDesign)
-designFind id darray =
-  let
-    find2 = \index ->
-      if index < 0 then
-        (nonDesignIndex, Nothing)
-      else case Array.get index darray of
+designFindHelper : Int -> DesignID -> (Array Design.DisplayDesign) -> (Int, Maybe Design.DisplayDesign)
+designFindHelper =
+  \index id darray ->
+    if index >= (Array.length darray) then
+      (nonDesignIndex, Nothing)
+    else
+      case Array.get index darray of
         Nothing -> (nonDesignIndex, Nothing)
         Just design ->
           if design.design.designid == id then
             (index, Just design)
           else
-            find2 (index - 1)
-  in
-    find2 ((Array.length darray) - 1)
+            designFindHelper (index + 1) id darray
       
+
+designFind : DesignID -> (Array Design.DisplayDesign) -> (Int, Maybe Design.DisplayDesign)
+designFind = designFindHelper 0
       
 dmerge : String -> DesignList -> DesignList -> (DesignList, DesignID)
 dmerge hash new old =
@@ -246,8 +275,8 @@ type Route
 
 
 
-route : Url.Parser (Route -> a) a
-route =
+router : Url.Parser (Route -> a) a
+router =
   Url.oneOf
     [ Url.map Home top
     , Url.map Login (Url.s "login" </> Url.string </> Url.string </> Url.string)
@@ -288,7 +317,8 @@ type Msg
   = LogoutClick
   | CCcheck Bool
   | SwitchTo Design.ViewSize
-  | NewURL Navigation.Location
+  | NewURL Url.Url
+  | LinkClicked Browser.UrlRequest
   | LoadDesigns String
   | LoginMsg Login.Msg
   | DesignMsg Design.MsgId
@@ -300,7 +330,7 @@ type Msg
   | Cfdg2Change String
   | NewSeed Int
   | NewMiniSeed Int Int
-  | LoadDesign Time
+  | LoadDesign Posix
   | NewDesign (Result Http.Error DesignTags)
   | NewEditDesign (Result Http.Error Design.EditDesign)
   | NewDesigns (Result Http.Error DesignList)
@@ -322,12 +352,12 @@ type Msg
   | DesignStatusUpdated (Result Http.Error Bool)
   | NewMiniList String (Result Http.Error (List Design.DisplayDesign))
   | ReceiveUnseen (Result Http.Error Int)
-  | GetCFAWidth (Result Dom.Error Float)
+  | GetCFAWidth (Result Browser.Dom.Error Browser.Dom.Element)
   | TryScroll String
   | FileRead FilePortData
   | FileChange String
   | TranslateText
-  | TickTock Time
+  | TickTock Posix
   | IsVisible String
 
 
@@ -363,7 +393,7 @@ errorModel error context model =
         in case List.head i of
           Nothing -> resp.body
           Just found -> "<h3>" ++ context ++ " issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
-      Http.BadPayload msg resp -> "Unexpected response."
+      Http.BadPayload _ resp -> "Unexpected response."
       _ -> "Communication error."
   in
     {model | errorInfo = Err error, errorMessage = msg}
@@ -378,31 +408,34 @@ update msg model =
         model_ = {model | limitCC = cc}
         url_ = (makeQuery model_) ++ "#" ++ model_.designList.thislink
       in
-        (model_, Navigation.newUrl url_)
+        (model_, Nav.pushUrl model_.key url_)
     SwitchTo size ->
       let
         model_ = {model | designMode = size}
         url_ = (makeQuery model_) ++ "#" ++ model_.designList.thislink
       in
-        (model_, Navigation.newUrl url_)
+        (model_, Nav.pushUrl model_.key url_)
     LoadDesigns newHash ->
-      (model, Navigation.modifyUrl ("#" ++ newHash))
+      (model, Nav.replaceUrl model.key ("#" ++ newHash))
     NewURL loc ->
       let
-        qbits = String.split "&" (String.dropLeft 1 loc.search)
+        search = Maybe.withDefault "" loc.query
+        qbits = String.split "&" (String.dropLeft 1 search)
         cc_ = List.member "cc" qbits
         mode_ = if (List.member "large" qbits) then Design.Medium 
                 else if (List.member "medium" qbits) then Design.Small
                 else Design.Mini
+        hash = Maybe.withDefault "" loc.fragment
         model_ = {model | limitCC = cc_
                         , designMode = mode_
-                        , currentHash = loc.hash}
+                        , currentHash = hash}
         dcount = case model_.designMode of
           Design.Mini -> 48
           Design.Small -> 27
           _ -> 5
+        loc_ = {loc | path = hash, fragment = Nothing}
       in
-        case Url.parseHash route loc of
+        case Url.parse router loc_ of
           Nothing ->
             (model_, Cmd.none)
           Just route ->
@@ -417,7 +450,7 @@ update msg model =
                                     , pendingLoad = False}
                 in
                   (model__, Cmd.batch
-                    [ Task.attempt GetCFAWidth <| Dom.Size.width Dom.Size.VisibleContent "CFAcontent"
+                    [ Task.attempt GetCFAWidth <| Browser.Dom.getElement "CFAcontent"
                     , checkUnseen model__
                     , pageTitle "Gallery"
                     ])
@@ -432,15 +465,15 @@ update msg model =
                 in
                   if err == "" then
                     ( {model__ | user = LoginPending}
-                    , Cmd.batch [loginUser model__, Navigation.modifyUrl "#"]
+                    , Cmd.batch [loginUser model__, Nav.replaceUrl model__.key "#"]
                     )
                   else
-                    ({model__ | user = NotLoggedIn err}, Navigation.modifyUrl "#")
+                    ({model__ | user = NotLoggedIn err}, Nav.replaceUrl model__.key "#")
               ErrorMsg msg_enc ->
                 let
-                  msg = Maybe.withDefault "Malformed error message." (Http.decodeUri msg_enc)
+                  emsg = Maybe.withDefault "Malformed error message." (Url.percentDecode msg_enc)
                 in
-                  ({model_ | errorMessage = msg, viewMode = Error}, 
+                  ({model_ | errorMessage = emsg, viewMode = Error}, 
                    pageTitle "Gallery - Error")
               DesignByID id ->
                 let
@@ -531,31 +564,31 @@ update msg model =
                   _ -> (model_, Cmd.none)
               Author name_enc start count ->
                 let
-                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                  name = Maybe.withDefault "" (Url.percentDecode name_enc)
                 in
                   updateDesigns name model_ (makeUri "by" [name]) start count
               AuthorInit name_enc start ->
                 let
-                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                  name = Maybe.withDefault "" (Url.percentDecode name_enc)
                 in
                   ( {model_  | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#user" [name, String.fromInt start, String.fromInt dcount]))
+                  , Nav.replaceUrl model_.key (makeUri "#user" [name, String.fromInt start, String.fromInt dcount]))
               AuthorInit2 name_enc ->
                 let
-                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                  name = Maybe.withDefault "" (Url.percentDecode name_enc)
                 in
-                  (model_, Navigation.modifyUrl (makeUri "#user" [name, "0", String.fromInt dcount]))
+                  (model_, Nav.replaceUrl model_.key (makeUri "#user" [name, "0", String.fromInt dcount]))
               Faves name_enc start count ->
                 let
-                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                  name = Maybe.withDefault "" (Url.percentDecode name_enc)
                 in
                   updateDesigns (name ++ " favorite") model_ (makeUri "faves" [name]) start count
               FavesInit name_enc start ->
                 let
-                  name = Maybe.withDefault "" (Http.decodeUri name_enc)
+                  name = Maybe.withDefault "" (Url.percentDecode name_enc)
                 in
                   ({model_ | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#faves" [name, String.fromInt start, String.fromInt dcount]))
+                  , Nav.replaceUrl model_.key (makeUri "#faves" [name, String.fromInt start, String.fromInt dcount]))
               Newest start count ->
                 updateDesigns "Latest" model_ "newest" start count
               NewestInit start ->
@@ -565,42 +598,42 @@ update msg model =
                     _ -> model_.user
                 in
                   ({model_ | designList = zeroList, user = user_}
-                  , Navigation.modifyUrl (makeUri "#newest" [String.fromInt start, String.fromInt dcount]))
+                  , Nav.replaceUrl model_.key (makeUri "#newest" [String.fromInt start, String.fromInt dcount]))
               Oldest start count ->
                 updateDesigns "Oldest" model_ "oldest" start count
               OldestInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#oldest" [String.fromInt start, String.fromInt dcount]))
+                , Nav.replaceUrl model_.key (makeUri "#oldest" [String.fromInt start, String.fromInt dcount]))
               Title start count ->
                 updateDesigns "Title" model_ "title" start count
               TitleInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#title" [String.fromInt start, String.fromInt dcount]))
+                , Nav.replaceUrl model_.key (makeUri "#title" [String.fromInt start, String.fromInt dcount]))
               TitleIndex title ->
                 (model_, getTitle model_ title)
               Popular start count ->
                 updateDesigns "Likes" model_ "popular" start count
               PopularInit start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#popular" ["0", String.fromInt dcount]))
+                , Nav.replaceUrl model_.key (makeUri "#popular" ["0", String.fromInt dcount]))
               RandomDes seed start count ->
                 updateDesigns "Random" model_ ("random/" ++ (String.fromInt seed)) start count
               RandomInit seed start ->
                 ({model_ | designList = zeroList }
-                , Navigation.modifyUrl (makeUri "#random" [String.fromInt seed, "0", String.fromInt dcount]))
+                , Nav.replaceUrl model_.key (makeUri "#random" [String.fromInt seed, "0", String.fromInt dcount]))
               RandomSeed ->
                 (model_, Random.generate NewSeed (Random.int 1 1000000000))
               Tag tag_enc start count ->
                 let
-                  tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+                  tag = Maybe.withDefault "" (Url.percentDecode tag_enc)
                 in
                   updateDesigns ("Tag " ++ tag) model_ (makeUri "tag" [tag]) start count
               TagInit tag_enc start ->
                 let
-                  tag = Maybe.withDefault "" (Http.decodeUri tag_enc)
+                  tag = Maybe.withDefault "" (Url.percentDecode tag_enc)
                 in
                   ({model_ | designList = zeroList }
-                  , Navigation.modifyUrl (makeUri "#tag" [tag, "0", String.fromInt dcount]))
+                  , Nav.replaceUrl model_.key (makeUri "#tag" [tag, "0", String.fromInt dcount]))
               ShowTags tagType ->
                 let
                   comp = 
@@ -645,8 +678,19 @@ update msg model =
                   else
                     Cmd.none
                 )
+    LinkClicked req -> 
+      ( model
+      , case req of
+          Browser.Internal url ->
+            if String.contains "gallery2" url.path then
+              Nav.replaceUrl model.key <| Url.toString url
+            else
+              Nav.load (Url.toString url)
+          Browser.External str ->
+            Nav.load str
+      )
     NewSeed seed ->
-      (model, Navigation.modifyUrl ("#random/" ++ (String.fromInt seed ++ "/0")))
+      (model, Nav.replaceUrl model.key ("#random/" ++ (String.fromInt seed ++ "/0")))
     LoginMsg lMsg ->
       let
         newLoginModel = Login.update lMsg model.loginform          
@@ -665,34 +709,34 @@ update msg model =
               designList_ = {designList | designs = Array.set index ddesign_ model.designList.designs}
               model_ = {model | designList = designList_}
             in case act_ of
-              Just (DeleteDesign id) ->
-                if id == model_.designToDelete && id /= nonDesign then
-                  (model_, deleteDesign id model)
+              Just (DeleteDesign id_) ->
+                if id_ == model_.designToDelete && id_ /= nonDesign then
+                  (model_, deleteDesign id_ model)
                 else
-                  ({model_ | designToDelete = id}, Cmd.none)
+                  ({model_ | designToDelete = id_}, Cmd.none)
               Just (DeleteComment commentid) ->
                 if commentid == model_.commentToDelete && commentid /= noComment then
                   (model_, deleteComment commentid model)
                 else
                   ({model_ | commentToDelete = commentid}, Cmd.none)
               Just (CloseDesign) ->
-                ({model_ | mainDesign = nonDesign, showFans = False}, Navigation.back 1)
+                ({model_ | mainDesign = nonDesign, showFans = False}, Nav.back model_.key 1)
               Just (CancelEditAct) -> case model_.editDesign of
                 Nothing ->
-                  ({model_ | mainDesign = nonDesign}, Navigation.back 1)
+                  ({model_ | mainDesign = nonDesign}, Nav.back model_.key 1)
                 Just edesign ->
                   ( {model_ | mainDesign = edesign.design.designid}
                   , Cmd.batch
-                    [ Navigation.back 1
+                    [ Nav.back model_.key 1
                     , scrollToDesign edesign.design.designid
                     ]
                   )
-              Just (Focus id) -> 
-                ( {model_ | mainDesign = id, showFans = False}
+              Just (Focus id_) -> 
+                ( {model_ | mainDesign = id_, showFans = False}
                 , if model_.mainDesign == nonDesign then
-                    Navigation.newUrl ("#design/" ++ (idStr id))
+                    Nav.pushUrl model_.key ("#design/" ++ (idStr id_))
                   else
-                    Navigation.modifyUrl ("#design/" ++ (idStr id))
+                    Nav.replaceUrl model_.key ("#design/" ++ (idStr id_))
                 )
               Just (ShowFans show) ->
                 ({model_ | showFans = show}, Cmd.none)
@@ -706,16 +750,16 @@ update msg model =
         in
           (model_, resolveAction act_ model_)
     LookupName ->
-      (model, Navigation.newUrl (makeUri "#user" [model.authorLookup, "0"]))
+      (model, Nav.pushUrl model.key (makeUri "#user" [model.authorLookup, "0"]))
     LookupDesign ->
-      (model, Navigation.newUrl ("#design/" ++ (String.fromInt model.designLookup)))
+      (model, Nav.pushUrl model.key ("#design/" ++ (String.fromInt model.designLookup)))
     AuthorText author ->
       ({ model | authorLookup = trimLeft author }, Cmd.none)
     Cfdg2Change cfdg2 ->
       ({model | cfdg2text = cfdg2}, Cmd.none)
     DesignText desText ->
       let
-        des = Result.withDefault 0 (String.toInt desText)
+        des = Maybe.withDefault 0 (String.toInt desText)
       in
         if des < 1  && desText /= "" then
           (model, Cmd.none)
@@ -805,7 +849,7 @@ update msg model =
       case loginResult of
         Ok user ->
           ( {model | user = LoggedIn user, errorInfo = Ok "Login success"}
-          , Navigation.modifyUrl "#newest/0"
+          , Nav.replaceUrl model.key "#newest/0"
           )
         Err error ->
           ( {model | user = NotLoggedIn "login failed", errorInfo = Err error }
@@ -829,7 +873,7 @@ update msg model =
         Ok yes ->
           ({model | user = NotLoggedIn "", errorInfo = Ok "Logout success"}, Cmd.none)
         Err error ->
-          ({model | errorInfo = Err error}, Navigation.newUrl "#error/Logout%20failed%2e")
+          ({model | errorInfo = Err error}, Nav.pushUrl model.key "#error/Logout%20failed%2e")
     ReceiveCfdg id cfdgResult ->
       case cfdgResult of
         Ok cfdgText ->
@@ -934,7 +978,7 @@ update msg model =
       case indexResult of
         Ok index ->
           ( { model | errorInfo = Ok "Title index"}
-          , Navigation.newUrl ("#title/" ++ (String.fromInt index))
+          , Nav.pushUrl model.key ("#title/" ++ (String.fromInt index))
           )
         Err error ->
           ({model | errorInfo = Err error}, Cmd.none)
@@ -944,7 +988,7 @@ update msg model =
           if model.initUrl == "" then
             Cmd.none
           else
-            Navigation.modifyUrl model.initUrl
+            Nav.replaceUrl model.key model.initUrl
       in
         case tagsResult of
           Ok tags ->
@@ -992,16 +1036,16 @@ update msg model =
             designList_ = {designList | designs = designs_}
             cmd_ = 
               if Array.isEmpty designs_ then
-                Navigation.newUrl "#"
+                Nav.pushUrl model.key "#"
               else
-                Navigation.newUrl ("#" ++ designList_.thislink)
+                Nav.pushUrl model.key ("#" ++ designList_.thislink)
           in
             ( { model | designList = designList_, mainDesign = nonDesign, showFans = False
                     , errorInfo = Ok "Design deleted"}
             , cmd_
             )
         Err error ->
-          ({model | errorInfo = Err error}, Navigation.newUrl "#error/Delete%20failed%2e")
+          ({model | errorInfo = Err error}, Nav.pushUrl model.key "#error/Delete%20failed%2e")
     UploadResponse uploadResponse ->
       case uploadResponse of
         Ok dt -> 
@@ -1023,13 +1067,13 @@ update msg model =
                 {designList | designs = designs_}
             cmd_ =
               if index == nonDesignIndex then
-                Navigation.modifyUrl ("#design/" ++ (idStr ddesign_.design.designid))
+                Nav.replaceUrl model.key ("#design/" ++ (idStr ddesign_.design.designid))
               else
                 Cmd.batch
                   [ getComments id model
                   , getCfdg id model
                   , getInfo id model
-                  , Navigation.back 1
+                  , Nav.back model.key 1
                   ]
           in
             ( { model | designList = designList_
@@ -1068,7 +1112,7 @@ update msg model =
     GetCFAWidth widthResult ->
       let
         num = case widthResult of
-          Ok width -> Basics.clamp 1 8 ((floor width) // 295) 
+          Ok elem -> Basics.clamp 1 8 ((floor elem.scene.width) // 295) 
           Err _ -> 5
       in
         ( model
@@ -1096,7 +1140,7 @@ update msg model =
     FileChange idstr -> (model, utf8FileSelected idstr)
     TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model)
     TickTock _ -> (model, checkVisible "moreplease")
-    IsVisible _ -> (model, Navigation.modifyUrl ("#" ++ model.designList.nextlink))
+    IsVisible _ -> (model, Nav.replaceUrl model.key ("#" ++ model.designList.nextlink))
 
 makeQuery : Model -> String
 makeQuery model =
@@ -1130,7 +1174,7 @@ makeIndexLink c =
 makePNlink : String -> Int -> String -> Html Msg
 makePNlink type_ count url =
   a [ href ("#" ++ url), 
-      style "visibility" if (String.isEmpty url) then "hidden" else "visible"]
+      style "visibility" <| if (String.isEmpty url) then "hidden" else "visible"]
     [ b [] [text (type_ ++ " " ++ (String.fromInt count))]]
 
 makeUpBar : Bool -> DesignList -> Html Msg
@@ -1164,11 +1208,12 @@ makeHeader thislink =
     urlparts = String.split "/" thislink
     urlname = Maybe.withDefault "" (List.head <| (List.drop 1) <| urlparts)
     urltype = Maybe.withDefault "" (List.head urlparts)
-    name = Maybe.withDefault "What's his name" (Http.decodeUri urlname)
-    namepos = if String.endsWith "s" name then
-      name ++ "'"
-    else
-      name ++ "'s"
+    name = Maybe.withDefault "What's his name" (Url.percentDecode urlname)
+    namepos = 
+      if String.endsWith "s" name then
+        name ++ "'"
+      else
+        name ++ "'s"
     designs = namepos ++ " Designs"
     likes = namepos ++ " Likes"
     linktext = "To link to this author: [link user:" ++ name ++ "] ... [/link] "
@@ -1320,231 +1365,251 @@ viewMiniList listType desc moreUrl model =
       )
     Nothing -> text ""
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
-  div []
-  [ div [ id "CFAcolumn" ]
-    [ h5 [] [ text "Gallery Tools:" ]
-    , ul []
-      [ li [] [ a [href "#newest/0"] 
-                  [ case model.user of
-                      LoggedIn u ->
-                        if u.unseen > 0 then
-                          text ("Newest (" ++ (String.fromInt u.unseen) ++ " new)")
-                        else
-                          text "Newest"
-                      _ -> text "Newest"
-                  ]
-              ]
-      , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
-      , li [] [ a [href "#title/0"]  [text "By Title" ]]
-      , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
-      , li [] [ a [href "#random"] [text "Random" ]]
-      , li [] [ a [href "#users/name/0/25"] [text "People" ]]
-      , li [] [ a [href "#tags/tag"] [text "Design Tags"] ]
-      , li [] [ a [href "#translate/0"] [text "Version Translator"]]
+  { title = ""
+  , body =
+    [ div [ id "CFAheader" ] [ p [] [text "Context Free"] ]
+    , div [ id "CFAtitle" ]
+      [ h1 [id "titlenode"] [text "Gallery"]]
+    , div [ id "CFAnavbar" ]
+      [ ul []
+        [ li [] [a [href "../index.html"] [text "Home"]]
+        , li [] [a [href "index.html"] [text "Gallery"]]
+        , li [] [a [href "../downloads.html"] [text "Download"]]
+        , li [] [a [href "https://github.com/MtnViewJohn/context-free/wiki"] [text "Documentation"]]
+        , li [] [a [href "../phpbb/index.php"] [text "Forums"]]
+        ]
       ]
-    , h5 [] [ text "Display Mode:" ]
-    , ( let
-          disable = model.viewMode /= Designs || (String.startsWith "#design/" model.currentHash)
-        in
-        ul [style "color" if disable then "#d8cb9f" else "inherit"]
+    , div [ id "CFAcolumn" ]
+      [ h5 [] [ text "Gallery Tools:" ]
+      , ul []
+        [ li [] [ a [href "#newest/0"] 
+                    [ case model.user of
+                        LoggedIn u ->
+                          if u.unseen > 0 then
+                            text ("Newest (" ++ (String.fromInt u.unseen) ++ " new)")
+                          else
+                            text "Newest"
+                        _ -> text "Newest"
+                    ]
+                ]
+        , li [] [ a [href "#oldest/0"] [text "Oldest" ]]
+        , li [] [ a [href "#title/0"]  [text "By Title" ]]
+        , li [] [ a [href "#popular/0"] [text "Most Likes" ]]
+        , li [] [ a [href "#random"] [text "Random" ]]
+        , li [] [ a [href "#users/name/0/25"] [text "People" ]]
+        , li [] [ a [href "#tags/tag"] [text "Design Tags"] ]
+        , li [] [ a [href "#translate/0"] [text "Version Translator"]]
+        ]
+      , h5 [] [ text "Display Mode:" ]
+      , ( let
+            disable = model.viewMode /= Designs || (String.startsWith "#design/" model.currentHash)
+          in
+          ul [style "color" <| if disable then "#d8cb9f" else "inherit"]
+          [ li [] 
+              [ label []
+                [ input
+                  [ type_ "checkbox", onCheck CCcheck, checked model.limitCC, disabled disable] []
+                , img 
+                  [ class "top"
+                  , style "padding" "0px 5px"
+                  , src "graphics/CC.badge.png"
+                  , alt "Creative Commons badge"
+                  ] []
+                , text "Only"
+                ]
+              ]
+            , li [] [text " "]
+            , li [] [ text "Display size:" ]
+            , fieldset [disabled disable]
+              [ li [] [radio " Small" (SwitchTo Design.Mini)  (model.designMode == Design.Mini)]
+              , li [] [radio " Medium" (SwitchTo Design.Small) (model.designMode == Design.Small)]
+              , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
+              ]
+            ])
+      , h5 [] [ text "Lookup" ]
+      , ul []
         [ li [] 
-            [ label []
-              [ input
-                [ type_ "checkbox", onCheck CCcheck, checked model.limitCC, disabled disable] []
-              , img 
-                [ class "top"
-                , style "padding" "0px 5px"
-                , src "graphics/CC.badge.png"
-                , alt "Creative Commons badge"
-                ] []
-              , text "Only"
+          [ Html.form [ onSubmit LookupName ]
+            [ fieldset []
+              [ label []
+                [ text "Author "
+                , input [ type_ "text", name "by", size 8, placeholder "name", id "lookname"
+                        , value model.authorLookup, onInput AuthorText
+                        , attribute "data-lpignore" "true"
+                        , style "padding" "1px"] []
+                , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
+                ]
               ]
             ]
-          , li [] [text " "]
-          , li [] [ text "Display size:" ]
-          , fieldset [disabled disable]
-            [ li [] [radio " Small" (SwitchTo Design.Mini)  (model.designMode == Design.Mini)]
-            , li [] [radio " Medium" (SwitchTo Design.Small) (model.designMode == Design.Small)]
-            , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
-            ]
-          ])
-    , h5 [] [ text "Lookup" ]
-    , ul []
-      [ li [] 
-        [ Html.form [ onSubmit LookupName ]
-          [ fieldset []
-            [ label []
-              [ text "Author "
-              , input [ type_ "text", name "by", size 8, placeholder "name", id "lookname"
-                      , value model.authorLookup, onInput AuthorText
-                      , attribute "data-lpignore" "true"
-                      , style "padding" "1px"] []
-              , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
+          ]
+        , li []
+          [ Html.form [ onSubmit LookupDesign ]
+            [ fieldset []
+              [ label []
+                [ text "Design "
+                , input [ type_ "text", name "id", size 8, placeholder "id #", id "lookid"
+                        , value (designString model.designLookup), onInput DesignText
+                        , attribute "data-lpignore" "true"
+                        , style "padding" "1px"] []
+                , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
+                ]
               ]
             ]
           ]
         ]
-      , li []
-        [ Html.form [ onSubmit LookupDesign ]
-          [ fieldset []
-            [ label []
-              [ text "Design "
-              , input [ type_ "text", name "id", size 8, placeholder "id #", id "lookid"
-                      , value (designString model.designLookup), onInput DesignText
-                      , attribute "data-lpignore" "true"
-                      , style "padding" "1px"] []
-              , input [ type_ "submit", value "Go", style "padding" "1px"] [ ]
+      , case model.user of
+          LoggedIn user ->
+            div []
+            [ h5 [] [ text ("User " ++ user.name) ]
+            , ul []
+              [ li [] [ a [href "#edit/0"] [text "Upload a Design" ]]
+              , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
+              , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
+              ]
+            , div [hidden True]
+              [ Html.map LoginMsg (Login.view model.loginform "") ]
+            ]
+          LoginPending ->
+            div [hidden True] 
+            [ Html.map LoginMsg (Login.view model.loginform "")]
+          NotLoggedIn errmsg ->
+            div [] [ Html.map LoginMsg (Login.view model.loginform errmsg)]
+      ]
+    , div [ id "CFAcontent" ]
+      ( case model.viewMode of
+          Error ->
+            [ div [ property "innerHTML" (JE.string model.errorMessage) ] []
+            ]
+          Editing ->
+            case model.editDesign of
+              Nothing -> [makeDownBar True zeroList]
+              Just edesign ->
+                [ Html.map EDesignMsg (Design.viewEdit model.tagList edesign)
+                , if model.errorMessage == "" then
+                    text ""
+                  else
+                    div [ property "innerHTML" (JE.string model.errorMessage)
+                        , class "alertbox"] []
+                ]
+          EditingTags ->
+            case model.editDesign of
+              Nothing -> [makeDownBar True zeroList]
+              Just edesign ->
+                [ Html.map EDesignMsg (Design.viewEditTags model.tagList edesign)
+                , if model.errorMessage == "" then
+                    text ""
+                  else
+                    div [ property "innerHTML" (JE.string model.errorMessage)
+                        , class "alertbox"] []
+                ]
+          Designs ->
+            viewDesigns model
+          Tags ->
+            [ table [class "tagstable"]
+              ( [ thead [] 
+                  [ tr [] 
+                    [ th [align "right"] [a [href "#tags/count"] [text "Count"]]
+                    , th [align "left"] [a [href "#tags/tag"] [text "Tag"]]
+                    ]
+                  ]
+                ]
+              ++
+                List.map viewTagInfo model.tagList
+              )
+            ]
+          People ->
+            viewUsers model
+          Translation ->
+            [ if model.errorMessage == "" then
+                    text ""
+                  else
+                    div [ property "innerHTML" (JE.string model.errorMessage)
+                        , class "alertbox"] []
+            , h1 [] [text "Cfdg text translated from v2 syntax to v3:"]
+            , textarea 
+              [ id "cfdg3txt"
+              , class "cfdg"
+              , rows 100
+              , cols 100
+              , readonly True
+              , value model.cfdg3text] []
+            , button [ class "copy-button", attribute "data-clipboard-target" "#cfdg3txt" ]
+                     [ text "Copy to clipboard" ]
+            , h1 [] [text "Enter some v2 cfdg text to translate:"]
+            , Html.form [onSubmit TranslateText]
+              [ textarea [class "cfdg", rows 100, cols 100, value model.cfdg2text, onInput Cfdg2Change] []
+              , h2 [] [text "Or select (or drop) a cfdg file"]
+              , input [type_ "file", name "cfdgfile", id "cfdgfile"
+                      , on "change" (JD.succeed (FileChange "cfdgfile"))][]
+              , p [] 
+                [ text "Note: Targeted color changes are not translated. They cannot be automatically translated and require manual fixup. "
+                , a [href "https://github.com/MtnViewJohn/context-free/wiki/Version-2-Syntax#targeted-color-adjustments"] [text "This page"]
+                , text " describes why."
+                ]
+              , input [type_ "submit", name "submit", value "Translate!"] []
               ]
             ]
+          Default ->
+            [ table []
+              [ tr []
+                [ td [class "vupload"]
+                  [ text """
+       Context Free/cfdg is a simple language for generating stunning images.
+       With only a few lines you can describe abstract art, beautiful organic scenery,
+       and many kinds of fractals. It's highly addictive!
+                    """
+                  , br [] []
+                  , br [] []
+                  , text "The Context Free Gallery is a public repository for artwork made "
+                  , text "using the language."
+                  ]
+                , td [class "vupload"]
+                  [ h2 [] [text "What next?"]
+                  , table []
+                    [ tr []
+                      [ td []
+                        [ a [ href "../downloads.html", class "call-to-action"] 
+                            [ text "Get the software"]]
+                      , td []
+                        [ a [ href "https://github.com/MtnViewJohn/context-free/wiki"
+                            , class "call-to-action"
+                            ]
+                            [ text "Learn Context Free"]]
+                      ]
+                    , tr []
+                      [ td []
+                        [ a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
+                            [ text " Join the gallery "]]
+                      , td []
+                        [ a [ href "#newest/0", class "call-to-action"] 
+                            [ text "See what people are doing"]]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            , viewMiniList "newest" "Newest designs:" "#newest/0" model
+            , viewMiniList "newbie" "Newest contributors:" "" model
+            , viewMiniList "popula" "Some popular designs:" "#popular/0" model
+            , viewMiniList "random" "Some random designs:" 
+                ("#random/" ++ (String.fromInt model.miniSeed) ++ "/0") model
+            ]
+      )
+    , div [ id "CFAfooter" ] []
+    , div [ id "CFAbook" ]
+      [ a [href "../book.html"]
+        [ img [src "graphics/cover-shot-120.png", alt "book cover"] []
+        , span [class "CFAmessage"]
+          [ span [class "CFAleadin"] [text "See our book:"]
+          , br [] []
+          , span [class "CFAtitle"] [text "Community of Variation"]
           ]
         ]
       ]
-    , case model.user of
-        LoggedIn user ->
-          div []
-          [ h5 [] [ text ("User " ++ user.name) ]
-          , ul []
-            [ li [] [ a [href "#edit/0"] [text "Upload a Design" ]]
-            , li [] [ a [href (makeUri "#user" [user.name, "0"])] [text "My uploads" ]]
-            , li [] [ a [ onClick LogoutClick, href "#" ] [ text "Logout" ]]
-            ]
-          , div [hidden True]
-            [ Html.map LoginMsg (Login.view model.loginform "") ]
-          ]
-        LoginPending ->
-          div [hidden True] 
-          [ Html.map LoginMsg (Login.view model.loginform "")]
-        NotLoggedIn errmsg ->
-          div [] [ Html.map LoginMsg (Login.view model.loginform errmsg)]
     ]
-  , div [ id "CFAcontent" ]
-    ( case model.viewMode of
-        Error ->
-          [ div [ property "innerHTML" (JE.string model.errorMessage) ] []
-          ]
-        Editing ->
-        ( case model.editDesign of
-            Nothing -> [makeDownBar True zeroList]
-            Just edesign ->
-              [ Html.map EDesignMsg (Design.viewEdit model.tagList edesign)
-              , if model.errorMessage == "" then
-                  text ""
-                else
-                  div [ property "innerHTML" (JE.string model.errorMessage)
-                      , class "alertbox"] []
-              ]
-        )
-        EditingTags ->
-        ( case model.editDesign of
-            Nothing -> [makeDownBar True zeroList]
-            Just edesign ->
-              [ Html.map EDesignMsg (Design.viewEditTags model.tagList edesign)
-              , if model.errorMessage == "" then
-                  text ""
-                else
-                  div [ property "innerHTML" (JE.string model.errorMessage)
-                      , class "alertbox"] []
-              ]
-        )
-        Designs ->
-          viewDesigns model
-        Tags ->
-        ( [ table [class "tagstable"]
-            ( [ thead [] 
-                [ tr [] 
-                  [ th [align "right"] [a [href "#tags/count"] [text "Count"]]
-                  , th [align "left"] [a [href "#tags/tag"] [text "Tag"]]
-                  ]
-                ]
-              ]
-            ++
-              List.map viewTagInfo model.tagList
-            )
-          ]
-        )
-        People ->
-          viewUsers model
-        Translation ->
-        ( [ if model.errorMessage == "" then
-                  text ""
-                else
-                  div [ property "innerHTML" (JE.string model.errorMessage)
-                      , class "alertbox"] []
-          , h1 [] [text "Cfdg text translated from v2 syntax to v3:"]
-          , textarea 
-            [ id "cfdg3txt"
-            , class "cfdg"
-            , rows 100
-            , cols 100
-            , readonly True
-            , value model.cfdg3text] []
-          , button [ class "copy-button", attribute "data-clipboard-target" "#cfdg3txt" ]
-                   [ text "Copy to clipboard" ]
-          , h1 [] [text "Enter some v2 cfdg text to translate:"]
-          , Html.form [onSubmit TranslateText]
-            [ textarea [class "cfdg", rows 100, cols 100, value model.cfdg2text, onInput Cfdg2Change] []
-            , h2 [] [text "Or select (or drop) a cfdg file"]
-            , input [type_ "file", name "cfdgfile", id "cfdgfile"
-                    , on "change" (JD.succeed (FileChange "cfdgfile"))][]
-            , p [] 
-              [ text "Note: Targeted color changes are not translated. They cannot be automatically translated and require manual fixup. "
-              , a [href "https://github.com/MtnViewJohn/context-free/wiki/Version-2-Syntax#targeted-color-adjustments"] [text "This page"]
-              , text " describes why."
-              ]
-            , input [type_ "submit", name "submit", value "Translate!"] []
-            ]
-          ]
-        )
-        Default ->
-        [ table []
-          [ tr []
-            [ td [class "vupload"]
-              [ text """
-   Context Free/cfdg is a simple language for generating stunning images.
-   With only a few lines you can describe abstract art, beautiful organic scenery,
-   and many kinds of fractals. It's highly addictive!
-                """
-              , br [] []
-              , br [] []
-              , text "The Context Free Gallery is a public repository for artwork made "
-              , text "using the language."
-              ]
-            , td [class "vupload"]
-              [ h2 [] [text "What next?"]
-              , table []
-                [ tr []
-                  [ td []
-                    [ a [ href "../downloads.html", class "call-to-action"] 
-                        [ text "Get the software"]]
-                  , td []
-                    [ a [ href "https://github.com/MtnViewJohn/context-free/wiki"
-                        , class "call-to-action"
-                        ]
-                        [ text "Learn Context Free"]]
-                  ]
-                , tr []
-                  [ td []
-                    [ a [ href "../phpbb/ucp.php?mode=register", class "call-to-action"]
-                        [ text " Join the gallery "]]
-                  , td []
-                    [ a [ href "#newest/0", class "call-to-action"] 
-                        [ text "See what people are doing"]]
-                  ]
-                ]
-              ]
-            ]
-          ]
-        , viewMiniList "newest" "Newest designs:" "#newest/0" model
-        , viewMiniList "newbie" "Newest contributors:" "" model
-        , viewMiniList "popula" "Some popular designs:" "#popular/0" model
-        , viewMiniList "random" "Some random designs:" 
-            ("#random/" ++ (String.fromInt model.miniSeed) ++ "/0") model
-        ]
-    )
-  ]
-
+  }
 
 
 
@@ -1596,7 +1661,7 @@ resolveAction ma model =
       CreateComment comment_ -> newComment comment_ model
       AddFaves designid -> changeFave "addfave" designid model
       RemoveFaves designid -> changeFave "deletefave" designid model
-      CancelEditAct -> Navigation.back 1
+      CancelEditAct -> Nav.back model.key 1
       UploadDesign -> case model.editDesign of
         Nothing -> Cmd.none
         Just edesign -> uploadDesign edesign model
@@ -1764,10 +1829,10 @@ loginUser model =
   in
     Http.send NewUser (post url Http.emptyBody decodeUser)
 
-loginSession : Model -> Cmd Msg
-loginSession model =
+loginSession : String -> Cmd Msg
+loginSession backend =
   let
-    url = model.backend ++ "/userinfo"
+    url = backend ++ "/userinfo"
   in
     Http.send SessionUser (get url decodeUser)
 
@@ -1829,9 +1894,9 @@ getTitle model title =
   let
     url = 
       if model.limitCC then
-        model.backend ++ "/cctitleindex/" ++ (Http.encodeUri title)
+        model.backend ++ "/cctitleindex/" ++ (Url.percentEncode title)
       else
-        model.backend ++ "/titleindex/" ++ (Http.encodeUri title)
+        model.backend ++ "/titleindex/" ++ (Url.percentEncode title)
   in
     Http.send GotTitleIndex (get url decodeTitleIndex)
 
@@ -1906,7 +1971,7 @@ subscriptions model =
   Sub.batch 
   (
     if model.viewMode == Designs && model.designList.nextlink /= "" then
-      [ Time.every (250*Time.millisecond) TickTock
+      [ Time.every 250.0 TickTock
       , isVisible IsVisible
       ]
     else
