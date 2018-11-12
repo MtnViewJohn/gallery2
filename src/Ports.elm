@@ -19,5 +19,3 @@ port scrolledToElement : (String -> msg) -> Sub msg
 port checkVisible : String -> Cmd msg
 
 port isVisible : (String -> msg) -> Sub msg
-
-port pageTitle : String -> Cmd a 

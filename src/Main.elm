@@ -112,6 +112,7 @@ type alias Model =
   { user : Session
   , loginform : Login.Model
   , key : Nav.Key
+  , title : String
   , limitCC : Bool
   , authorLookup : String
   , designLookup : Int
@@ -149,6 +150,7 @@ initModel backend loc key =
   ( { user              = LoginPending
     , loginform         = Login.initModel
     , key               = key
+    , title             = "Gallery"
     , limitCC           = False
     , authorLookup      = ""
     , designLookup      = 0
@@ -367,14 +369,17 @@ updateDesigns title model query start count =
     go2server = model.currentHash /= model.designList.currentHash ||
                 model.currentHash == ""
   in
-    ({model | mainDesign = nonDesign, viewMode = Designs, pendingLoad = go2server, showFans = False},
-      if go2server then
-        Cmd.batch
-        [ getDesigns model query start count
-        , pageTitle <| "Gallery - " ++ title ++ " designs"
-        ]
+    ( { model | mainDesign = nonDesign
+              , viewMode = Designs
+              , pendingLoad = go2server
+              , showFans = False
+              , title = "Gallery - " ++ title ++ " designs"
+      }
+    , if go2server then
+        getDesigns model query start count
       else
-        pageTitle <| "Gallery - " ++ title ++ " designs")
+        Cmd.none
+    )
 
 scrollToDesign : DesignID -> Cmd Msg
 scrollToDesign id = 
@@ -447,12 +452,13 @@ update msg model =
                                     , showFans = False
                                     , designList = zeroList
                                     , miniLists = Dict.empty
-                                    , pendingLoad = False}
+                                    , pendingLoad = False
+                                    , title = "Gallery"
+                            }
                 in
                   (model__, Cmd.batch
                     [ Task.attempt GetCFAWidth <| Browser.Dom.getElement "CFAcontent"
                     , checkUnseen model__
-                    , pageTitle "Gallery"
                     ])
               Login user password remember ->
                 let
@@ -473,8 +479,10 @@ update msg model =
                 let
                   emsg = Maybe.withDefault "Malformed error message." (Url.percentDecode msg_enc)
                 in
-                  ({model_ | errorMessage = emsg, viewMode = Error}, 
-                   pageTitle "Gallery - Error")
+                  ( {model_ | errorMessage = emsg
+                            , viewMode = Error
+                            , title = "Gallery - Error"
+                    }, Cmd.none)
               DesignByID id ->
                 let
                   designId = ID id
@@ -485,20 +493,22 @@ update msg model =
                               , showFans = False
                               , viewMode = Designs
                               , designList = zeroList
-                              , pendingLoad = True }
-                    , Cmd.batch 
-                      [ getDesign designId model_
-                      , pageTitle <| "Gallery - Design"
-                      ]
+                              , pendingLoad = True
+                              , title = "Gallery - Design"
+                       }
+                    , getDesign designId model_
                     )
                   Just ddesign ->
-                    ( {model_ | mainDesign = designId, showFans = False, viewMode = Designs}
+                    ( {model_ | mainDesign = designId
+                              , showFans = False
+                              , viewMode = Designs
+                              , title = "Gallery - Design: " ++ ddesign.design.title
+                      }
                     , Cmd.batch
                       [ getComments designId model_
                       , getCfdg designId model_
                       , getInfo designId model_
                       , scrollToDesign designId
-                      , pageTitle <| "Gallery - Design: " ++ ddesign.design.title
                       ]
                     )
               EditDesign id ->
@@ -518,20 +528,18 @@ update msg model =
                                     , viewMode = Editing
                                     , errorMessage = ""
                                     , designList = zeroList
-                                    , pendingLoad = True}
-                          , Cmd.batch
-                            [ loadEditDesign designid model_
-                            , pageTitle <| "Gallery - Edit Design"
-                            ]
+                                    , pendingLoad = True
+                                    , title = "Gallery - Edit Design"
+                            }
+                          , loadEditDesign designid model_
                           )
                         Just ddesign ->
                           ( {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                     , viewMode = Editing
-                                    , errorMessage = ""}
-                          , Cmd.batch
-                            [ getInfo designid model_
-                            , pageTitle <| "Gallery - Edit Design: " ++ ddesign.design.title
-                            ]
+                                    , errorMessage = ""
+                                    , title = "Gallery - Edit Design: " ++ ddesign.design.title
+                            }
+                          , getInfo designid model_
                           )
                   _ -> (model_, Cmd.none)
               EditTags id ->
@@ -546,20 +554,18 @@ update msg model =
                                   , viewMode = EditingTags
                                   , errorMessage = ""
                                   , designList = zeroList
-                                  , pendingLoad = True}
-                        , Cmd.batch 
-                          [ loadEditDesign designid model_
-                          , pageTitle <| "Gallery - Edit Design"
-                          ]
+                                  , pendingLoad = True
+                                  , title = "Gallery - Edit Design"
+                          }
+                        , loadEditDesign designid model_
                         )
                       Just ddesign ->
                         ( {model_ | editDesign = Just <| Design.makeEDesign ddesign.design
                                   , viewMode = EditingTags
-                                  , errorMessage = ""}
-                        , Cmd.batch
-                          [ getInfo designid model_
-                          , pageTitle <| "Gallery - Edit Design: " ++ ddesign.design.title
-                          ]
+                                  , errorMessage = ""
+                                  , title = "Gallery - Edit Design: " ++ ddesign.design.title
+                          }
+                        , getInfo designid model_
                         )
                   _ -> (model_, Cmd.none)
               Author name_enc start count ->
@@ -648,8 +654,12 @@ update msg model =
                         else
                           compare b.count a.count   -- descending order
                 in
-                  ({model_| tagList = List.sortWith comp model_.tagList, viewMode = Tags}
-                  , pageTitle "Gallery - Tag list")
+                  ( { model_| tagList = List.sortWith comp model_.tagList
+                            , viewMode = Tags
+                            , title = "Gallery - Tag list"
+                    }
+                  , Cmd.none
+                  )
               Users utype start count ->
                 let
                   (userOrder_, valid) = case utype of
@@ -662,21 +672,22 @@ update msg model =
                     _          -> (UserOrder None None None, False)
                 in
                   if valid then
-                    ({model_ | viewMode = People, userOrder = userOrder_}
-                    , Cmd.batch
-                      [ getUsers ("users/" ++ utype) start count model_
-                      , pageTitle "Gallery - User list"
-                      ]
+                    ( {model_ | viewMode = People
+                              , userOrder = userOrder_
+                              , title = "Gallery - User list"
+                      }
+                    , getUsers ("users/" ++ utype) start count model_
                     )
                   else
                     (model_, Cmd.none)
               ShowTranslate idint ->
-                ({model_ | viewMode = Translation, cfdg3text = "", errorMessage = ""}
+                ( {model_ | viewMode = Translation
+                          , cfdg3text = ""
+                          , errorMessage = ""
+                          , title = "Gallery - Translation"
+                  }
                 , if idint > 0 then
-                    Cmd.batch
-                      [ translateDesign (ID idint) model_
-                      , pageTitle <| "Gallery - Translation"
-                      ]
+                    translateDesign (ID idint) model_
                   else
                     Cmd.none
                 )
@@ -789,11 +800,12 @@ update msg model =
                       , mainDesign = id
                       , showFans = False
                       , pendingLoad = False
-                      , errorInfo = Ok "New design"}
+                      , errorInfo = Ok "New design"
+                      , title = "Gallery - Design: " ++ design.design.title
+              }
             , Cmd.batch
               [ getComments id model
               , getCfdg id model
-              , pageTitle <| "Gallery - Design: " ++ design.design.title
               ]
             )
         Err error ->
@@ -811,8 +823,10 @@ update msg model =
           Ok design ->
             ( { model | editDesign = Just design
                       , pendingLoad = stillPending
-                      , errorInfo = Ok "New edit design"}
-            , pageTitle <| "Gallery - Edit Design: " ++ design.design.title
+                      , errorInfo = Ok "New edit design"
+                      , title = "Gallery - Edit Design: " ++ design.design.title
+              }
+            , Cmd.none 
             )
           Err error ->
             ( { model | editDesign = Nothing
@@ -1365,11 +1379,11 @@ viewMiniList listType desc moreUrl model =
 
 view : Model -> Browser.Document Msg
 view model =
-  { title = ""
+  { title = model.title
   , body =
     [ div [ id "CFAheader" ] [ p [] [text "Context Free"] ]
     , div [ id "CFAtitle" ]
-      [ h1 [id "titlenode"] [text "Gallery"]]
+      [ h1 [id "titlenode"] [text model.title]]
     , div [ id "CFAnavbar" ]
       [ ul []
         [ li [] [a [href "../index.html"] [text "Home"]]

@@ -161,9 +161,5 @@
         app.ports.isVisible.send(id);
       };
     });
-    app.ports.pageTitle.subscribe(function(title) {
-        document.title = title;
-        document.getElementById("titlenode").innerHTML = title;
-    });
 </script>
 </html>
