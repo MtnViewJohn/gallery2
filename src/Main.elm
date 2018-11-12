@@ -696,7 +696,7 @@ update msg model =
       , case req of
           Browser.Internal url ->
             if String.contains "gallery2" url.path then
-              Nav.replaceUrl model.key <| Url.toString url
+              Nav.pushUrl model.key <| Url.toString url
             else
               Nav.load (Url.toString url)
           Browser.External str ->
