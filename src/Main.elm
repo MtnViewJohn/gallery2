@@ -425,7 +425,7 @@ update msg model =
     NewURL loc ->
       let
         search = Maybe.withDefault "" loc.query
-        qbits = String.split "&" (String.dropLeft 1 search)
+        qbits = String.split "&" search
         cc_ = List.member "cc" qbits
         mode_ = if (List.member "large" qbits) then Design.Medium 
                 else if (List.member "medium" qbits) then Design.Small
@@ -1160,12 +1160,14 @@ update msg model =
 
 makeQuery : Model -> String
 makeQuery model =
-  let
-    start = if model.limitCC then "?cc" else "?"
-  in case model.designMode of
-    Design.Medium -> start ++ "large"
-    Design.Small -> start ++ "medium"
-    _ -> start
+  case (model.limitCC, model.designMode) of
+    (False, Design.Mini)   -> "?"
+    (False, Design.Small)  -> "?medium"
+    (False, Design.Medium) -> "?large"
+    (True,  Design.Mini)   -> "?cc"
+    (True,  Design.Small)  -> "?cc&medium"
+    (True,  Design.Medium) -> "?cc&large"
+    _                      -> ""
 
 
 
