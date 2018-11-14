@@ -168,18 +168,18 @@ interStyle a b =
 styleImage : TabStyle -> String
 styleImage style =
   case style of
-    Empty -> "url(graphics/empty.png)"
-    Active -> "url(graphics/active.png)"
-    Inactive -> "url(graphics/inactive.png)"
-    Rest -> "url(graphics/empty.png)"
-    E2A -> "url(graphics/empty2active.png)"
-    E2I -> "url(graphics/empty2inactive.png)"
-    A2E -> "url(graphics/active2empty.png)"
-    I2E -> "url(graphics/inactive2empty.png)"
-    A2I -> "url(graphics/active2inactive.png)"
-    I2A -> "url(graphics/inactive2active.png)"
-    I2IL -> "url(graphics/inactive2inactive_left.png)"
-    I2IR -> "url(graphics/inactive2inactive_right.png)"
+    Empty -> " Empty"
+    Active -> " Active"
+    Inactive -> " Inactive"
+    Rest -> " Empty"
+    E2A -> " E2A"
+    E2I -> " E2I"
+    A2E -> " A2E"
+    I2E -> " I2E"
+    A2I -> " A2I"
+    I2A -> " I2A"
+    I2IL -> " I2IL"
+    I2IR -> " I2IR"
 
 styleClass : TabStyle -> String
 styleClass style =
@@ -200,8 +200,7 @@ addInter tabs =
 makeTab : TabInfo -> Html msg
 makeTab tab =
   div 
-    [ class <| styleClass tab.style
-    , style "background-image"  (styleImage tab.style)
+    [ class <| styleClass tab.style ++ (styleImage tab.style)
     ]
     [ if tab.url == "" then
         text <| toNB tab.content
