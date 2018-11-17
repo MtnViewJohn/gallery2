@@ -16,14 +16,16 @@ module GalleryUtils exposing
   , TabStyle (..)
   , TabInfo
   , makeTabs
+  , decodeFiles
   )
 
 import Time
 import Url
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (custom)
+import Html.Events exposing (preventDefaultOn)
 import Json.Decode as JD
+import File
 
 type DesignID = ID Int
 
@@ -59,7 +61,6 @@ type Action
     | CancelEditAct
     | CloseDesign
     | ShowFans Bool
-    | GetFile String
 
 type alias TagInfo =
   { name : String
@@ -115,7 +116,15 @@ makeUri base rest =
 
 onNav : msg -> Attribute msg
 onNav message =
-    custom "click" (JD.succeed { message = message, stopPropagation = False, preventDefault = True })
+  preventDefaultOn "click" (JD.map alwaysPreventDefault (JD.succeed message)) 
+
+alwaysPreventDefault : msg -> ( msg, Bool )
+alwaysPreventDefault msg =
+  ( msg, True )
+
+decodeFiles : JD.Decoder (List File.File)
+decodeFiles =
+  JD.at ["target","files"] (JD.list File.decoder)
 
 
 tagHelp : Html msg

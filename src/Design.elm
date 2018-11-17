@@ -4,7 +4,6 @@ module Design exposing
   , Design
   , initDesign
   , setCfdg
-  , setFile
   , setComments
   , setComment
   , removeComment
@@ -17,6 +16,7 @@ module Design exposing
 
   , Msg
   , MsgId
+  , msgIdString
   , EMsg
   , update
   , editupdate
@@ -43,7 +43,9 @@ import Comment
 import GalleryUtils exposing (..)
 import Markdown
 import Char
-import Ports exposing (FilePortData, fileSelected, fileContentRead)
+import File
+import Http
+
 
 -- MODEL
 
@@ -81,8 +83,8 @@ type alias EditDesign =
     { design : Design
     , ccLicense : String
     , newTag : String
-    , filePortData : Maybe FilePortData
-    , imagePortData : Maybe FilePortData
+    , fileData : Maybe File.File
+    , imageData : Maybe File.File
     , fileSelected : Bool
     , imageSelected : Bool
     , uploadPNG : Bool
@@ -92,9 +94,19 @@ type alias EditDesign =
     }
 
 makeEDesign : Design -> EditDesign
-makeEDesign design =
-  EditDesign design "-" "" Nothing Nothing False False (String.endsWith ".png" design.imagelocation) 
-    False False False
+makeEDesign design_ =
+  { design = design_
+  , ccLicense = "-"
+  , newTag = ""
+  , fileData = Nothing
+  , imageData = Nothing
+  , fileSelected = False
+  , imageSelected = False
+  , uploadPNG = String.endsWith ".png" design_.imagelocation
+  , focusTag = False
+  , focusTaglist = False
+  , tagSelected = False
+  }
 
 type alias DisplayDesign =
     { design : Design
@@ -145,13 +157,13 @@ str2Tiled i =
     "3" -> Tiled
     _   -> Untiled
 
-tiled2Int : TileType -> Int
-tiled2Int tt =
+tiled2Str : TileType -> String
+tiled2Str tt =
   case tt of
-    Untiled -> 0
-    Hfrieze -> 1
-    Vfrieze -> 2
-    Tiled -> 3
+    Untiled -> "0"
+    Hfrieze -> "1"
+    Vfrieze -> "2"
+    Tiled   -> "3"
 
 initDesign: String -> String -> Time.Posix -> EditDesign
 initDesign user ccURI now = 
@@ -184,13 +196,6 @@ setCfdg newCfdg ddesign =
   in
     { ddesign | cfdghtml = toHtml markdown }
 
-setFile : FilePortData -> EditDesign -> EditDesign
-setFile fpd edesign =
-  if fpd.fileid == "cfdgfile" then
-    {edesign | filePortData = Just fpd, fileSelected = True}
-  else
-    {edesign | imagePortData = Just fpd, imageSelected = True}
-    
 setComments : List Comment.Comment -> DisplayDesign -> DisplayDesign
 setComments newComments ddesign =
   { ddesign | comments = List.map Comment.setupHtml newComments }
@@ -259,32 +264,28 @@ decodeEDesign : JD.Decoder EditDesign
 decodeEDesign =
   JD.map makeEDesign decodeDesign
 
-encodeDesign : EditDesign -> JE.Value
+encodeDesign : EditDesign -> (List Http.Part)
 encodeDesign record =
-  case record.design.designid of
-    ID designid ->
-      JE.object
-          [ ("ccImage",    JE.string record.design.ccImage)
-          , ("ccName",     JE.string record.design.ccName)
-          , ("ccURI",      JE.string record.design.ccURI)
-          , ("cclicense",  JE.string record.ccLicense)
-          , ("designid",   JE.int    designid)
-          , ("tags",       JE.list   JE.string record.design.tags)
-          , ("notes",      JE.string record.design.notes)
-          , ("tiled",      JE.int    <| tiled2Int record.design.tiled)
-          , ("title",      JE.string record.design.title)
-          , ("variation",  JE.string record.design.variation)
-          , ("compression",JE.string <| if record.uploadPNG then "PNG-8" else "JPEG")
-          , ("cfdgfile",   (encodeMaybe encodeFileData) <| record.filePortData)
-          , ("imagefile",  (encodeMaybe encodeFileData) <| record.imagePortData)
-          ]
-
-encodeFileData : FilePortData -> JE.Value
-encodeFileData fpd =
-    JE.object
-        [ ("filename", JE.string <| fpd.filename)
-        , ("contents", JE.string <| stripUrl <| fpd.contents)
-        ]
+  [ Http.stringPart "ccImage" record.design.ccImage
+  , Http.stringPart "ccName" record.design.ccName
+  , Http.stringPart "ccURI" record.design.ccURI
+  , Http.stringPart "cclicense" record.ccLicense
+  , Http.stringPart "designid" <| idStr record.design.designid
+  , Http.stringPart "tags" <| String.join " " record.design.tags
+  , Http.stringPart "notes" record.design.notes
+  , Http.stringPart "tiled" <| tiled2Str record.design.tiled
+  , Http.stringPart "title" record.design.title
+  , Http.stringPart "variation" record.design.variation
+  , Http.stringPart "compression" <| if record.uploadPNG then "PNG-8" else "JPEG"
+  ] ++ 
+  ( case record.fileData of
+      Nothing -> []
+      Just file -> [Http.filePart "cfdgfile" file]
+  ) ++
+  ( case record.imageData of
+      Nothing -> []
+      Just file -> [Http.filePart "imagefile" file]
+  )
 
 encodeMaybe : (a -> JE.Value) -> (Maybe a) -> JE.Value
 encodeMaybe valEncode mVal =
@@ -323,7 +324,8 @@ type Msg
 type EMsg
     = CancelEdit
     | TitleChange String
-    | FileChange String
+    | CfdgChange (List File.File)
+    | ImageChange (List File.File)
     | VariationChange String
     | CCchange String
     | TiledChange String
@@ -339,6 +341,19 @@ type EMsg
     | UploadTags
 
 type alias MsgId = (Msg, DesignID)
+
+msgIdString : MsgId -> String
+msgIdString (dmsg, id) =
+  case dmsg of
+    DeleteClick -> "Delete design " ++ (idStr id)
+    CancelDelete -> "Cancel delete design " ++ (idStr id)
+    FocusClick -> "Focus design " ++ (idStr id)
+    DismissDesign -> "Dismiss design " ++ (idStr id)
+    ViewFans v -> "View fans of design " ++ (idStr id)
+    AddFavesClick -> "I like design " ++ (idStr id)
+    RemoveFavesClick -> "I don't like design " ++ (idStr id)
+    CommentMsg _ -> "Comment message for design " ++ (idStr id)
+
 
 commentMsgId : DesignID -> Comment.MsgId -> MsgId
 commentMsgId id cmsgid =
@@ -375,8 +390,16 @@ editupdate msg edesign = case msg of
         design_ = {design | title = title_}
       in
         ({edesign | design = design_}, Nothing)
-    FileChange id ->
-      (edesign , Just (GetFile id))
+    CfdgChange files ->
+      let
+        file = List.head files
+      in
+        ({edesign | fileData = file, fileSelected = file /= Nothing}, Nothing)
+    ImageChange files ->
+      let
+        file = List.head files
+      in
+        ({edesign | imageData = file, imageSelected = file /= Nothing}, Nothing)
     VariationChange var_ ->
       let
         design = edesign.design
@@ -482,14 +505,14 @@ validateVariation var =
 
 
 validateCfdg : EditDesign -> Bool
-validateCfdg edesign = case edesign.filePortData of
+validateCfdg edesign = case edesign.fileData of
   Nothing -> not (String.isEmpty edesign.design.filelocation)
-  Just fpd -> String.endsWith ".cfdg" (String.toLower fpd.filename)
+  Just file -> String.endsWith ".cfdg" (String.toLower <| File.name file)
 
 validateImage : EditDesign -> Bool
-validateImage edesign = case edesign.imagePortData of
+validateImage edesign = case edesign.imageData of
   Nothing -> not (String.isEmpty edesign.design.imagelocation)
-  Just fpd -> String.endsWith ".png" (String.toLower fpd.filename)
+  Just file -> String.endsWith ".png" (String.toLower <| File.name file)
 
 
 -- VIEW
@@ -645,10 +668,10 @@ thumbImage design =
   in
     case design.tiled of
       Untiled ->
-        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
-          [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
+        span [onClick (FocusClick, design.designid)]
+             [ img [ class "image", src design.thumblocation, alt "design thumbnail"] []]
       Hfrieze ->
-        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        span [onClick (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -657,7 +680,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Vfrieze ->
-        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        span [ onClick (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -666,7 +689,7 @@ thumbImage design =
             , alt "design thumbnail"
             ] []]
       Tiled ->
-        a [ href <| "#design/" ++ (idStr design.designid), onNav (FocusClick, design.designid)]
+        span [ onClick (FocusClick, design.designid)]
           [ img 
             [ class "image"
             , src "empty300.png"
@@ -740,29 +763,28 @@ thumbLink cfg linkClass id contents =
       , class linkClass 
       ] contents
   else
-    a [ href <| "#design/" ++ (idStr id)
-      , onNav (FocusClick,id)
-      , title "View design."
-      , class linkClass 
-      ] contents
+    span  [ onClick (FocusClick,id)
+          , title "View design."
+          , class linkClass 
+          ] contents
 
 viewEditDeleteButtons : Bool -> ViewConfig -> DisplayDesign -> List (Html MsgId)
 viewEditDeleteButtons icons cfg design =
   if canModify design.design.owner cfg.currentUser then  
     if cfg.readyToDelete == design.design.designid then
-      [ a [ href "#", onNav (CancelDelete,design.design.designid), title "Cancel deletion."
-          , class "keepbutton"
-          ] [ text <| if icons then "" else "Cancel"]
+      [ span  [ onClick (CancelDelete,design.design.designid), title "Cancel deletion."
+              , class "keepbutton"
+              ] [ text <| if icons then "" else "Cancel"]
       , text " "
-      , a [ href "#", onNav (DeleteClick,design.design.designid), title "Confirm deletion."
-          , class "confirmbutton"
-          ] [ text <| if icons then "" else "Confirm"]
+      , span  [ onClick (DeleteClick,design.design.designid), title "Confirm deletion."
+              , class "confirmbutton"
+              ] [ text <| if icons then "" else "Confirm"]
       , text " "
       ]
     else
-      [ a [ href "#", onNav (DeleteClick,design.design.designid), title "Delete this design."
-          , class "button deletebutton" 
-          ] [ text  <| if icons then "" else " Delete "]
+      [ span  [ onClick (DeleteClick,design.design.designid), title "Delete this design."
+              , class "button deletebutton" 
+              ] [ text  <| if icons then "" else " Delete "]
       , text " "
       , a [ href ("#edit/" ++ (idStr design.design.designid)), title "Edit this design."
           , class "button editbutton"
@@ -818,27 +840,27 @@ viewDesignInfo size cfg design =
                   Nothing -> text ""
                   Just user ->
                     if List.member user.name design.design.fans then
-                      a [ href "#", onNav (RemoveFavesClick,design.design.designid)
-                        , title "Click to 'Unlike' this design."
-                        , class "button favebutton removefave"
-                        ] [ text ""]
+                      span  [ onClick (RemoveFavesClick,design.design.designid)
+                            , title "Click to 'Unlike' this design."
+                            , class "button favebutton removefave"
+                            ] [ text ""]
                     else
-                      a [ href "#", onNav (AddFavesClick,design.design.designid)
-                        , title "Click to 'Like' this design."
-                        , class "button favebutton addfave"
-                        ] [ text ""]
+                      span  [ onClick (AddFavesClick,design.design.designid)
+                            , title "Click to 'Like' this design."
+                            , class "button favebutton addfave"
+                            ] [ text ""]
               ) ::
               ( if not (List.isEmpty design.design.fans) then
                   [ text (fanCount design.design.numvotes), text ": "
-                  , a [href "#", onNav ((ViewFans True),design.design.designid)] 
-                      [text "See who liked it"]
+                  , span  [style "cursor" "pointer", onClick ((ViewFans True),design.design.designid)] 
+                          [text "See who liked it"]
                   , div
                     [ class "popup"
                     , style "display" <| if cfg.showFanlist then "block" else "none"
                     ]
                   ( [ h2 [] [text "Fans:"]
-                    , a [class "close", href "#", onNav ((ViewFans False),design.design.designid)]
-                        [text "✖"]
+                    , span  [class "close", onClick ((ViewFans False),design.design.designid)]
+                            [text "✖"]
                     ] ++ 
                     (List.intersperse (text ", ") <| List.map makeFanLink design.design.fans)
                   )
@@ -868,9 +890,9 @@ viewDesignInfo size cfg design =
       , div [class "buttondiv"]
         ( [ downloadLink design.design.filelocation " Download CFDG "
           , text " "
-          , a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick,design.design.designid), title "View design."
-              , class "button viewbutton" 
-              ] [ text " View "]
+          , span  [ onClick (FocusClick,design.design.designid), title "View design."
+                  , class "button viewbutton" 
+                  ] [ text " View "]
           , text " "
           ] ++
           viewEditDeleteButtons False cfg design
@@ -915,30 +937,28 @@ view cfg design =
         else
           text ""
           , div [class "khomut"]
-            [ a 
+            [ span 
               [ style "visibility" <| if cfg.prev == nonDesign then "hidden" else "visible"
               , class "pcnbutton prevbutton"
-              , href <| "#design/" ++ (idStr cfg.prev)
-              , onNav (FocusClick,cfg.prev)
+              , onClick (FocusClick,cfg.prev)
               , title "Previous design."
               ] []
             , text " "
-            , a 
+            , span 
               [ style "visibility" <|
                       if cfg.prev == nonDesign && cfg.next == nonDesign then 
                         "hidden" 
                       else
                         "visible"
               , class "pcnbutton closebutton"
-              , href "#", onNav (DismissDesign,design.design.designid)
+              , onClick (DismissDesign,design.design.designid)
               , title "Close this design"
               ] []
             , text " "
-            , a 
+            , span 
               [ style "visibility" <| if cfg.next == nonDesign then "hidden" else "visible"
               , class "pcnbutton nextbutton"
-              , href <| "#design/" ++ (idStr cfg.next)
-              , onNav (FocusClick,cfg.next)
+              , onClick (FocusClick,cfg.next)
               , title "Next design."
               ] []
             ]
@@ -1027,8 +1047,8 @@ view cfg design =
       table [class "med_thumbtable", id ("design" ++ (idStr design.design.designid))]
         [ tr []
           [ td [class "med_thumbcell"]
-            [ a [ href <| "#design/" ++ (idStr design.design.designid), onNav (FocusClick, design.design.designid) ]
-              [ img [ class "image", src design.design.thumblocation, alt "design thumbnail"] []]
+            [ span  [ onClick (FocusClick, design.design.designid) ]
+                    [ img [ class "image", src design.design.thumblocation, alt "design thumbnail"] []]
             ]
           ]
         , tr []
@@ -1051,7 +1071,7 @@ tagDeleteLink tag =
   [ text " "
   , a [href (makeUri "#tag" [tag, "0"]), target "_blank"] [text tag]
   , text " "
-  , a [href "#", onNav (TagDelete tag), title "Delete this tag", class "tagbutton"] [text "x"]
+  , span [onClick (TagDelete tag), title "Delete this tag", class "tagbutton"] [text "x"]
   ]
 
 tagOptions : List TagInfo -> List (Html EMsg)
@@ -1074,7 +1094,7 @@ viewTagEdit tags edesign =
         , onFocus (TagFocus True), onBlur (TagFocus False)
         , onInput TagType
         ] []
-       ):: [text " ", a [href "#", onNav TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
+       ):: [text " ", span [onClick TagAdd, title "Add this tag", class "tagbutton"] [text "add"]]
         ++ (List.concat (List.map tagDeleteLink edesign.design.tags))
         ++ [ let
                 match tag tagi = String.contains tag tagi.name
@@ -1131,7 +1151,7 @@ viewEdit tags edesign =
       , tr []
         [ td [] [b [] [text "CFDG"], text " file:"]
         , td [] [ input [type_ "file", name "cfdgfile", id "cfdgfile"
-                , on "change" (JD.succeed (FileChange "cfdgfile"))][]]
+                , on "change" (JD.map CfdgChange decodeFiles)][]]
         , td 
           [ class (if (validateCfdg edesign) then "foo" else "alert")]
           [ if validateCfdg edesign then
@@ -1146,7 +1166,7 @@ viewEdit tags edesign =
       , tr []
         [ td [] [b [] [text "PNG"], text " file:"]
         , td [] [ input [type_ "file", name "imagefile", id "imagefile"
-                , on "change" (JD.succeed (FileChange "imagefile"))] []]
+                , on "change" (JD.map ImageChange decodeFiles)] []]
         , td 
           [ class (if (validateImage edesign) then "foo" else "alert")]
           [ if validateImage edesign then

@@ -201,23 +201,23 @@ view cfg comment =
         , if commentOwner cfg.currentUser comment.screenname then
             if comment.commentid == cfg.commentToDelete then
               div []
-              [ a [ href "#", onNav (CancelDeleteClick, comment.commentid), title "Cancel deletion."
-                  , class "keepbutton"
-                  ] [ ]
+              [ span  [ onClick (CancelDeleteClick, comment.commentid), title "Cancel deletion."
+                      , class "keepbutton"
+                      ] [ ]
               , text " "
-              , a [ href "#", onNav (DeleteClick, comment.commentid), title "Confirm deletion."
-                  , class "confirmbutton"
-                  ] [ ]
+              , span  [ onClick (DeleteClick, comment.commentid), title "Confirm deletion."
+                      , class "confirmbutton"
+                      ] [ ]
               ]
             else
               div []
-              [ a [ href "#", onNav (DeleteClick, comment.commentid), title "Delete this comment."
-                  , class "button deletebutton commentbutton"
-                  ] [ ]
+              [ span  [ onClick (DeleteClick, comment.commentid), title "Delete this comment."
+                      , class "button deletebutton commentbutton"
+                      ] [ ]
               , text " "
-              , a [ href "#", onNav (EditClick, comment.commentid), title "Edit this comment."
-                  , class "button editbutton commentbutton"
-                  ] [ ]
+              , span  [ onClick (EditClick, comment.commentid), title "Edit this comment."
+                      , class "button editbutton commentbutton"
+                      ] [ ]
               ]
           else
             text ""

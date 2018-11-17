@@ -22,6 +22,7 @@ import Task
 import Ports exposing (..)
 import Browser.Dom
 import Dict exposing (Dict)
+import File
 
 main =
   Browser.application
@@ -356,9 +357,9 @@ type Msg
   | ReceiveUnseen (Result Http.Error Int)
   | GetCFAWidth (Result Browser.Dom.Error Browser.Dom.Element)
   | TryScroll String
-  | FileRead FilePortData
-  | FileChange String
   | TranslateText
+  | Cfdg2Read String
+  | TranslateFile (List File.File)
   | TickTock Posix
   | IsVisible String
 
@@ -392,13 +393,14 @@ errorModel : Http.Error -> String -> Model -> Model
 errorModel error context model =
   let
     msg = case error of
-      Http.BadStatus resp -> 
-        let
-          i = String.indices "</h1>" resp.body
-        in case List.head i of
-          Nothing -> resp.body
-          Just found -> "<h3>" ++ context ++ " issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
-      Http.BadPayload _ resp -> "Unexpected response."
+      --Http.BadStatus resp -> 
+      --  let
+      --    i = String.indices "</h1>" resp.body
+      --  in case List.head i of
+      --    Nothing -> resp.body
+      --    Just found -> "<h3>" ++ context ++ " issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
+      Http.BadStatus stat -> "Status: " ++ (String.fromInt stat)  -- TODO: get response body
+      Http.BadBody _ -> "Unexpected response."
       _ -> "Communication error."
   in
     {model | errorInfo = Err error, errorMessage = msg}
@@ -1145,15 +1147,12 @@ update msg model =
         , getMiniList model ("popularrandom/" ++ (String.fromInt seed)) num
         ]
       )
-    FileRead fpd ->
-      case model.editDesign of
-        Nothing -> ({model | cfdg2text = fpd.contents}, Cmd.none)
-        Just edesign ->
-          let
-            edesign_ = Design.setFile fpd edesign
-          in
-            ({model | editDesign = Just edesign_}, Cmd.none)
-    FileChange idstr -> (model, utf8FileSelected idstr)
+    TranslateFile files ->
+      case List.head files of
+        Nothing -> (model, Cmd.none)
+        Just file -> (model, Task.perform Cfdg2Read <| File.toString file)
+    Cfdg2Read cfdg2 ->
+      ({model | cfdg2text = cfdg2, cfdg3text = "", errorMessage = ""}, translateText model)
     TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model)
     TickTock _ -> (model, checkVisible "moreplease")
     IsVisible _ -> (model, Nav.replaceUrl model.key ("#" ++ model.designList.nextlink))
@@ -1556,7 +1555,7 @@ view model =
               [ textarea [class "cfdg", rows 100, cols 100, value model.cfdg2text, onInput Cfdg2Change] []
               , h2 [] [text "Or select (or drop) a cfdg file"]
               , input [type_ "file", name "cfdgfile", id "cfdgfile"
-                      , on "change" (JD.succeed (FileChange "cfdgfile"))][]
+                      , on "change" (JD.map TranslateFile decodeFiles)][]
               , p [] 
                 [ text "Note: Targeted color changes are not translated. They cannot be automatically translated and require manual fixup. "
                 , a [href "https://github.com/MtnViewJohn/context-free/wiki/Version-2-Syntax#targeted-color-adjustments"] [text "This page"]
@@ -1629,42 +1628,21 @@ view model =
 
 -- HTTP
 
-post : String -> Http.Body -> JD.Decoder a -> Http.Request a
-post url body decoder =
-  Http.request
-    { method = "POST"
-    , headers = []
-    , url = url
-    , body = body
-    , expect = Http.expectJson decoder
-    , timeout = Nothing
-    , withCredentials = True
+maybeRiskyRequest : String -> (
+    { method : String
+    , headers : List Http.Header
+    , url : String
+    , body : Http.Body
+    , expect : Http.Expect msg
+    , timeout : Maybe Float
+    , tracker : Maybe String
     }
-
-put : String -> Http.Body -> JD.Decoder a -> Http.Request a
-put url body decoder =
-  Http.request
-    { method = "PUT"
-    , headers = []
-    , url = url
-    , body = body
-    , expect = Http.expectJson decoder
-    , timeout = Nothing
-    , withCredentials = True
-    }
-
-get : String -> JD.Decoder a -> Http.Request a
-get url decoder =
-  Http.request
-    { method = "GET"
-    , headers = []
-    , url = url
-    , body = Http.emptyBody
-    , expect = Http.expectJson decoder
-    , timeout = Nothing
-    , withCredentials = True
-    }
-
+  -> Cmd msg)
+maybeRiskyRequest backend =
+  if String.contains "localhost" backend then
+    Http.riskyRequest
+  else
+    Http.request
 
 resolveAction : Maybe Action -> Model -> Cmd Msg
 resolveAction ma model =
@@ -1682,21 +1660,33 @@ resolveAction ma model =
       UploadDesignTags -> case model.editDesign of
         Nothing -> Cmd.none
         Just edesign -> uploadDesignTags edesign model
-      GetFile id -> fileSelected id
       _ -> Cmd.none
 
 updateDesignStatus : Model -> Cmd Msg
 updateDesignStatus model =
-  let
-    url = model.backend ++ "/newdesigns"
-  in
-    Http.send DesignStatusUpdated (post url Http.emptyBody decodeStatus)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/newdesigns"
+    , body = Http.emptyBody
+    , expect = Http.expectJson DesignStatusUpdated decodeStatus
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 checkUnseen : Model -> Cmd Msg
 checkUnseen model =
   case model.user of
     LoggedIn u ->
-      Http.send ReceiveUnseen (get (model.backend ++ "/unseen") decodeUnseen)
+      maybeRiskyRequest model.backend
+        { method = "GET"
+        , headers = []
+        , url = model.backend ++ "/unseen"
+        , body = Http.emptyBody
+        , expect = Http.expectJson ReceiveUnseen decodeUnseen
+        , timeout = Nothing
+        , tracker = Nothing
+        }
     _ -> Cmd.none
 
 decodeUnseen : JD.Decoder Int
@@ -1710,10 +1700,15 @@ decodeStatus =
 
 changeFave : String -> DesignID -> Model -> Cmd Msg
 changeFave change designid model =
-  let
-    url = String.join "/" [model.backend, change, idStr designid]
-  in
-    Http.send NewFaves (post url Http.emptyBody decodeFaves)
+  maybeRiskyRequest model.backend 
+    { method = "POST"
+    , headers = []
+    , url = String.join "/" [model.backend, change, idStr designid]
+    , body = Http.emptyBody
+    , expect = Http.expectJson NewFaves decodeFaves
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeFaves : JD.Decoder FaveInfo
 decodeFaves =
@@ -1723,24 +1718,39 @@ decodeFaves =
 
 sendComment : CommentID -> String -> Model -> Cmd Msg
 sendComment commentid comment_ model =
-  let
-    url = model.backend ++ "/updatecomment/" ++ (cidStr commentid)
-  in
-    Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
+  maybeRiskyRequest model.backend
+    { method = "PUT"
+    , headers = []
+    , url = model.backend ++ "/updatecomment/" ++ (cidStr commentid)
+    , body = Http.stringBody "text/plain" comment_
+    , expect = Http.expectJson NewComment Comment.decodeComment
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 newComment : String -> Model -> Cmd Msg
 newComment comment_ model =
-  let
-    url = model.backend ++ "/createcomment/" ++ (idStr model.mainDesign)
-  in
-    Http.send NewComment (put url (Http.stringBody "text/plain" comment_) Comment.decodeComment)
+  maybeRiskyRequest model.backend
+    { method = "PUT"
+    , headers = []
+    , url = model.backend ++ "/createcomment/" ++ (idStr model.mainDesign)
+    , body = Http.stringBody "text/plain" comment_
+    , expect = Http.expectJson NewComment Comment.decodeComment
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 deleteComment : CommentID -> Model -> Cmd Msg
 deleteComment commentid model =
-  let
-    url = model.backend ++ "/deletecomment/" ++ (cidStr commentid)
-  in
-    Http.send RemoveComment (post url Http.emptyBody decodeCommentId)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/deletecomment/" ++ (cidStr commentid)
+    , body = Http.emptyBody
+    , expect = Http.expectJson RemoveComment decodeCommentId
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeCommentId : JD.Decoder CommentID
 decodeCommentId =
@@ -1749,10 +1759,15 @@ decodeCommentId =
 
 getDesign : DesignID -> Model -> Cmd Msg
 getDesign id model =
-  let
-    url = model.backend ++ "/design/" ++ (idStr id)
-  in
-    Http.send NewDesign (get url decodeDesignTag)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/design/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson NewDesign decodeDesignTag
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeDesignTag : JD.Decoder DesignTags
 decodeDesignTag =
@@ -1762,10 +1777,15 @@ decodeDesignTag =
 
 loadEditDesign : DesignID -> Model -> Cmd Msg
 loadEditDesign id model =
-  let
-    url = model.backend ++ "/design/" ++ (idStr id)
-  in
-    Http.send NewEditDesign (get url decodeEDesign)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/design/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson NewEditDesign decodeEDesign
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeEDesign : JD.Decoder Design.EditDesign
 decodeEDesign =
@@ -1773,19 +1793,27 @@ decodeEDesign =
 
 uploadDesign : Design.EditDesign -> Model -> Cmd Msg
 uploadDesign edesign model =
-  let
-    url = model.backend ++ "/postdesign"
-    jbody = Design.encodeDesign edesign      
-  in
-    Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesignTag)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/fpostdesign"
+    , body = Http.multipartBody <| Design.encodeDesign edesign
+    , expect = Http.expectJson UploadResponse decodeDesignTag
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 uploadDesignTags : Design.EditDesign -> Model -> Cmd Msg
 uploadDesignTags edesign model =
-  let
-    url = model.backend ++ "/postdesigntags"
-    jbody = Design.encodeDesign edesign      
-  in
-    Http.send UploadResponse (post url (Http.jsonBody jbody) decodeDesignTag)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/fpostdesigntags"
+    , body = Http.multipartBody <| Design.encodeDesign edesign
+    , expect = Http.expectJson UploadResponse decodeDesignTag
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 getDesigns : Model -> String -> Int -> Int -> Cmd Msg
 getDesigns model query start count =
@@ -1794,7 +1822,15 @@ getDesigns model query start count =
     url = String.join "/" [model.backend, ccquery, 
                            String.fromInt(start), String.fromInt(count)]
   in
-    Http.send NewDesigns (get url decodeDesigns)
+    maybeRiskyRequest model.backend
+      { method = "GET"
+      , headers = []
+      , url = url
+      , body = Http.emptyBody
+      , expect = Http.expectJson NewDesigns decodeDesigns
+      , timeout = Nothing
+      , tracker = Nothing
+      }
 
 decodeDesigns : JD.Decoder DesignList
 decodeDesigns = 
@@ -1812,7 +1848,15 @@ getMiniList model listType count =
   let
     url = String.join "/" [model.backend, listType, "0", String.fromInt(count)]
   in
-    Http.send (NewMiniList (String.left 6 listType)) (get url decodeMiniList)
+    maybeRiskyRequest model.backend
+      { method = "GET"
+      , headers = []
+      , url = url
+      , body = Http.emptyBody
+      , expect = Http.expectJson (NewMiniList <| String.left 6 listType) decodeMiniList
+      , timeout = Nothing
+      , tracker = Nothing
+      }
 
 decodeMiniList : JD.Decoder (List Design.DisplayDesign)
 decodeMiniList =
@@ -1820,10 +1864,15 @@ decodeMiniList =
 
 deleteDesign : DesignID -> Model -> Cmd Msg
 deleteDesign designid model =
-  let
-    url = model.backend ++ "/delete/" ++ (idStr designid)
-  in
-    Http.send DeleteADesign (post url Http.emptyBody decodeDesignId)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/delete/" ++ (idStr designid)
+    , body = Http.emptyBody
+    , expect = Http.expectJson DeleteADesign decodeDesignId
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeDesignId : JD.Decoder DesignID
 decodeDesignId = 
@@ -1841,14 +1890,27 @@ loginUser model =
       , if model.loginform.remember then "1" else "0"
       ]
   in
-    Http.send NewUser (post url Http.emptyBody decodeUser)
+    maybeRiskyRequest model.backend
+      { method = "POST"
+      , headers = []
+      , url = url
+      , body = Http.emptyBody
+      , expect = Http.expectJson NewUser decodeUser
+      , timeout = Nothing
+      , tracker = Nothing
+      }
 
 loginSession : String -> Cmd Msg
 loginSession backend =
-  let
-    url = backend ++ "/userinfo"
-  in
-    Http.send SessionUser (get url decodeUser)
+  maybeRiskyRequest backend
+    { method = "GET"
+    , headers = []
+    , url = backend ++ "/userinfo"
+    , body = Http.emptyBody
+    , expect = Http.expectJson SessionUser decodeUser
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeUser : JD.Decoder User.User
 decodeUser =
@@ -1856,10 +1918,15 @@ decodeUser =
 
 logoutUser : Model -> Cmd Msg
 logoutUser model = 
-  let
-    url = model.backend ++ "/logout"
-  in
-    Http.send LogoutUser (post url Http.emptyBody decodeUserLogout)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/logout"
+    , body = Http.emptyBody
+    , expect = Http.expectJson LogoutUser decodeUserLogout
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeUserLogout : JD.Decoder Bool
 decodeUserLogout =
@@ -1867,10 +1934,15 @@ decodeUserLogout =
 
 getCfdg : DesignID -> Model -> Cmd Msg
 getCfdg id model =
-  let
-    url = model.backend ++ "/data/cfdg/" ++ (idStr id)
-  in
-    Http.send (ReceiveCfdg id) (Http.getString url)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/data/cfdg/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectString <| ReceiveCfdg id
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 getCfdgfromDesign : Model -> Design.DisplayDesign -> Cmd Msg
 getCfdgfromDesign model ddesign =
@@ -1878,10 +1950,15 @@ getCfdgfromDesign model ddesign =
 
 getInfo : DesignID -> Model -> Cmd Msg
 getInfo id model =
-  let
-    url = model.backend ++ "/auxinfo/" ++ (idStr id)
-  in
-    Http.send (ReceiveInfo id) (get url decodeInfo)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/auxinfo/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson (ReceiveInfo id) decodeInfo
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeInfo : JD.Decoder DesignInfo
 decodeInfo =
@@ -1892,10 +1969,15 @@ decodeInfo =
 
 getComments : DesignID -> Model -> Cmd Msg
 getComments id model =
-  let
-    url = model.backend ++ "/comments/" ++ (idStr id)
-  in
-    Http.send NewComments (get url decodeComments)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/comments/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson NewComments decodeComments
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeComments : JD.Decoder CommentList
 decodeComments =
@@ -1912,7 +1994,15 @@ getTitle model title =
       else
         model.backend ++ "/titleindex/" ++ (Url.percentEncode title)
   in
-    Http.send GotTitleIndex (get url decodeTitleIndex)
+    maybeRiskyRequest model.backend
+      { method = "GET"
+      , headers = []
+      , url = url
+      , body = Http.emptyBody
+      , expect = Http.expectJson GotTitleIndex decodeTitleIndex
+      , timeout = Nothing
+      , tracker = Nothing
+      }
 
 decodeTitleIndex : JD.Decoder Int
 decodeTitleIndex = 
@@ -1920,10 +2010,15 @@ decodeTitleIndex =
 
 getTags : Model -> Cmd Msg
 getTags model = 
-  let
-    url = model.backend ++ "/tags"
-  in
-    Http.send GotTags (get url decodeTags)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/tags"
+    , body = Http.emptyBody
+    , expect = Http.expectJson GotTags decodeTags
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 decodeTags : JD.Decoder (List TagInfo)
 decodeTags =
@@ -1942,7 +2037,15 @@ getUsers query start count model =
     url = String.join "/" [model.backend, query, 
                            String.fromInt(start), String.fromInt(count)]
   in
-    Http.send NewUsers (get url decodeUsers)
+    maybeRiskyRequest model.backend
+      { method = "GET"
+      , headers = []
+      , url = url
+      , body = Http.emptyBody
+      , expect = Http.expectJson NewUsers decodeUsers
+      , timeout = Nothing
+      , tracker = Nothing
+      }
 
 decodeUsers : JD.Decoder UserList
 decodeUsers =
@@ -1955,17 +2058,27 @@ decodeUsers =
 
 translateDesign : DesignID -> Model -> Cmd Msg
 translateDesign id model =
-  let
-    url = model.backend ++ "/translate/" ++ (idStr id)
-  in
-    Http.send NewCfdg3 (get url decodeCfdg3)
+  maybeRiskyRequest model.backend
+    { method = "GET"
+    , headers = []
+    , url = model.backend ++ "/translate/" ++ (idStr id)
+    , body = Http.emptyBody
+    , expect = Http.expectJson NewCfdg3 decodeCfdg3
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 translateText : Model -> Cmd Msg
 translateText model =
-  let
-    url = model.backend ++ "/translate"
-  in
-    Http.send NewCfdg3 (post url (Http.stringBody "text/plain" model.cfdg2text) decodeCfdg3)
+  maybeRiskyRequest model.backend
+    { method = "POST"
+    , headers = []
+    , url = model.backend ++ "/translate"
+    , body = Http.stringBody "text/plain" model.cfdg2text
+    , expect = Http.expectJson NewCfdg3 decodeCfdg3
+    , timeout = Nothing
+    , tracker = Nothing
+    }
 
 
 decodeCfdg3 : JD.Decoder Cfdg3Info
@@ -1983,16 +2096,12 @@ decodeCfdg3 =
 subscriptions : Model -> Sub Msg
 subscriptions model = 
   Sub.batch 
-  (
+  ( scrolledToElement TryScroll ::
     if model.viewMode == Designs && model.designList.nextlink /= "" then
       [ Time.every 250.0 TickTock
       , isVisible IsVisible
       ]
     else
       []
-    ++
-    [ fileContentRead FileRead
-    , scrolledToElement TryScroll
-    ]
   )
   
