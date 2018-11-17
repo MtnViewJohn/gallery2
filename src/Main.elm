@@ -1130,7 +1130,7 @@ update msg model =
     GetCFAWidth widthResult ->
       let
         num = case widthResult of
-          Ok elem -> Basics.clamp 1 8 ((floor elem.scene.width) // 295) 
+          Ok elem -> Basics.clamp 1 8 ((floor elem.element.width) // 295) 
           Err _ -> 5
       in
         ( model
