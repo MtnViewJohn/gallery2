@@ -1217,7 +1217,7 @@ makePNlink type_ count url =
 makeUpBar : Bool -> DesignList -> Html Msg
 makeUpBar pending dlist =
   if pending && Array.length dlist.designs > 0 then
-    div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]
+    div [class "khomut"] [img [src "graphics/loading.gif?2", alt "No designs", width 64, height 64] []]
   else
     if String.isEmpty dlist.prevlink then
       text ""
@@ -1234,7 +1234,7 @@ makeUpBar pending dlist =
 makeDownBar : Bool -> DesignList -> Html Msg
 makeDownBar pending dlist =
   if pending then
-    div [class "khomut"] [img [src "graphics/loading.gif", alt "No designs", width 216, height 216] []]
+    div [class "khomut"] [img [src "graphics/loading.gif?2", alt "No designs", width 64, height 64] []]
   else
     if String.isEmpty dlist.nextlink then
       div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 200, height 64] []]
