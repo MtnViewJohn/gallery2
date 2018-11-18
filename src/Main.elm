@@ -1208,8 +1208,13 @@ makeUpBar pending dlist =
       text ""
     else
       div [class "khomut"]
-      [ a [href "#", onNav <| LoadDesigns dlist.prevlink] 
-          [img [src "graphics/more_up.png", alt "More designs", width 64, height 64] []]]
+      [ img
+        [ src "graphics/more_up.png"
+        , onClick <| LoadDesigns dlist.prevlink
+        , alt "More designs"
+        , width 64
+        , height 64
+        ] []]
 
 makeDownBar : Bool -> DesignList -> Html Msg
 makeDownBar pending dlist =
@@ -1220,8 +1225,14 @@ makeDownBar pending dlist =
       div [class "khomut"] [img [src "graphics/khomut.png", alt "No designs", width 200, height 64] []]
     else
       div [class "khomut"]
-      [ a [href "#", onNav <| LoadDesigns dlist.nextlink] 
-          [img [src "graphics/more_down.png", alt "More designs", width 64, height 64, id "moreplease"] []]]
+      [ img
+        [ src "graphics/more_down.png"
+        , onClick <| LoadDesigns dlist.nextlink
+        , alt "More designs"
+        , width 64
+        , height 64
+        , id "moreplease"
+        ] []]
 
 
 makeHeader : String -> Html Msg
