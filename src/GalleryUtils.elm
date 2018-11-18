@@ -220,4 +220,4 @@ makeTab tab =
 makeTabs : List TabInfo -> Html msg
 makeTabs tabs =
   div [class "tabtable"]
-    ( (List.map makeTab <| addInter tabs) ++ [ div [class "tabclear"] []] )
+    (List.map makeTab <| addInter tabs)
