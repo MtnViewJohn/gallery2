@@ -1330,7 +1330,7 @@ viewUsers model =
   if List.isEmpty model.userList.users then
     [ text "Nothing to show" ]
   else
-  [ div [class "clearleft"] 
+  [ div []
     [ makePNlink "Previous" model.userList.count model.userList.prevlink
     , text " "
     , makePNlink "Next" model.userList.count model.userList.nextlink
@@ -1356,7 +1356,7 @@ viewUsers model =
     ++
       List.map viewMiniUser model.userList.users
     )
-  , div [class "clearleft"] 
+  , div []
     [ makePNlink "Previous" model.userList.count model.userList.prevlink
     , text " "
     , makePNlink "Next" model.userList.count model.userList.nextlink
@@ -1414,8 +1414,6 @@ view model =
   { title = model.title
   , body =
     [ div [ id "CFAheader" ] [ p [] [text "Context Free"] ]
-    , div [ id "CFAtitle" ]
-      [ h1 [id "titlenode"] [text model.title]]
     , div [ id "CFAnavbar" ]
       [ ul []
         [ li [] [a [href "../index.html"] [text "Home"]]
@@ -1425,6 +1423,8 @@ view model =
         , li [] [a [href "../phpbb/index.php"] [text "Forums"]]
         ]
       ]
+    , div [ id "CFAtitle" ]
+      [ h1 [id "titlenode"] [text model.title]]
     , div [ id "CFAcolumn" ]
       [ h5 [] [ text "Gallery Tools:" ]
       , ul []
