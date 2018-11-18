@@ -316,6 +316,13 @@ router =
 
 -- UPDATE
 
+type HttpError18
+  = BadUrl String
+  | Timeout
+  | NetworkError
+  | BadStatus Int String
+  | BadPayload String Int String
+
 type Msg
   = LogoutClick
   | CCcheck Bool
@@ -350,8 +357,8 @@ type Msg
   | NewUsers (Result Http.Error UserList)
   | NewFaves (Result Http.Error FaveInfo)
   | DeleteADesign (Result Http.Error DesignID)
-  | UploadResponse (Result Http.Error DesignTags)
-  | NewCfdg3 (Result Http.Error Cfdg3Info)
+  | UploadResponse (Result HttpError18 DesignTags)
+  | NewCfdg3 (Result HttpError18 Cfdg3Info)
   | DesignStatusUpdated (Result Http.Error Bool)
   | NewMiniList String (Result Http.Error (List Design.DisplayDesign))
   | ReceiveUnseen (Result Http.Error Int)
@@ -389,21 +396,29 @@ scrollToDesign id =
   else
     scrollToElement <| "design" ++ (idStr id)
 
-errorModel : Http.Error -> String -> Model -> Model
+errorModel : HttpError18 -> String -> Model -> Model
 errorModel error context model =
   let
     msg = case error of
-      --Http.BadStatus resp -> 
-      --  let
-      --    i = String.indices "</h1>" resp.body
-      --  in case List.head i of
-      --    Nothing -> resp.body
-      --    Just found -> "<h3>" ++ context ++ " issue:</h3>" ++ (String.dropLeft (found + 5) resp.body)
-      Http.BadStatus stat -> "Status: " ++ (String.fromInt stat)  -- TODO: get response body
-      Http.BadBody _ -> "Unexpected response."
+      BadStatus _ body -> 
+        let
+          i = String.indices "<p>" body
+          j = String.indices "</p>" body
+        in case (List.head i, List.head j) of
+          (Just start, Just end) ->
+            context ++ " issue: " ++ (String.slice (start + 3) end body)
+          _ -> body
+      BadPayload jmsg code body -> 
+        "Unexpected response."
       _ -> "Communication error."
+    httpError = case error of
+      BadUrl url -> Http.BadUrl url
+      Timeout -> Http.Timeout
+      NetworkError -> Http.NetworkError
+      BadStatus code _ -> Http.BadStatus code
+      BadPayload jmsg _ _ -> Http.BadBody jmsg
   in
-    {model | errorInfo = Err error, errorMessage = msg}
+    {model | errorInfo = Err httpError, errorMessage = msg}
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -1519,8 +1534,7 @@ view model =
                 , if model.errorMessage == "" then
                     text ""
                   else
-                    div [ property "innerHTML" (JE.string model.errorMessage)
-                        , class "alertbox"] []
+                    div [class "alertbox"] [text model.errorMessage]
                 ]
           EditingTags ->
             case model.editDesign of
@@ -1530,8 +1544,7 @@ view model =
                 , if model.errorMessage == "" then
                     text ""
                   else
-                    div [ property "innerHTML" (JE.string model.errorMessage)
-                        , class "alertbox"] []
+                    div [class "alertbox"] [text model.errorMessage]
                 ]
           Designs ->
             viewDesigns model
@@ -1554,8 +1567,7 @@ view model =
             [ if model.errorMessage == "" then
                     text ""
                   else
-                    div [ property "innerHTML" (JE.string model.errorMessage)
-                        , class "alertbox"] []
+                    div [class "alertbox"] [text model.errorMessage]
             , h1 [] [text "Cfdg text translated from v2 syntax to v3:"]
             , textarea 
               [ id "cfdg3txt"
@@ -1659,6 +1671,23 @@ maybeRiskyRequest backend =
     Http.riskyRequest
   else
     Http.request
+
+
+myExpectJson : (Result HttpError18 a -> msg) -> JD.Decoder a -> Http.Expect msg
+myExpectJson toMsg decoder =
+  Http.expectStringResponse toMsg <|
+    \response ->
+      case response of
+        Http.BadUrl_ url          -> Err (BadUrl url)
+        Http.Timeout_             -> Err Timeout
+        Http.NetworkError_        -> Err NetworkError
+        Http.BadStatus_ meta body -> Err (BadStatus meta.statusCode body)
+        Http.GoodStatus_ _ body   ->
+          case JD.decodeString decoder body of
+            Ok value ->
+              Ok value
+            Err err ->
+              Err (BadPayload (JD.errorToString err) 500 body)
 
 resolveAction : Maybe Action -> Model -> Cmd Msg
 resolveAction ma model =
@@ -1814,7 +1843,7 @@ uploadDesign edesign model =
     , headers = []
     , url = model.backend ++ "/fpostdesign"
     , body = Http.multipartBody <| Design.encodeDesign edesign
-    , expect = Http.expectJson UploadResponse decodeDesignTag
+    , expect = myExpectJson UploadResponse decodeDesignTag
     , timeout = Nothing
     , tracker = Nothing
     }
@@ -1826,7 +1855,7 @@ uploadDesignTags edesign model =
     , headers = []
     , url = model.backend ++ "/fpostdesigntags"
     , body = Http.multipartBody <| Design.encodeDesign edesign
-    , expect = Http.expectJson UploadResponse decodeDesignTag
+    , expect = myExpectJson UploadResponse decodeDesignTag
     , timeout = Nothing
     , tracker = Nothing
     }
@@ -2079,7 +2108,7 @@ translateDesign id model =
     , headers = []
     , url = model.backend ++ "/translate/" ++ (idStr id)
     , body = Http.emptyBody
-    , expect = Http.expectJson NewCfdg3 decodeCfdg3
+    , expect = myExpectJson NewCfdg3 decodeCfdg3
     , timeout = Nothing
     , tracker = Nothing
     }
@@ -2091,7 +2120,7 @@ translateText model =
     , headers = []
     , url = model.backend ++ "/translate"
     , body = Http.stringBody "text/plain" model.cfdg2text
-    , expect = Http.expectJson NewCfdg3 decodeCfdg3
+    , expect = myExpectJson NewCfdg3 decodeCfdg3
     , timeout = Nothing
     , tracker = Nothing
     }
