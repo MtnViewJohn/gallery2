@@ -735,7 +735,12 @@ update msg model =
                 else
                   ({model_ | commentToDelete = commentid}, Cmd.none)
               Just (CloseDesign) ->
-                ({model_ | mainDesign = nonDesign, showFans = False}, Nav.back model_.key 1)
+                ( {model_ | mainDesign = nonDesign, showFans = False}
+                , Cmd.batch
+                  [ Nav.back model_.key 1
+                  , scrollToDesign model_.mainDesign
+                  ]
+                )
               Just (CancelEditAct) -> case model_.editDesign of
                 Nothing ->
                   ({model_ | mainDesign = nonDesign}, Nav.back model_.key 1)
