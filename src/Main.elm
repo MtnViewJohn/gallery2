@@ -1764,7 +1764,7 @@ decodeFaves =
 sendComment : CommentID -> String -> Model -> Cmd Msg
 sendComment commentid comment_ model =
   maybeRiskyRequest model.backend
-    { method = "PUT"
+    { method = "POST"
     , headers = []
     , url = model.backend ++ "/updatecomment/" ++ (cidStr commentid)
     , body = Http.stringBody "text/plain" comment_
@@ -1776,7 +1776,7 @@ sendComment commentid comment_ model =
 newComment : String -> Model -> Cmd Msg
 newComment comment_ model =
   maybeRiskyRequest model.backend
-    { method = "PUT"
+    { method = "POST"
     , headers = []
     , url = model.backend ++ "/createcomment/" ++ (idStr model.mainDesign)
     , body = Http.stringBody "text/plain" comment_
