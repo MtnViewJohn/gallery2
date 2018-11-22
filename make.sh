@@ -5,7 +5,7 @@ set -e
 echo "Compiling..."
 
 mkdir build 2>/dev/null || true
-elm make src/Main.elm --output build/main.js
+elm make --optimize src/Main.elm --output build/main.js
 
 # concat JS together
 # cat assets/*.js build/main-elm.js > build/main.js
@@ -19,12 +19,12 @@ echo "Minifying..."
 
 if $use_java
 then
-  # "$java_exe" -jar "$closure_jar" \
-  # --js build/main.js \
-  # --js_output_file build/main-min.js \
-  # --create_source_map build/main.map \
-  # --jscomp_off uselessCode
-  cp build/main.js build/main-min.js
+  "$java_exe" -jar "$closure_jar" \
+  --js build/main.js \
+  --js_output_file build/main-min.js \
+  --create_source_map build/main.map \
+  --jscomp_off uselessCode
+  # cp build/main.js build/main-min.js
 else
   curl --output build/main-min.js \
     --data output_info=errors \
@@ -32,8 +32,6 @@ else
     --data-urlencode 'js_code@build/main.js' \
     https://closure-compiler.appspot.com/compile
 fi
-
-# cp build/main.js build/main-min.js
 
 echo "Compressing..."
 
