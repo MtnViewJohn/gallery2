@@ -77,7 +77,7 @@ possessive name =
 
 int2Time : Int -> Time.Posix
 int2Time i = 
-  Time.millisToPosix i
+  Time.millisToPosix (i * 1000)
 
 makeDate : Time.Posix -> String
 makeDate udate =

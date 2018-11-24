@@ -716,7 +716,6 @@ viewCC design =
     let
       date = Time.toYear Time.utc design.uploaddate
     in
-        
       text ("Copyright " ++ (String.fromInt date) ++ ", all rights reserved.")
   else
     div [class "ccInfo"]
