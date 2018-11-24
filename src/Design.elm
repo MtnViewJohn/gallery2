@@ -1003,8 +1003,13 @@ view cfg design =
                   editing = List.any Comment.isEditable design.comments
                   user = if editing then Nothing else cfg.currentUser
                   commentcfg = Comment.ViewConfig user cfg.commentToDelete
+                  commentclass =
+                    if cfg.currentUser == Nothing && List.isEmpty design.comments then
+                      "nocomment"
+                    else
+                      "commentsdiv"
                 in
-                  [ div [class "commentsdiv"]
+                  [ div [class commentclass]
                     (List.intersperse (hr [][])
                       (List.map ((Comment.view commentcfg) >> (Html.map (commentMsgId design.design.designid)))
                         ( design.comments
