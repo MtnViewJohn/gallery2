@@ -87,7 +87,7 @@ makeDate udate =
       if day // 10 == 1 then
         "th"
       else
-        case modBy day 10 of
+        case modBy 10 day of
           1 -> "st"
           2 -> "nd"
           3 -> "rd"
