@@ -12,6 +12,7 @@ import Json.Encode as JE
 import Http
 import Browser
 import Browser.Navigation as Nav
+import Browser.Events
 import Url exposing (Url)
 import Url.Parser as Url exposing ((</>), (<?>), s, int, top)
 import Url.Parser.Query as UrlQ
@@ -118,6 +119,7 @@ type alias Model =
   , authorLookup : String
   , designLookup : Int
   , viewMode : ViewMode
+  , windowVisibility : Browser.Events.Visibility
   , mainDesign : DesignID
   , designToDelete : DesignID
   , commentToDelete : CommentID
@@ -156,6 +158,7 @@ initModel backend loc key =
     , authorLookup      = ""
     , designLookup      = 0
     , viewMode          = Designs
+    , windowVisibility  = Browser.Events.Visible
     , mainDesign        = nonDesign
     , designToDelete    = nonDesign
     , commentToDelete   = noComment
@@ -369,6 +372,7 @@ type Msg
   | TranslateFile (List File.File)
   | TickTock Posix
   | IsVisible String
+  | WindowVisible Browser.Events.Visibility
 
 
 updateDesigns : String -> Model -> String -> Int -> Int -> (Model, Cmd Msg)
@@ -1176,6 +1180,7 @@ update msg model =
     TranslateText -> ({model | cfdg3text = "", errorMessage = ""}, translateText model)
     TickTock _ -> (model, checkVisible "moreplease")
     IsVisible _ -> (model, Nav.replaceUrl model.key ("#" ++ model.designList.nextlink))
+    WindowVisible vis -> ({model | windowVisibility = vis}, Cmd.none)
 
 makeQuery : Model -> String
 makeQuery model =
@@ -2142,7 +2147,9 @@ subscriptions : Model -> Sub Msg
 subscriptions model = 
   Sub.batch 
   ( scrolledToElement TryScroll ::
-    if model.viewMode == Designs && model.designList.nextlink /= "" then
+    if model.viewMode == Designs && 
+       model.designList.nextlink /= ""  && 
+       model.windowVisibility == Browser.Events.Visible then
       [ Time.every 250.0 TickTock
       , isVisible IsVisible
       ]
