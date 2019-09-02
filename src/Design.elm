@@ -512,7 +512,11 @@ validateCfdg edesign = case edesign.fileData of
 validateImage : EditDesign -> Bool
 validateImage edesign = case edesign.imageData of
   Nothing -> not (String.isEmpty edesign.design.imagelocation)
-  Just file -> String.endsWith ".png" (String.toLower <| File.name file)
+  Just file -> 
+    let
+      lname = String.toLower <| File.name file
+    in
+      String.endsWith ".png" lname || String.endsWith ".gif" lname
 
 
 -- VIEW
@@ -1168,7 +1172,7 @@ viewEdit tags edesign =
           ]
         ]
       , tr []
-        [ td [] [b [] [text "PNG"], text " file:"]
+        [ td [] [b [] [text "PNG/GIF"], text " file:"]
         , td [] [ input [type_ "file", name "imagefile", id "imagefile"
                 , on "change" (JD.map ImageChange decodeFiles)] []]
         , td 
@@ -1179,7 +1183,7 @@ viewEdit tags edesign =
               else
                 text "Existing image file will be kept."
             else
-              text "PNG file must be chosen."
+              text "PNG/GIF file must be chosen."
           ]
         ]
       , tr [] 
