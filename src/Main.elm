@@ -1,3 +1,5 @@
+module Main exposing (..)
+
 import Html exposing (..)
 import Array exposing (Array)
 import Html.Attributes exposing (..)
@@ -1471,11 +1473,9 @@ view model =
               ]
             , li [] [text " "]
             , li [] [ text "Display size:" ]
-            , fieldset [disabled disable]
-              [ li [] [radio " Small" (SwitchTo Design.Mini)  (model.designMode == Design.Mini)]
-              , li [] [radio " Medium" (SwitchTo Design.Small) (model.designMode == Design.Small)]
-              , li [] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
-              ]
+            , li [disabled disable] [radio " Small" (SwitchTo Design.Mini)  (model.designMode == Design.Mini)]
+            , li [disabled disable] [radio " Medium" (SwitchTo Design.Small) (model.designMode == Design.Small)]
+            , li [disabled disable] [radio " Large" (SwitchTo Design.Medium) (model.designMode == Design.Medium)]
             ])
       , h5 [] [ text "Lookup" ]
       , ul []
